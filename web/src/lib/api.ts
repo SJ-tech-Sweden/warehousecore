@@ -126,3 +126,57 @@ export const jobsApi = {
   getAll: (params?: { status?: string }) => api.get<Job[]>('/jobs', { params }),
   getById: (id: number) => api.get<JobSummary>(`/jobs/${id}`),
 };
+
+export interface Defect {
+  defect_id: number;
+  device_id: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in_progress' | 'repaired' | 'closed';
+  title: string;
+  description: string;
+  reported_at: string;
+  repair_cost?: number;
+  repaired_at?: string;
+  closed_at?: string;
+  product_name?: string;
+}
+
+export interface Inspection {
+  schedule_id: number;
+  device_id?: string;
+  product_id?: number;
+  inspection_type: string;
+  interval_days: number;
+  last_inspection?: string;
+  next_inspection?: string;
+  is_active: boolean;
+  product_name?: string;
+  device_name?: string;
+}
+
+export interface MaintenanceStats {
+  open_defects: number;
+  in_progress_defects: number;
+  repaired_defects: number;
+  overdue_inspections: number;
+  upcoming_inspections: number;
+}
+
+export const maintenanceApi = {
+  getStats: () => api.get<MaintenanceStats>('/maintenance/stats'),
+  getDefects: (params?: { status?: string; severity?: string }) =>
+    api.get<Defect[]>('/defects', { params }),
+  createDefect: (data: {
+    device_id: string;
+    severity: string;
+    title: string;
+    description: string;
+  }) => api.post<{ defect_id: number; message: string }>('/defects', data),
+  updateDefect: (id: number, data: {
+    status?: string;
+    repair_cost?: number;
+    repair_notes?: string;
+  }) => api.put(`/defects/${id}`, data),
+  getInspections: (params?: { status?: string }) =>
+    api.get<Inspection[]>('/maintenance/inspections', { params }),
+};

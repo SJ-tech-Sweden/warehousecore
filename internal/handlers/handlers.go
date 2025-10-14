@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -808,20 +809,301 @@ func GetCaseContents(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, []map[string]string{})
 }
 
+// GetDefects returns defect reports with filters
 func GetDefects(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, []map[string]string{})
+	status := r.URL.Query().Get("status")
+	severity := r.URL.Query().Get("severity")
+	deviceID := r.URL.Query().Get("device_id")
+
+	db := repository.GetDB()
+	query := `
+		SELECT dr.defect_id, dr.device_id, dr.severity, dr.status, dr.title, dr.description,
+		       dr.reported_at, dr.repair_cost, dr.repaired_at, dr.closed_at,
+		       COALESCE(p.name, '') as product_name
+		FROM defect_reports dr
+		LEFT JOIN devices d ON dr.device_id = d.deviceID
+		LEFT JOIN products p ON d.productID = p.productID
+		WHERE 1=1`
+
+	args := []interface{}{}
+	if status != "" {
+		query += " AND dr.status = ?"
+		args = append(args, status)
+	}
+	if severity != "" {
+		query += " AND dr.severity = ?"
+		args = append(args, severity)
+	}
+	if deviceID != "" {
+		query += " AND dr.device_id = ?"
+		args = append(args, deviceID)
+	}
+
+	query += " ORDER BY dr.reported_at DESC LIMIT 100"
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		log.Printf("Error getting defects: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type DefectResponse struct {
+		DefectID    int64   `json:"defect_id"`
+		DeviceID    string  `json:"device_id"`
+		Severity    string  `json:"severity"`
+		Status      string  `json:"status"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		ReportedAt  string  `json:"reported_at"`
+		RepairCost  *float64 `json:"repair_cost,omitempty"`
+		RepairedAt  *string `json:"repaired_at,omitempty"`
+		ClosedAt    *string `json:"closed_at,omitempty"`
+		ProductName string  `json:"product_name,omitempty"`
+	}
+
+	defects := []DefectResponse{}
+	for rows.Next() {
+		var d DefectResponse
+		var reportedAt, repairedAt, closedAt sql.NullTime
+		var repairCost sql.NullFloat64
+
+		if err := rows.Scan(&d.DefectID, &d.DeviceID, &d.Severity, &d.Status, &d.Title, &d.Description,
+			&reportedAt, &repairCost, &repairedAt, &closedAt, &d.ProductName); err != nil {
+			log.Printf("Error scanning defect row: %v", err)
+			continue
+		}
+
+		if reportedAt.Valid {
+			d.ReportedAt = reportedAt.Time.Format("2006-01-02T15:04:05Z")
+		}
+		if repairCost.Valid {
+			cost := repairCost.Float64
+			d.RepairCost = &cost
+		}
+		if repairedAt.Valid {
+			repaired := repairedAt.Time.Format("2006-01-02T15:04:05Z")
+			d.RepairedAt = &repaired
+		}
+		if closedAt.Valid {
+			closed := closedAt.Time.Format("2006-01-02T15:04:05Z")
+			d.ClosedAt = &closed
+		}
+
+		defects = append(defects, d)
+	}
+
+	respondJSON(w, http.StatusOK, defects)
 }
 
 func CreateDefect(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusCreated, map[string]string{"message": "Defect created"})
+	var input struct {
+		DeviceID    string  `json:"device_id"`
+		Severity    string  `json:"severity"`
+		Title       string  `json:"title"`
+		Description string  `json:"description"`
+		AssignedTo  *int64  `json:"assigned_to,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		return
+	}
+
+	if input.DeviceID == "" || input.Title == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "device_id and title are required"})
+		return
+	}
+
+	db := repository.GetDB()
+
+	// Set device status to defective
+	_, err := db.Exec(`UPDATE devices SET status = 'defective' WHERE deviceID = ?`, input.DeviceID)
+	if err != nil {
+		log.Printf("Error updating device status: %v", err)
+	}
+
+	// Create defect report
+	result, err := db.Exec(`
+		INSERT INTO defect_reports (device_id, severity, title, description, assigned_to, status)
+		VALUES (?, ?, ?, ?, ?, 'open')
+	`, input.DeviceID, input.Severity, input.Title, input.Description, input.AssignedTo)
+
+	if err != nil {
+		log.Printf("Error creating defect: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	defectID, _ := result.LastInsertId()
+
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"defect_id": defectID,
+		"message":   "Defect report created successfully",
+	})
 }
 
 func UpdateDefect(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"message": "Defect updated"})
+	vars := mux.Vars(r)
+	defectID := vars["id"]
+
+	var input struct {
+		Status      *string  `json:"status,omitempty"`
+		AssignedTo  *int64   `json:"assigned_to,omitempty"`
+		RepairCost  *float64 `json:"repair_cost,omitempty"`
+		RepairNotes *string  `json:"repair_notes,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		return
+	}
+
+	db := repository.GetDB()
+
+	// Build dynamic UPDATE query
+	updates := []string{}
+	args := []interface{}{}
+
+	if input.Status != nil {
+		updates = append(updates, "status = ?")
+		args = append(args, *input.Status)
+
+		// Update timestamps based on status
+		if *input.Status == "repaired" {
+			updates = append(updates, "repaired_at = NOW()")
+		} else if *input.Status == "closed" {
+			updates = append(updates, "closed_at = NOW()")
+		}
+	}
+	if input.AssignedTo != nil {
+		updates = append(updates, "assigned_to = ?")
+		args = append(args, *input.AssignedTo)
+	}
+	if input.RepairCost != nil {
+		updates = append(updates, "repair_cost = ?")
+		args = append(args, *input.RepairCost)
+	}
+	if input.RepairNotes != nil {
+		updates = append(updates, "repair_notes = ?")
+		args = append(args, *input.RepairNotes)
+	}
+
+	if len(updates) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "No fields to update"})
+		return
+	}
+
+	query := "UPDATE defect_reports SET " + strings.Join(updates, ", ") + " WHERE defect_id = ?"
+	args = append(args, defectID)
+
+	_, err := db.Exec(query, args...)
+	if err != nil {
+		log.Printf("Error updating defect: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// If status is repaired or closed, update device status
+	if input.Status != nil && (*input.Status == "repaired" || *input.Status == "closed") {
+		var deviceID string
+		db.QueryRow(`SELECT device_id FROM defect_reports WHERE defect_id = ?`, defectID).Scan(&deviceID)
+		if deviceID != "" {
+			db.Exec(`UPDATE devices SET status = 'in_storage' WHERE deviceID = ?`, deviceID)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Defect updated successfully"})
 }
 
 func GetInspections(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, []map[string]string{})
+	status := r.URL.Query().Get("status") // upcoming, overdue, all
+	deviceID := r.URL.Query().Get("device_id")
+
+	db := repository.GetDB()
+	query := `
+		SELECT i.schedule_id, i.device_id, i.product_id, i.inspection_type,
+		       i.interval_days, i.last_inspection, i.next_inspection, i.is_active,
+		       COALESCE(p.name, '') as product_name,
+		       COALESCE(d.deviceID, '') as device_name
+		FROM inspection_schedules i
+		LEFT JOIN products p ON i.product_id = p.productID
+		LEFT JOIN devices d ON i.device_id = d.deviceID
+		WHERE 1=1`
+
+	args := []interface{}{}
+
+	if status == "upcoming" {
+		query += " AND i.next_inspection >= NOW() AND i.next_inspection <= DATE_ADD(NOW(), INTERVAL 30 DAY) AND i.is_active = 1"
+	} else if status == "overdue" {
+		query += " AND i.next_inspection < NOW() AND i.is_active = 1"
+	} else if status == "active" {
+		query += " AND i.is_active = 1"
+	}
+
+	if deviceID != "" {
+		query += " AND i.device_id = ?"
+		args = append(args, deviceID)
+	}
+
+	query += " ORDER BY i.next_inspection ASC LIMIT 100"
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		log.Printf("Error getting inspections: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type InspectionResponse struct {
+		ScheduleID      int64   `json:"schedule_id"`
+		DeviceID        *string `json:"device_id,omitempty"`
+		ProductID       *int64  `json:"product_id,omitempty"`
+		InspectionType  string  `json:"inspection_type"`
+		IntervalDays    int     `json:"interval_days"`
+		LastInspection  *string `json:"last_inspection,omitempty"`
+		NextInspection  *string `json:"next_inspection,omitempty"`
+		IsActive        bool    `json:"is_active"`
+		ProductName     string  `json:"product_name,omitempty"`
+		DeviceName      string  `json:"device_name,omitempty"`
+	}
+
+	inspections := []InspectionResponse{}
+	for rows.Next() {
+		var i InspectionResponse
+		var deviceID sql.NullString
+		var lastInspection, nextInspection sql.NullTime
+		var prodID sql.NullInt64
+
+		if err := rows.Scan(&i.ScheduleID, &deviceID, &prodID, &i.InspectionType,
+			&i.IntervalDays, &lastInspection, &nextInspection, &i.IsActive,
+			&i.ProductName, &i.DeviceName); err != nil {
+			log.Printf("Error scanning inspection row: %v", err)
+			continue
+		}
+
+		if deviceID.Valid {
+			i.DeviceID = &deviceID.String
+		}
+		if prodID.Valid {
+			pid := prodID.Int64
+			i.ProductID = &pid
+		}
+		if lastInspection.Valid {
+			last := lastInspection.Time.Format("2006-01-02T15:04:05Z")
+			i.LastInspection = &last
+		}
+		if nextInspection.Valid {
+			next := nextInspection.Time.Format("2006-01-02T15:04:05Z")
+			i.NextInspection = &next
+		}
+
+		inspections = append(inspections, i)
+	}
+
+	respondJSON(w, http.StatusOK, inspections)
 }
 
 func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
@@ -860,4 +1142,26 @@ func parseInt(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return val
+}
+
+// GetMaintenanceStats returns maintenance dashboard statistics  
+func GetMaintenanceStats(w http.ResponseWriter, r *http.Request) {
+	db := repository.GetDB()
+
+	var openDefects, inProgressDefects, repairedDefects int
+	var overdueInspections, upcomingInspections int
+
+	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'open'`).Scan(&openDefects)
+	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'in_progress'`).Scan(&inProgressDefects)
+	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'repaired'`).Scan(&repairedDefects)
+	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection < NOW() AND is_active = 1`).Scan(&overdueInspections)
+	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection >= NOW() AND next_inspection <= DATE_ADD(NOW(), INTERVAL 30 DAY) AND is_active = 1`).Scan(&upcomingInspections)
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"open_defects":        openDefects,
+		"in_progress_defects": inProgressDefects,
+		"repaired_defects":    repairedDefects,
+		"overdue_inspections": overdueInspections,
+		"upcoming_inspections": upcomingInspections,
+	})
 }

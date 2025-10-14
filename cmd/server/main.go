@@ -89,6 +89,7 @@ func main() {
 	api.HandleFunc("/defects", handlers.CreateDefect).Methods("POST")
 	api.HandleFunc("/defects/{id}", handlers.UpdateDefect).Methods("PUT")
 	api.HandleFunc("/maintenance/inspections", handlers.GetInspections).Methods("GET")
+	api.HandleFunc("/maintenance/stats", handlers.GetMaintenanceStats).Methods("GET")
 
 	// Dashboard/stats
 	api.HandleFunc("/dashboard/stats", handlers.GetDashboardStats).Methods("GET")

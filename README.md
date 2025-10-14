@@ -250,10 +250,11 @@ curl http://localhost:8081/api/v1/health
 - `GET /cases/{id}/contents` - Get case contents
 
 #### Maintenance
-- `GET /defects` - List defect reports
+- `GET /defects` - List defect reports (filters: status, severity, device_id)
 - `POST /defects` - Create defect report
-- `PUT /defects/{id}` - Update defect report
-- `GET /maintenance/inspections` - Get inspection schedules
+- `PUT /defects/{id}` - Update defect status, costs, notes
+- `GET /maintenance/inspections` - Get inspection schedules (filters: upcoming, overdue, all)
+- `GET /maintenance/stats` - Get maintenance dashboard statistics
 
 #### Dashboard
 - `GET /dashboard/stats` - Get warehouse statistics
@@ -365,7 +366,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.14` - Job-based outtake workflow with live scan tracking (current)
+- `1.15` - Complete maintenance module with defect tracking and inspections (current)
+- `1.14` - Job-based outtake workflow with live scan tracking
 - `1.13` - Recursive device count for parent zones
 - `1.12` - Two-step intake workflow with zone barcode scanning
 - `1.11` - Fixed SPA routing for page reloads
@@ -426,13 +428,88 @@ For issues or questions:
 
 ---
 
-**Version:** 1.14
+**Version:** 1.15
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.15 (2025-10-14)
+- **Feature: Complete Maintenance Module Implementation**
+  - Full defect tracking and repair management system
+  - Inspection scheduling and monitoring
+  - Comprehensive maintenance dashboard with real-time statistics
+- **Defect Management:**
+  - Create defect reports with severity levels (low, medium, high, critical)
+  - Status workflow: open → in_progress → repaired → closed
+  - Automatic device status updates when defects are created/resolved
+  - Inline defect creation form with device ID, severity, title, description
+  - Filter defects by status: All, Open, In Progress, Repaired, Closed
+  - Color-coded severity badges (critical=red, high=orange, medium=yellow, low=blue)
+  - Track repair costs and repair notes
+  - Automatic timestamp management (reported_at, repaired_at, closed_at)
+  - Status update buttons for workflow progression
+- **Inspection Management:**
+  - View all inspection schedules with filtering
+  - Filter by: All, Overdue, Upcoming (next 30 days)
+  - Visual indicators for overdue inspections (red border, "ÜBERFÄLLIG" badge)
+  - Display inspection type, interval days, last/next inspection dates
+  - Support for both device-specific and product-wide inspections
+  - Active/inactive inspection status
+- **Maintenance Dashboard:**
+  - Overview tab with 5 real-time statistics cards
+  - Shows: Open defects, In Progress defects, Repaired defects, Overdue inspections, Upcoming inspections
+  - Quick action cards to navigate to defects or inspections
+  - Auto-refresh data on view changes
+- **Backend API:**
+  - `GET /defects` - List defects with filters (status, severity, device_id)
+  - `POST /defects` - Create new defect report
+  - `PUT /defects/{id}` - Update defect status, costs, notes
+  - `GET /maintenance/inspections` - Get inspection schedules (filters: upcoming, overdue, all)
+  - `GET /maintenance/stats` - Dashboard statistics
+  - Dynamic SQL query building for flexible filtering
+  - JOIN queries with devices and products tables for rich data
+- **Frontend Features:**
+  - New MaintenancePage with three-tab interface (Overview, Defects, Inspections)
+  - Real-time data loading with automatic updates
+  - Responsive card-based layout with glassmorphism design
+  - Color-coded status and severity indicators
+  - Inline forms for quick defect creation
+  - Status progression buttons for efficient workflow
+  - Clock icons with color coding (red=overdue, blue=upcoming)
+- **API Types:**
+  - New TypeScript interfaces: Defect, Inspection, MaintenanceStats
+  - Added maintenanceApi with getStats(), getDefects(), createDefect(), updateDefect(), getInspections()
+- **Navigation:**
+  - New "Wartung" (Maintenance) menu item with Wrench icon
+  - Route: /maintenance
+- **Database Integration:**
+  - Uses existing tables: defect_reports, inspection_schedules
+  - Bi-directional device status updates (defective ↔ in_storage)
+  - Full audit trail with timestamps
+- **User Workflow:**
+  - Defect Reporting:
+    1. Navigate to Wartung → Defects tab
+    2. Click "Neuer Defekt" to create report
+    3. Enter device ID, select severity, add title and description
+    4. Submit → Device automatically marked as defective
+    5. Track repair progress with status updates
+    6. Mark as repaired → Device automatically returns to in_storage
+  - Inspection Management:
+    1. Navigate to Wartung → Inspections tab
+    2. View all scheduled inspections
+    3. Filter by overdue or upcoming
+    4. See visual indicators for priority
+    5. Track last and next inspection dates
+- **Use Cases:**
+  - Track equipment defects from discovery through repair completion
+  - Monitor repair costs and maintenance budgets
+  - Ensure timely inspections with overdue alerts
+  - Maintain compliance with inspection schedules
+  - Full visibility into equipment condition and maintenance needs
+  - Historical tracking of all repairs and defects
 
 ### Version 1.14 (2025-10-14)
 - **Feature: Job-Based Outtake Workflow with Live Scan Tracking**
