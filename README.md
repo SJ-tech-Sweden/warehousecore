@@ -365,7 +365,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.5` - Clean JSON API responses (current)
+- `1.6` - Hierarchical zones with auto code generation (current)
+- `1.5` - Clean JSON API responses
 - `1.4` - Zone creation fix
 - `1.3` - Multi-platform API URL support
 - `1.2` - Frontend enhancements
@@ -417,13 +418,28 @@ For issues or questions:
 
 ---
 
-**Version:** 1.5
+**Version:** 1.6
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.6 (2025-10-14)
+- **Automatic Zone Code Generation:** Smart, hierarchical code generation (e.g., WDB → WDB-RG-01 → WDB-RG-01-F-01)
+- **Hierarchical Zone System:** Create nested zones (Lager → Regal → Fach)
+- **Zone Detail View:** Click zones to see subzones, devices, and breadcrumb navigation
+- **ZoneService:** New service layer for zone business logic
+- **API Enhancements:**
+  - `GET /zones/{id}` returns full details with subzones and breadcrumb
+  - `GET /zones/{id}/devices` lists all devices in a zone
+  - Optional `code` field in zone creation (auto-generated if not provided)
+- **Frontend Improvements:**
+  - New ZoneDetailPage component with subzone navigation
+  - Parent zone selection in zone creation form
+  - Breadcrumb navigation for zone hierarchy
+  - Click-to-navigate zone cards
 
 ### Version 1.5 (2025-10-14)
 - Fixed JSON API responses to return clean primitive types

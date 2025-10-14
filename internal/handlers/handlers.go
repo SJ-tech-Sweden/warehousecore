@@ -279,11 +279,11 @@ func GetZones(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, zones)
 }
 
-// CreateZone creates a new zone
+// CreateZone creates a new zone with automatic code generation
 func CreateZone(w http.ResponseWriter, r *http.Request) {
 	// Input struct for API requests
 	var input struct {
-		Code         string  `json:"code"`
+		Code         *string `json:"code"` // Optional - will be auto-generated if not provided
 		Name         string  `json:"name"`
 		Type         string  `json:"type"`
 		Description  *string `json:"description"`
@@ -296,6 +296,22 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Zone creation error - JSON decode: %v", err)
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request: " + err.Error()})
 		return
+	}
+
+	// Auto-generate code if not provided
+	var zoneCode string
+	if input.Code != nil && *input.Code != "" {
+		zoneCode = *input.Code
+	} else {
+		zoneService := services.NewZoneService()
+		generatedCode, err := zoneService.GenerateZoneCode(input.Name, input.Type, input.ParentZoneID)
+		if err != nil {
+			log.Printf("Zone code generation error: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to generate zone code"})
+			return
+		}
+		zoneCode = generatedCode
+		log.Printf("Auto-generated zone code: %s for zone: %s", zoneCode, input.Name)
 	}
 
 	db := repository.GetDB()
@@ -321,7 +337,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 	result, err := db.Exec(`
 		INSERT INTO storage_zones (code, name, type, description, parent_zone_id, capacity, is_active)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, input.Code, input.Name, input.Type, description, parentZoneID, capacity, input.IsActive)
+	`, zoneCode, input.Name, input.Type, description, parentZoneID, capacity, input.IsActive)
 	if err != nil {
 		log.Printf("Zone creation error - SQL insert: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -344,7 +360,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 
 	zone := ZoneResponse{
 		ZoneID:       id,
-		Code:         input.Code,
+		Code:         zoneCode,
 		Name:         input.Name,
 		Type:         input.Type,
 		Description:  input.Description,
@@ -353,63 +369,93 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 		IsActive:     input.IsActive,
 	}
 
-	log.Printf("Zone created successfully: %s (ID: %d)", input.Name, id)
+	log.Printf("Zone created successfully: %s (Code: %s, ID: %d)", input.Name, zoneCode, id)
 	respondJSON(w, http.StatusCreated, zone)
 }
 
-// GetZone returns a single zone
+// GetZone returns a single zone with details (subzones, devices, breadcrumb)
 func GetZone(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id := vars["id"]
+	idStr := vars["id"]
 
-	db := repository.GetDB()
-	var z models.Zone
-	err := db.QueryRow(`
-		SELECT zone_id, code, name, type, description, parent_zone_id, capacity, is_active
-		FROM storage_zones
-		WHERE zone_id = ?
-	`, id).Scan(&z.ZoneID, &z.Code, &z.Name, &z.Type, &z.Description, &z.ParentZoneID, &z.Capacity, &z.IsActive)
+	zoneID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid zone ID"})
+		return
+	}
 
-	if err == sql.ErrNoRows {
+	zoneService := services.NewZoneService()
+	details, err := zoneService.GetZoneDetails(zoneID)
+	if err != nil {
+		log.Printf("Error getting zone details: %v", err)
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Zone not found"})
 		return
 	}
+
+	respondJSON(w, http.StatusOK, details)
+}
+
+// GetZoneDevices returns all devices in a specific zone
+func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	zoneID := vars["id"]
+
+	db := repository.GetDB()
+	rows, err := db.Query(`
+		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code,
+		       COALESCE(p.name, '') as product_name,
+		       COALESCE(p.manufacturer, '') as manufacturer,
+		       COALESCE(p.model, '') as model
+		FROM devices d
+		LEFT JOIN products p ON d.productID = p.productID
+		WHERE d.zone_id = ? AND d.status = 'in_storage'
+		ORDER BY p.name, d.deviceID
+	`, zoneID)
+
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	defer rows.Close()
 
-	// Convert to clean response format
-	type ZoneResponse struct {
-		ZoneID       int64   `json:"zone_id"`
-		Code         string  `json:"code"`
-		Name         string  `json:"name"`
-		Type         string  `json:"type"`
-		Description  *string `json:"description,omitempty"`
-		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
-		Capacity     *int64  `json:"capacity,omitempty"`
-		IsActive     bool    `json:"is_active"`
-	}
-
-	resp := ZoneResponse{
-		ZoneID:   z.ZoneID,
-		Code:     z.Code,
-		Name:     z.Name,
-		Type:     z.Type,
-		IsActive: z.IsActive,
+	type DeviceInZone struct {
+		DeviceID     string  `json:"device_id"`
+		ProductID    *int    `json:"product_id"`
+		ProductName  string  `json:"product_name"`
+		Manufacturer string  `json:"manufacturer,omitempty"`
+		Model        string  `json:"model,omitempty"`
+		Status       string  `json:"status"`
+		Barcode      *string `json:"barcode,omitempty"`
+		QRCode       *string `json:"qr_code,omitempty"`
 	}
 
-	if z.Description.Valid {
-		resp.Description = &z.Description.String
-	}
-	if z.ParentZoneID.Valid {
-		resp.ParentZoneID = &z.ParentZoneID.Int64
-	}
-	if z.Capacity.Valid {
-		resp.Capacity = &z.Capacity.Int64
+	devices := []DeviceInZone{}
+	for rows.Next() {
+		var d DeviceInZone
+		var productID sql.NullInt64
+		var barcode, qrCode sql.NullString
+
+		if err := rows.Scan(&d.DeviceID, &productID, &d.Status, &barcode, &qrCode,
+			&d.ProductName, &d.Manufacturer, &d.Model); err != nil {
+			log.Printf("Error scanning device row: %v", err)
+			continue
+		}
+
+		if productID.Valid {
+			pid := int(productID.Int64)
+			d.ProductID = &pid
+		}
+		if barcode.Valid {
+			d.Barcode = &barcode.String
+		}
+		if qrCode.Valid {
+			d.QRCode = &qrCode.String
+		}
+
+		devices = append(devices, d)
 	}
 
-	respondJSON(w, http.StatusOK, resp)
+	respondJSON(w, http.StatusOK, devices)
 }
 
 // UpdateZone updates a zone
