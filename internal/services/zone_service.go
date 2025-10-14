@@ -163,9 +163,8 @@ func (s *ZoneService) GetZoneDetails(zoneID int64) (map[string]interface{}, erro
 		return nil, err
 	}
 
-	// Get devices in this zone
-	var deviceCount int
-	s.db.QueryRow(`SELECT COUNT(*) FROM devices WHERE zone_id = ? AND status = 'in_storage'`, zoneID).Scan(&deviceCount)
+	// Get devices in this zone AND all subzones (recursive)
+	deviceCount := s.getDeviceCountRecursive(zoneID)
 
 	// Get breadcrumb path
 	breadcrumb, err := s.getBreadcrumb(zoneID)
@@ -201,7 +200,6 @@ func (s *ZoneService) GetZoneDetails(zoneID int64) (map[string]interface{}, erro
 func (s *ZoneService) getSubzones(parentID int64) ([]map[string]interface{}, error) {
 	rows, err := s.db.Query(`
 		SELECT zone_id, code, name, type, capacity,
-		       (SELECT COUNT(*) FROM devices WHERE zone_id = sz.zone_id AND status = 'in_storage') as device_count,
 		       (SELECT COUNT(*) FROM storage_zones WHERE parent_zone_id = sz.zone_id AND is_active = TRUE) as subzone_count
 		FROM storage_zones sz
 		WHERE parent_zone_id = ? AND is_active = TRUE
@@ -216,14 +214,17 @@ func (s *ZoneService) getSubzones(parentID int64) ([]map[string]interface{}, err
 	subzones := []map[string]interface{}{}
 	for rows.Next() {
 		var (
-			zoneID, deviceCount, subzoneCount int64
-			code, name, zoneType              string
-			capacity                          sql.NullInt64
+			zoneID, subzoneCount int64
+			code, name, zoneType string
+			capacity             sql.NullInt64
 		)
 
-		if err := rows.Scan(&zoneID, &code, &name, &zoneType, &capacity, &deviceCount, &subzoneCount); err != nil {
+		if err := rows.Scan(&zoneID, &code, &name, &zoneType, &capacity, &subzoneCount); err != nil {
 			continue
 		}
+
+		// Get device count recursively for this subzone (includes all its subzones)
+		deviceCount := s.getDeviceCountRecursive(zoneID)
 
 		zone := map[string]interface{}{
 			"zone_id":       zoneID,
@@ -278,4 +279,31 @@ func (s *ZoneService) getBreadcrumb(zoneID int64) ([]map[string]interface{}, err
 	}
 
 	return breadcrumb, nil
+}
+
+// getDeviceCountRecursive returns device count including all subzones recursively
+func (s *ZoneService) getDeviceCountRecursive(zoneID int64) int {
+	var count int
+	err := s.db.QueryRow(`
+		WITH RECURSIVE zone_tree AS (
+			-- Start with the given zone
+			SELECT zone_id FROM storage_zones WHERE zone_id = ? AND is_active = TRUE
+			UNION ALL
+			-- Recursively add all child zones
+			SELECT sz.zone_id
+			FROM storage_zones sz
+			INNER JOIN zone_tree zt ON sz.parent_zone_id = zt.zone_id
+			WHERE sz.is_active = TRUE
+		)
+		-- Count devices in the zone and all subzones
+		SELECT COUNT(*)
+		FROM devices d
+		INNER JOIN zone_tree zt ON d.zone_id = zt.zone_id
+		WHERE d.status = 'in_storage'
+	`, zoneID).Scan(&count)
+
+	if err != nil {
+		return 0
+	}
+	return count
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Package, MapPin, ScanLine, Wrench, Menu } from 'lucide-react';
+import { Home, Package, MapPin, ScanLine, Wrench, Menu, Briefcase } from 'lucide-react';
 import { useState } from 'react';
 
 interface LayoutProps {
@@ -16,6 +16,7 @@ export function Layout({ children }: LayoutProps) {
     { path: '/scan', icon: ScanLine, label: 'Scan' },
     { path: '/devices', icon: Package, label: 'Geräte' },
     { path: '/zones', icon: MapPin, label: 'Zonen' },
+    { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/maintenance', icon: Wrench, label: 'Wartung' },
   ];
 

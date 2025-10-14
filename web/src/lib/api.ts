@@ -63,6 +63,39 @@ export interface DashboardStats {
   total: number;
 }
 
+export interface Job {
+  job_id: number;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  status: string;
+  customer_first_name?: string;
+  customer_last_name?: string;
+  device_count: number;
+}
+
+export interface JobDevice {
+  device_id: string;
+  status: string;
+  product_name: string;
+  zone_name?: string;
+  barcode?: string;
+  qr_code?: string;
+  pack_status: string;
+  scanned: boolean;
+}
+
+export interface JobSummary {
+  job_id: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  status: string;
+  customer_first_name?: string;
+  customer_last_name?: string;
+  devices: JobDevice[];
+}
+
 // API Functions
 export const dashboardApi = {
   getStats: () => api.get<DashboardStats>('/dashboard/stats'),
@@ -87,4 +120,9 @@ export const zonesApi = {
 export const scansApi = {
   process: (data: ScanRequest) => api.post<ScanResponse>('/scans', data),
   getHistory: (limit: number = 50) => api.get(`/scans/history`, { params: { limit } }),
+};
+
+export const jobsApi = {
+  getAll: (params?: { status?: string }) => api.get<Job[]>('/jobs', { params }),
+  getById: (id: number) => api.get<JobSummary>(`/jobs/${id}`),
 };

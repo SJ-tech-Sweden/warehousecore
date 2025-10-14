@@ -612,15 +612,184 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, resp)
 }
 
-// Placeholder handlers (simplified versions - to be expanded)
+// GetJobs returns jobs filtered by status
 func GetJobs(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, []map[string]string{})
+	status := r.URL.Query().Get("status")
+
+	db := repository.GetDB()
+	query := `
+		SELECT j.jobID, j.description, j.startDate, j.endDate, s.status,
+		       COALESCE(c.firstName, '') as customer_first_name,
+		       COALESCE(c.lastName, '') as customer_last_name,
+		       COUNT(DISTINCT jd.deviceID) as device_count
+		FROM jobs j
+		LEFT JOIN status s ON j.statusID = s.statusID
+		LEFT JOIN customers c ON j.customerID = c.customerID
+		LEFT JOIN jobdevices jd ON j.jobID = jd.jobID
+		WHERE 1=1`
+
+	args := []interface{}{}
+	if status != "" {
+		query += " AND s.status = ?"
+		args = append(args, status)
+	}
+
+	query += " GROUP BY j.jobID ORDER BY j.startDate ASC"
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		log.Printf("Error getting jobs: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type JobResponse struct {
+		JobID             int     `json:"job_id"`
+		Description       *string `json:"description,omitempty"`
+		StartDate         *string `json:"start_date,omitempty"`
+		EndDate           *string `json:"end_date,omitempty"`
+		Status            string  `json:"status"`
+		CustomerFirstName string  `json:"customer_first_name,omitempty"`
+		CustomerLastName  string  `json:"customer_last_name,omitempty"`
+		DeviceCount       int     `json:"device_count"`
+	}
+
+	jobs := []JobResponse{}
+	for rows.Next() {
+		var j JobResponse
+		var description, startDate, endDate sql.NullString
+
+		if err := rows.Scan(&j.JobID, &description, &startDate, &endDate, &j.Status,
+			&j.CustomerFirstName, &j.CustomerLastName, &j.DeviceCount); err != nil {
+			log.Printf("Error scanning job row: %v", err)
+			continue
+		}
+
+		if description.Valid {
+			j.Description = &description.String
+		}
+		if startDate.Valid {
+			j.StartDate = &startDate.String
+		}
+		if endDate.Valid {
+			j.EndDate = &endDate.String
+		}
+
+		jobs = append(jobs, j)
+	}
+
+	respondJSON(w, http.StatusOK, jobs)
 }
 
 func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
-	respondJSON(w, http.StatusOK, map[string]interface{}{"job_id": jobID, "status": "in_progress"})
+
+	db := repository.GetDB()
+
+	// Get job details
+	var (
+		description, startDate, endDate sql.NullString
+		status                          string
+		customerFirstName, customerLastName string
+	)
+
+	err := db.QueryRow(`
+		SELECT j.description, j.startDate, j.endDate, s.status,
+		       COALESCE(c.firstName, '') as customer_first_name,
+		       COALESCE(c.lastName, '') as customer_last_name
+		FROM jobs j
+		LEFT JOIN status s ON j.statusID = s.statusID
+		LEFT JOIN customers c ON j.customerID = c.customerID
+		WHERE j.jobID = ?
+	`, jobID).Scan(&description, &startDate, &endDate, &status, &customerFirstName, &customerLastName)
+
+	if err == sql.ErrNoRows {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Job not found"})
+		return
+	}
+	if err != nil {
+		log.Printf("Error getting job: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Get devices for this job with their current status
+	rows, err := db.Query(`
+		SELECT jd.deviceID, d.status, d.barcode, d.qr_code,
+		       COALESCE(p.name, '') as product_name,
+		       COALESCE(z.name, '') as zone_name,
+		       jd.pack_status
+		FROM jobdevices jd
+		LEFT JOIN devices d ON jd.deviceID = d.deviceID
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		WHERE jd.jobID = ?
+		ORDER BY p.name, jd.deviceID
+	`, jobID)
+
+	if err != nil {
+		log.Printf("Error getting job devices: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type JobDevice struct {
+		DeviceID    string  `json:"device_id"`
+		Status      string  `json:"status"`
+		ProductName string  `json:"product_name"`
+		ZoneName    string  `json:"zone_name,omitempty"`
+		Barcode     *string `json:"barcode,omitempty"`
+		QRCode      *string `json:"qr_code,omitempty"`
+		PackStatus  string  `json:"pack_status"`
+		Scanned     bool    `json:"scanned"` // true if pack_status is 'issued' or device status is 'on_job'
+	}
+
+	devices := []JobDevice{}
+	for rows.Next() {
+		var jd JobDevice
+		var barcode, qrCode sql.NullString
+
+		if err := rows.Scan(&jd.DeviceID, &jd.Status, &barcode, &qrCode,
+			&jd.ProductName, &jd.ZoneName, &jd.PackStatus); err != nil {
+			log.Printf("Error scanning device row: %v", err)
+			continue
+		}
+
+		if barcode.Valid {
+			jd.Barcode = &barcode.String
+		}
+		if qrCode.Valid {
+			jd.QRCode = &qrCode.String
+		}
+
+		// Mark as scanned if device is on_job or pack_status is issued
+		jd.Scanned = jd.Status == "on_job" || jd.PackStatus == "issued"
+
+		devices = append(devices, jd)
+	}
+
+	response := map[string]interface{}{
+		"job_id":              jobID,
+		"status":              status,
+		"customer_first_name": customerFirstName,
+		"customer_last_name":  customerLastName,
+		"devices":             devices,
+	}
+
+	if description.Valid {
+		response["description"] = description.String
+	}
+	if startDate.Valid {
+		response["start_date"] = startDate.String
+	}
+	if endDate.Valid {
+		response["end_date"] = endDate.String
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 func CompleteJob(w http.ResponseWriter, r *http.Request) {

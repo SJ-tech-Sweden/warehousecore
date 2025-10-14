@@ -365,7 +365,9 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.12` - Two-step intake workflow with zone barcode scanning (current)
+- `1.14` - Job-based outtake workflow with live scan tracking (current)
+- `1.13` - Recursive device count for parent zones
+- `1.12` - Two-step intake workflow with zone barcode scanning
 - `1.11` - Fixed SPA routing for page reloads
 - `1.10` - Fixed zone devices SQL query + subzone delete buttons
 - `1.9` - Fixed race condition in bulk shelf creation
@@ -424,13 +426,79 @@ For issues or questions:
 
 ---
 
-**Version:** 1.12
+**Version:** 1.14
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.14 (2025-10-14)
+- **Feature: Job-Based Outtake Workflow with Live Scan Tracking**
+  - New Jobs page accessible via sidebar navigation (/jobs)
+  - Displays all jobs with status "open" ready for device outtake
+  - Select a job to start the outtake/packing process
+  - Real-time live tracking of which devices have been scanned out
+  - Visual progress bar showing scan completion (e.g., 5/20 devices scanned)
+  - Two-column layout: Scan interface + Device checklist
+  - Auto-refresh every 2 seconds to show live updates as devices are scanned
+  - Device list shows checkmarks (✓) for scanned devices, X for remaining
+  - Color-coded status: Green for scanned, gray for pending
+  - Integration with job_devices table and pack_status tracking
+- **Backend Enhancements:**
+  - Completely implemented `GetJobs` handler with customer info and device counts
+  - Enhanced `GetJobSummary` handler to return full job details with all devices
+  - Device list includes current status, location, pack_status, and scan state
+  - Scanned flag based on device status ('on_job') or pack_status ('issued')
+  - Supports filtering jobs by status (e.g., ?status=open)
+  - JOIN queries across jobs, status, customers, jobdevices, devices, products, storage_zones
+- **Frontend Features:**
+  - New JobsPage component with job selection and scan interface
+  - Job cards show: Job ID, description, customer name, dates, device count
+  - Job detail view with customer info, dates, and progress statistics
+  - Live device checklist with product names, IDs, status, and scan indicators
+  - Scan form integrated with job context (sends job_id to scan API)
+  - Success/error feedback after each scan
+  - "Back to Job List" navigation
+  - Auto-refresh for live updates during scanning
+- **API Types:**
+  - New TypeScript interfaces: Job, JobDevice, JobSummary
+  - Added jobsApi.getAll() and jobsApi.getById() functions
+- **Navigation:**
+  - New "Jobs" menu item with Briefcase icon
+  - Route: /jobs
+- **User Workflow:**
+  1. Navigate to Jobs page
+  2. View all open jobs with device counts
+  3. Select a job to start packing/outtake
+  4. Scan devices one by one
+  5. Watch the progress bar and checklist update live
+  6. See which devices are still missing at a glance
+  7. Complete when all devices are scanned
+- **Use Case:**
+  - Perfect for warehouse workers preparing equipment for upcoming events
+  - Second-level verification that all job devices are physically present
+  - Real-time feedback prevents missing items before transport
+  - Live updates allow multiple workers to see scan progress simultaneously
+
+### Version 1.13 (2025-10-14)
+- **Feature: Recursive Device Count for Parent Zones**
+  - Zone device counts now include all devices in subzones recursively
+  - When viewing a parent zone (e.g., Lager or Regal), device count shows total across all child zones
+  - Implemented using MySQL recursive CTE (Common Table Expression) for efficient querying
+  - Example: Lager Weidelbach shows total of all devices in all Regale and all Fächer within
+- **Backend Enhancements:**
+  - New function `getDeviceCountRecursive` in ZoneService
+  - Uses `WITH RECURSIVE` query to build complete zone tree
+  - Counts all devices with status 'in_storage' across entire zone hierarchy
+  - Updated `GetZoneDetails` to use recursive count
+  - Updated `getSubzones` to show recursive counts for each subzone
+- **User Benefits:**
+  - Accurate inventory totals at every level of the hierarchy
+  - No need to manually sum devices across subzones
+  - Better overview of warehouse stock distribution
+  - Reflects real warehouse organization where parent zones contain all child zone contents
 
 ### Version 1.12 (2025-10-14)
 - **Feature: Two-Step Intake Workflow with Zone Selection**
