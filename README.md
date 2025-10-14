@@ -365,7 +365,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.9` - Fixed race condition in bulk shelf creation (current)
+- `1.10` - Fixed zone devices SQL query + subzone delete buttons (current)
+- `1.9` - Fixed race condition in bulk shelf creation
 - `1.8` - Automatic shelf creation with barcode generation
 - `1.7` - Simplified zone types + delete functionality
 - `1.6` - Hierarchical zones with auto code generation
@@ -421,13 +422,26 @@ For issues or questions:
 
 ---
 
-**Version:** 1.9
+**Version:** 1.10
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.10 (2025-10-14)
+- **Bug Fix: Zone Devices SQL Query**
+  - Fixed 500 Internal Server Error on `/api/v1/zones/{id}/devices` endpoint
+  - Updated query to properly join with `manufacturer` and `brands` tables
+  - Changed from direct `p.manufacturer` and `p.model` columns to `m.name` and `b.name` via JOINs
+  - Products table uses `manufacturerID` and `brandID` foreign keys, not direct string columns
+- **Feature: Subzone Delete Buttons**
+  - Added delete buttons to subzone cards in zone detail view
+  - Buttons appear on hover, similar to main zones page
+  - Click delete without navigating into the subzone
+  - Prevents accidental navigation when deleting
+  - Confirmation dialog before deletion
 
 ### Version 1.9 (2025-10-14)
 - **Bug Fix: Race Condition in Bulk Shelf Creation**

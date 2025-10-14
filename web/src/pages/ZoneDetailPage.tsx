@@ -124,6 +124,22 @@ export function ZoneDetailPage() {
     }
   };
 
+  const handleDeleteSubzone = async (e: React.MouseEvent, subzone: any) => {
+    e.stopPropagation(); // Prevent navigation when clicking delete
+
+    if (!confirm(`Zone "${subzone.name}" (${subzone.code}) wirklich löschen?`)) {
+      return;
+    }
+
+    try {
+      await zonesApi.delete(subzone.zone_id);
+      loadZoneDetails(); // Reload to show updated subzones list
+    } catch (error) {
+      console.error('Failed to delete subzone:', error);
+      alert('Fehler beim Löschen der Zone. Prüfe ob die Zone Unterzonen oder Geräte enthält.');
+    }
+  };
+
   const zoneTypes = {
     warehouse: { label: 'Lager', icon: '🏭' },
     rack: { label: 'Regal', icon: '🗄️' },
@@ -255,11 +271,18 @@ export function ZoneDetailPage() {
             {zone.subzones.map((subzone) => {
               const subTypeInfo = zoneTypes[subzone.type as keyof typeof zoneTypes] || zoneTypes.other;
               return (
-                <button
+                <div
                   key={subzone.zone_id}
+                  className="glass rounded-xl p-5 hover:bg-white/20 transition-all cursor-pointer group relative"
                   onClick={() => handleZoneClick(subzone.zone_id)}
-                  className="glass rounded-xl p-5 hover:bg-white/20 transition-all text-left group"
                 >
+                  <button
+                    onClick={(e) => handleDeleteSubzone(e, subzone)}
+                    className="absolute top-3 right-3 p-2 glass-dark rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-10"
+                    title="Zone löschen"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                   <div className="flex items-start gap-4">
                     <div className="text-3xl">{subTypeInfo.icon}</div>
                     <div className="flex-1 min-w-0">
@@ -275,7 +298,7 @@ export function ZoneDetailPage() {
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

@@ -451,10 +451,12 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code,
 		       COALESCE(p.name, '') as product_name,
-		       COALESCE(p.manufacturer, '') as manufacturer,
-		       COALESCE(p.model, '') as model
+		       COALESCE(m.name, '') as manufacturer,
+		       COALESCE(b.name, '') as model
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
+		LEFT JOIN brands b ON p.brandID = b.brandID
 		WHERE d.zone_id = ? AND d.status = 'in_storage'
 		ORDER BY p.name, d.deviceID
 	`, zoneID)
