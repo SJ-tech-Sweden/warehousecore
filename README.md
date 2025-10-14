@@ -365,7 +365,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.4` - Zone creation fix (current)
+- `1.5` - Clean JSON API responses (current)
+- `1.4` - Zone creation fix
 - `1.3` - Multi-platform API URL support
 - `1.2` - Frontend enhancements
 - `1.1` - TailwindCSS fixes
@@ -416,13 +417,20 @@ For issues or questions:
 
 ---
 
-**Version:** 1.4
+**Version:** 1.5
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.5 (2025-10-14)
+- Fixed JSON API responses to return clean primitive types
+- Removed nested sql.Null* structures from API responses
+- Added ZoneResponse struct for consistent API output
+- Fixed React rendering error on zones page
+- Updated TypeScript interfaces for nullable fields
 
 ### Version 1.4 (2025-10-14)
 - Fixed zone creation API endpoint

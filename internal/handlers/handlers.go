@@ -234,11 +234,46 @@ func GetZones(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	zones := []models.Zone{}
+	// Response struct with clean JSON types
+	type ZoneResponse struct {
+		ZoneID       int64   `json:"zone_id"`
+		Code         string  `json:"code"`
+		Name         string  `json:"name"`
+		Type         string  `json:"type"`
+		Description  *string `json:"description,omitempty"`
+		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
+		Capacity     *int64  `json:"capacity,omitempty"`
+		IsActive     bool    `json:"is_active"`
+	}
+
+	zones := []ZoneResponse{}
 	for rows.Next() {
 		var z models.Zone
-		rows.Scan(&z.ZoneID, &z.Code, &z.Name, &z.Type, &z.Description, &z.ParentZoneID, &z.Capacity, &z.IsActive)
-		zones = append(zones, z)
+		if err := rows.Scan(&z.ZoneID, &z.Code, &z.Name, &z.Type, &z.Description, &z.ParentZoneID, &z.Capacity, &z.IsActive); err != nil {
+			log.Printf("Error scanning zone row: %v", err)
+			continue
+		}
+
+		// Convert to clean response format
+		resp := ZoneResponse{
+			ZoneID:   z.ZoneID,
+			Code:     z.Code,
+			Name:     z.Name,
+			Type:     z.Type,
+			IsActive: z.IsActive,
+		}
+
+		if z.Description.Valid {
+			resp.Description = &z.Description.String
+		}
+		if z.ParentZoneID.Valid {
+			resp.ParentZoneID = &z.ParentZoneID.Int64
+		}
+		if z.Capacity.Valid {
+			resp.Capacity = &z.Capacity.Int64
+		}
+
+		zones = append(zones, resp)
 	}
 
 	respondJSON(w, http.StatusOK, zones)
@@ -295,13 +330,27 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := result.LastInsertId()
 
-	// Return the created zone
-	zone := models.Zone{
-		ZoneID:   id,
-		Code:     input.Code,
-		Name:     input.Name,
-		Type:     input.Type,
-		IsActive: input.IsActive,
+	// Return the created zone with clean JSON
+	type ZoneResponse struct {
+		ZoneID       int64   `json:"zone_id"`
+		Code         string  `json:"code"`
+		Name         string  `json:"name"`
+		Type         string  `json:"type"`
+		Description  *string `json:"description,omitempty"`
+		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
+		Capacity     *int64  `json:"capacity,omitempty"`
+		IsActive     bool    `json:"is_active"`
+	}
+
+	zone := ZoneResponse{
+		ZoneID:       id,
+		Code:         input.Code,
+		Name:         input.Name,
+		Type:         input.Type,
+		Description:  input.Description,
+		ParentZoneID: input.ParentZoneID,
+		Capacity:     input.Capacity,
+		IsActive:     input.IsActive,
 	}
 
 	log.Printf("Zone created successfully: %s (ID: %d)", input.Name, id)
@@ -330,7 +379,37 @@ func GetZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, z)
+	// Convert to clean response format
+	type ZoneResponse struct {
+		ZoneID       int64   `json:"zone_id"`
+		Code         string  `json:"code"`
+		Name         string  `json:"name"`
+		Type         string  `json:"type"`
+		Description  *string `json:"description,omitempty"`
+		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
+		Capacity     *int64  `json:"capacity,omitempty"`
+		IsActive     bool    `json:"is_active"`
+	}
+
+	resp := ZoneResponse{
+		ZoneID:   z.ZoneID,
+		Code:     z.Code,
+		Name:     z.Name,
+		Type:     z.Type,
+		IsActive: z.IsActive,
+	}
+
+	if z.Description.Valid {
+		resp.Description = &z.Description.String
+	}
+	if z.ParentZoneID.Valid {
+		resp.ParentZoneID = &z.ParentZoneID.Int64
+	}
+	if z.Capacity.Valid {
+		resp.Capacity = &z.Capacity.Int64
+	}
+
+	respondJSON(w, http.StatusOK, resp)
 }
 
 // UpdateZone updates a zone

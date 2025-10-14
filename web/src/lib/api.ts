@@ -32,8 +32,9 @@ export interface Zone {
   code: string;
   name: string;
   type: string;
-  description?: string;
-  capacity?: number;
+  description?: string | null;
+  parent_zone_id?: number | null;
+  capacity?: number | null;
   is_active: boolean;
 }
 
