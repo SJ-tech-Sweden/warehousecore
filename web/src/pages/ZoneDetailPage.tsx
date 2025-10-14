@@ -82,19 +82,15 @@ export function ZoneDetailPage() {
     if (!zone) return;
 
     try {
-      // Create multiple shelves at once
-      const promises = [];
+      // Create shelves sequentially to avoid race conditions with auto-naming
       for (let i = 0; i < count; i++) {
-        promises.push(
-          zonesApi.create({
-            type: 'shelf',
-            parent_zone_id: zone.zone_id,
-            capacity: 10, // Default capacity for shelves
-            is_active: true,
-          })
-        );
+        await zonesApi.create({
+          type: 'shelf',
+          parent_zone_id: zone.zone_id,
+          capacity: 10, // Default capacity for shelves
+          is_active: true,
+        });
       }
-      await Promise.all(promises);
       loadZoneDetails(); // Reload to show new shelves
     } catch (error) {
       console.error('Failed to create shelves:', error);

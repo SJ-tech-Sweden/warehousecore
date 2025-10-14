@@ -365,7 +365,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.8` - Automatic shelf creation with barcode generation (current)
+- `1.9` - Fixed race condition in bulk shelf creation (current)
+- `1.8` - Automatic shelf creation with barcode generation
 - `1.7` - Simplified zone types + delete functionality
 - `1.6` - Hierarchical zones with auto code generation
 - `1.5` - Clean JSON API responses
@@ -420,13 +421,23 @@ For issues or questions:
 
 ---
 
-**Version:** 1.8
+**Version:** 1.9
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.9 (2025-10-14)
+- **Bug Fix: Race Condition in Bulk Shelf Creation**
+  - Fixed duplicate entry errors when creating multiple shelves at once
+  - Changed from parallel (Promise.all) to sequential creation
+  - Prevents multiple shelves from reading the same count and generating duplicate codes
+  - Example: Creating 5 shelves now correctly generates Fach 01-05 instead of all trying to create Fach 01
+- **Improved Error Handling:**
+  - Eliminated 500 Internal Server errors during bulk operations
+  - Consistent shelf numbering without gaps
 
 ### Version 1.8 (2025-10-14)
 - **Automatic Shelf (Fach) Creation:**
