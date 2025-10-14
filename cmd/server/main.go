@@ -68,6 +68,7 @@ func main() {
 	// Zone endpoints
 	api.HandleFunc("/zones", handlers.GetZones).Methods("GET")
 	api.HandleFunc("/zones", handlers.CreateZone).Methods("POST")
+	api.HandleFunc("/zones/scan", handlers.GetZoneByBarcode).Methods("GET") // Zone barcode lookup
 	api.HandleFunc("/zones/{id}/devices", handlers.GetZoneDevices).Methods("GET") // Must be before /zones/{id}
 	api.HandleFunc("/zones/{id}", handlers.GetZone).Methods("GET")
 	api.HandleFunc("/zones/{id}", handlers.UpdateZone).Methods("PUT")

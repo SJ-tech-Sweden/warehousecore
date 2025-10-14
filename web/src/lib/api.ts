@@ -78,6 +78,7 @@ export const devicesApi = {
 export const zonesApi = {
   getAll: () => api.get<Zone[]>('/zones'),
   getById: (id: number) => api.get<Zone>(`/zones/${id}`),
+  getByScan: (scanCode: string) => api.get<Zone>('/zones/scan', { params: { scan_code: scanCode } }),
   create: (data: Partial<Zone>) => api.post<Zone>('/zones', data),
   update: (id: number, data: Partial<Zone>) => api.put(`/zones/${id}`, data),
   delete: (id: number) => api.delete(`/zones/${id}`),

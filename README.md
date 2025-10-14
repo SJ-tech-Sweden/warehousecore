@@ -365,7 +365,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.11` - Fixed SPA routing for page reloads (current)
+- `1.12` - Two-step intake workflow with zone barcode scanning (current)
+- `1.11` - Fixed SPA routing for page reloads
 - `1.10` - Fixed zone devices SQL query + subzone delete buttons
 - `1.9` - Fixed race condition in bulk shelf creation
 - `1.8` - Automatic shelf creation with barcode generation
@@ -423,13 +424,39 @@ For issues or questions:
 
 ---
 
-**Version:** 1.11
+**Version:** 1.12
 **Last Updated:** 2025-10-14
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.12 (2025-10-14)
+- **Feature: Two-Step Intake Workflow with Zone Selection**
+  - Implemented multi-step barcode scanning for device intake (Einlagerung)
+  - Step 1: Scan device barcode/QR code to verify device exists
+  - Step 2: Scan storage location (zone) barcode to specify exact placement
+  - Visual step indicator shows progress (Gerät → Lagerplatz)
+  - Automatic zone lookup by barcode or zone code
+- **Backend Enhancements:**
+  - New endpoint: `GET /api/v1/zones/scan?scan_code={code}` - Find zone by barcode/code
+  - Enhanced intake process to require and store zone_id
+  - Zone barcode support for precise location tracking
+- **Frontend Improvements:**
+  - Smart UI that adapts based on current step (device vs. zone scan)
+  - Different icons and placeholders for each step
+  - Action buttons hidden during zone scan step
+  - Seamless error handling with automatic step reset
+- **User Experience:**
+  - Clear visual feedback with step-by-step process
+  - Ensures every device is assigned to a specific storage location
+  - Prevents devices from being stored without location information
+- **Example Workflow:**
+  1. Select "Einlagern" action
+  2. Scan device barcode → Device verified ✓
+  3. Scan zone barcode (e.g., FACH-00000014) → Device stored at specific location
+  4. Process complete with full audit trail
 
 ### Version 1.11 (2025-10-14)
 - **Bug Fix: SPA Routing on Page Reload**

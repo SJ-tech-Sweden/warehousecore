@@ -547,6 +547,71 @@ func DeleteZone(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Zone deleted"})
 }
 
+// GetZoneByBarcode finds a zone by barcode or code
+func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
+	scanCode := r.URL.Query().Get("scan_code")
+	if scanCode == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "scan_code parameter required"})
+		return
+	}
+
+	db := repository.GetDB()
+	var zone models.Zone
+	err := db.QueryRow(`
+		SELECT zone_id, code, barcode, name, type, description, parent_zone_id, capacity, is_active
+		FROM storage_zones
+		WHERE (barcode = ? OR code = ?) AND is_active = TRUE
+		LIMIT 1
+	`, scanCode, scanCode).Scan(&zone.ZoneID, &zone.Code, &zone.Barcode, &zone.Name, &zone.Type,
+		&zone.Description, &zone.ParentZoneID, &zone.Capacity, &zone.IsActive)
+
+	if err == sql.ErrNoRows {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Zone not found"})
+		return
+	}
+	if err != nil {
+		log.Printf("Error finding zone by barcode: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Response struct with clean JSON types
+	type ZoneResponse struct {
+		ZoneID       int64   `json:"zone_id"`
+		Code         string  `json:"code"`
+		Barcode      *string `json:"barcode,omitempty"`
+		Name         string  `json:"name"`
+		Type         string  `json:"type"`
+		Description  *string `json:"description,omitempty"`
+		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
+		Capacity     *int64  `json:"capacity,omitempty"`
+		IsActive     bool    `json:"is_active"`
+	}
+
+	resp := ZoneResponse{
+		ZoneID:   zone.ZoneID,
+		Code:     zone.Code,
+		Name:     zone.Name,
+		Type:     zone.Type,
+		IsActive: zone.IsActive,
+	}
+
+	if zone.Barcode.Valid {
+		resp.Barcode = &zone.Barcode.String
+	}
+	if zone.Description.Valid {
+		resp.Description = &zone.Description.String
+	}
+	if zone.ParentZoneID.Valid {
+		resp.ParentZoneID = &zone.ParentZoneID.Int64
+	}
+	if zone.Capacity.Valid {
+		resp.Capacity = &zone.Capacity.Int64
+	}
+
+	respondJSON(w, http.StatusOK, resp)
+}
+
 // Placeholder handlers (simplified versions - to be expanded)
 func GetJobs(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, []map[string]string{})
