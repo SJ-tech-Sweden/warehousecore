@@ -29,8 +29,8 @@ COPY --from=builder /app/storagecore .
 # Copy migrations
 COPY --from=builder /app/migrations ./migrations
 
-# Create web/dist directory (frontend will be added later)
-RUN mkdir -p ./web/dist && echo '{"status":"backend-only"}' > ./web/dist/status.json
+# Copy frontend build
+COPY ./web/dist ./web/dist
 
 # Create .env placeholder
 RUN touch .env

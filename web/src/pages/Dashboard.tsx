@@ -1,0 +1,124 @@
+import { useEffect, useState } from 'react';
+import { Package, Warehouse, AlertTriangle, TrendingUp } from 'lucide-react';
+import { dashboardApi } from '../lib/api';
+import type { DashboardStats } from '../lib/api';
+
+export function Dashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    in_storage: 0,
+    on_job: 0,
+    defective: 0,
+    total: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadStats();
+    const interval = setInterval(loadStats, 10000); // Refresh every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      const { data } = await dashboardApi.getStats();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
+    {
+      title: 'Im Lager',
+      value: stats.in_storage,
+      icon: Warehouse,
+      color: 'from-gray-600 to-gray-800',
+      textColor: 'text-gray-300',
+    },
+    {
+      title: 'Auf Job',
+      value: stats.on_job,
+      icon: Package,
+      color: 'from-accent-red to-red-700',
+      textColor: 'text-accent-red',
+    },
+    {
+      title: 'Defekt',
+      value: stats.defective,
+      icon: AlertTriangle,
+      color: 'from-yellow-600 to-yellow-800',
+      textColor: 'text-yellow-500',
+    },
+    {
+      title: 'Gesamt',
+      value: stats.total,
+      icon: TrendingUp,
+      color: 'from-blue-600 to-blue-800',
+      textColor: 'text-blue-400',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-red"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-3xl font-bold text-white mb-2">Dashboard</h2>
+        <p className="text-gray-400">Lagerübersicht und Statistiken</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.title}
+              className="glass rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 group"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`p-3 rounded-xl bg-gradient-to-br ${card.color} bg-opacity-20`}>
+                  <Icon className={`w-6 h-6 ${card.textColor}`} />
+                </div>
+                <div className="text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  Live
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-gray-400 text-sm font-medium">{card.title}</p>
+                <p className={`text-4xl font-bold ${card.textColor}`}>{card.value}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Recent Activity */}
+      <div className="glass-dark rounded-2xl p-6">
+        <h3 className="text-xl font-bold text-white mb-4">Letzte Aktivität</h3>
+        <div className="space-y-3">
+          {[1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="flex items-center gap-4 p-4 glass rounded-xl hover:bg-white/10 transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full bg-accent-red animate-pulse"></div>
+              <div className="flex-1">
+                <p className="text-white font-medium">Gerät gescannt</p>
+                <p className="text-sm text-gray-400">vor {item} Minuten</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

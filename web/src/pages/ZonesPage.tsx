@@ -1,0 +1,189 @@
+import { useEffect, useState } from 'react';
+import { MapPin, Plus } from 'lucide-react';
+import { zonesApi } from '../lib/api';
+import type { Zone } from '../lib/api';
+
+export function ZonesPage() {
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    type: 'shelf',
+    description: '',
+    capacity: '',
+  });
+
+  useEffect(() => {
+    loadZones();
+  }, []);
+
+  const loadZones = async () => {
+    try {
+      const { data } = await zonesApi.getAll();
+      setZones(data);
+    } catch (error) {
+      console.error('Failed to load zones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await zonesApi.create({
+        ...formData,
+        capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
+        is_active: true,
+      });
+      setShowForm(false);
+      setFormData({ code: '', name: '', type: 'shelf', description: '', capacity: '' });
+      loadZones();
+    } catch (error) {
+      console.error('Failed to create zone:', error);
+    }
+  };
+
+  const zoneTypes = [
+    { value: 'shelf', label: 'Regal', icon: '📚' },
+    { value: 'rack', label: 'Rack', icon: '🗄️' },
+    { value: 'vehicle', label: 'Fahrzeug', icon: '🚐' },
+    { value: 'stage', label: 'Bühne', icon: '🎪' },
+    { value: 'warehouse', label: 'Lager', icon: '🏭' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-red"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-white mb-2">Zonen</h2>
+          <p className="text-gray-400">{zones.length} Zonen konfiguriert</p>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all transform hover:scale-105"
+        >
+          <Plus className="w-5 h-5" />
+          Zone erstellen
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showForm && (
+        <div className="glass-dark rounded-2xl p-6 border-2 border-accent-red/30">
+          <h3 className="text-xl font-bold text-white mb-4">Neue Zone</h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                value={formData.code}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                placeholder="Code (z.B. SHELF-A1)"
+                required
+                className="px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+              />
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Name"
+                required
+                className="px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+              />
+            </div>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white focus:outline-none focus:border-accent-red transition-colors"
+            >
+              {zoneTypes.map((type) => (
+                <option key={type.value} value={type.value} className="bg-dark-200">
+                  {type.icon} {type.label}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+              placeholder="Kapazität (optional)"
+              className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+            />
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Beschreibung (optional)"
+              rows={3}
+              className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors resize-none"
+            />
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-accent-red text-white font-semibold rounded-xl hover:bg-red-700 transition-colors"
+              >
+                Erstellen
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-6 py-3 glass text-gray-400 hover:text-white font-semibold rounded-xl transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Zones Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {zones.map((zone) => {
+          const typeInfo = zoneTypes.find((t) => t.value === zone.type);
+          return (
+            <div
+              key={zone.zone_id}
+              className="glass rounded-xl p-5 hover:bg-white/20 transition-all cursor-pointer group"
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-3xl">{typeInfo?.icon || '📦'}</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-white truncate mb-1">{zone.name}</h3>
+                  <p className="text-sm text-gray-400 mb-2">{zone.code}</p>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-gray-500">{typeInfo?.label}</span>
+                    {zone.capacity && (
+                      <span className="text-gray-500">Kapazität: {zone.capacity}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {zones.length === 0 && !showForm && (
+        <div className="text-center py-12">
+          <MapPin className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <p className="text-gray-400 mb-4">Noch keine Zonen vorhanden</p>
+          <button
+            onClick={() => setShowForm(true)}
+            className="text-accent-red hover:text-red-500 font-semibold"
+          >
+            Erste Zone erstellen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
