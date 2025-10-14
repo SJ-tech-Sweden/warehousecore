@@ -1,10 +1,6 @@
-version: '3.8'
-
 services:
   storagecore:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: nobentie/storagecore:latest
     container_name: storagecore
     ports:
       - "8081:8081"

@@ -307,8 +307,14 @@ docker push nobentie/storagecore:latest
 
 **Run with docker-compose:**
 ```bash
+# Pull latest image from Docker Hub
+docker-compose pull
+
+# Start the service
 docker-compose up -d
 ```
+
+> **Note:** docker-compose.yml is configured to use the `nobentie/storagecore:latest` image from Docker Hub.
 
 **Check logs:**
 ```bash
