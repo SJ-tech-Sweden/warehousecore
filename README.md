@@ -117,9 +117,11 @@ storagecore/
 ## Tech Stack
 
 **Backend:**
-- Go 1.22+ (matching RentalCore)
+- Go 1.24+ (GORM compatibility)
 - gorilla/mux (routing)
+- GORM (ORM for auth models)
 - MySQL 9.2 (shared RentalCore database)
+- Session-based authentication
 - CORS enabled
 
 **Frontend:**
@@ -139,7 +141,7 @@ storagecore/
 
 ### Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - MySQL 9.2+ (access to RentalCore database)
 - Docker (optional, for containerized deployment)
 - Node.js 18+ (for frontend development)
@@ -196,6 +198,35 @@ curl http://localhost:8081/api/v1/health
 
 #### Health
 - `GET /health` - Server health check
+
+#### Authentication
+- `POST /auth/login` - Login with username and password
+- `POST /auth/logout` - Logout and destroy session
+- `GET /auth/me` - Get current authenticated user
+
+**Login Request Body:**
+```json
+{
+  "username": "admin",
+  "password": "password"
+}
+```
+
+**Login Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "user": {
+    "UserID": 1,
+    "Username": "admin",
+    "Email": "admin@example.com",
+    "FirstName": "Admin",
+    "LastName": "User",
+    "IsActive": true
+  }
+}
+```
 
 #### Scans (CRITICAL)
 - `POST /scans` - Process barcode/QR scan
@@ -322,6 +353,40 @@ docker-compose up -d
 docker-compose logs -f storagecore
 ```
 
+### 🔄 Integrated Deployment with RentalCore
+
+For integrated deployment of both StorageCore and RentalCore together, use the root docker-compose configuration:
+
+```bash
+# Navigate to the parent directory (NOT a git repo)
+cd /opt/dev/lager_weidelbach
+
+# Pull latest images from Docker Hub
+docker compose pull
+
+# Start both services
+docker compose up -d
+
+# Check status
+docker compose ps
+
+# View logs
+docker compose logs -f storagecore
+docker compose logs -f rentalcore
+```
+
+**Access the applications:**
+- **StorageCore**: http://localhost:8082
+- **RentalCore**: http://localhost:8081
+
+**Cross-navigation:**
+Both applications feature sidebar/navbar links to seamlessly switch between StorageCore and RentalCore with a single click.
+
+**Note:** The images use `:latest` tags. Pull periodically to get the newest versions:
+```bash
+docker compose pull && docker compose up -d
+```
+
 ### Production Deployment
 
 1. Ensure database migrations are applied
@@ -366,7 +431,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.17` - Fixed mobile scrolling issues and button overlaps (current)
+- `1.18` - User authentication and SSO with RentalCore (current)
+- `1.17` - Fixed mobile scrolling issues and button overlaps
 - `1.16` - Complete mobile responsiveness for all pages
 - `1.15` - Complete maintenance module with defect tracking and inspections
 - `1.14` - Job-based outtake workflow with live scan tracking
@@ -430,13 +496,58 @@ For issues or questions:
 
 ---
 
-**Version:** 1.17
+**Version:** 1.18
 **Last Updated:** 2025-10-15
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.18 (2025-10-15)
+- **Feature: User Authentication and Single Sign-On (SSO)**
+  - Complete user authentication system integrated with RentalCore
+  - Shared session-based authentication using MySQL sessions table
+  - Cookie-based SSO across both applications (.server-nt.de domain)
+  - Login required to access StorageCore directly
+  - Automatic authentication when navigating from RentalCore
+- **Backend Authentication:**
+  - Added GORM ORM for auth model management (User, Session)
+  - New auth middleware validating session cookies
+  - Auth API endpoints: POST /auth/login, POST /auth/logout, GET /auth/me
+  - Shared cookie domain auto-detection for production and localhost
+  - Session validation with expiration checking
+  - User data loaded from shared users table
+- **Frontend Authentication:**
+  - New Login page with username/password form
+  - AuthContext for global authentication state management
+  - ProtectedRoute component guarding all main routes
+  - User profile display in sidebar with username and email
+  - Logout button with confirmation
+  - Loading states during authentication checks
+  - TypeScript interfaces for User and auth API
+- **Security:**
+  - HttpOnly session cookies
+  - SameSite Lax mode for CSRF protection
+  - Password validation against bcrypt hashes
+  - Automatic redirect to login for unauthenticated users
+  - Session expiration handling
+- **Database Integration:**
+  - Uses existing RentalCore tables: users, sessions
+  - No new tables required
+  - Maintains backward compatibility with RentalCore auth
+- **User Experience:**
+  - Seamless navigation between RentalCore and StorageCore when logged in
+  - Single login for both applications
+  - Professional login page matching StorageCore design
+  - Clear authentication feedback
+  - Automatic session check on application load
+- **Technical Changes:**
+  - Updated Go version to 1.24 for GORM compatibility
+  - Added GetDB() for GORM, GetSQLDB() for raw SQL queries
+  - All existing handlers updated to use GetSQLDB()
+  - Auth service layer with session management
+  - Protected routes middleware in main server setup
 
 ### Version 1.17 (2025-10-15)
 - **Bug Fix: Mobile Scrolling and Button Overlap Issues**

@@ -7,11 +7,16 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"storagecore/config"
 )
 
 // DB holds the database connection pool
 var DB *sql.DB
+
+// GormDB holds the GORM database connection for auth and models
+var GormDB *gorm.DB
 
 // InitDatabase initializes the database connection
 func InitDatabase(cfg *config.Config) error {
@@ -34,6 +39,19 @@ func InitDatabase(cfg *config.Config) error {
 
 	DB = db
 	log.Println("Database connection established successfully")
+
+	// Initialize GORM for auth and models
+	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		SkipDefaultTransaction: true,
+		PrepareStmt:            true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize GORM: %w", err)
+	}
+
+	GormDB = gormDB
+	log.Println("GORM database connection established successfully")
+
 	return nil
 }
 
@@ -46,6 +64,11 @@ func CloseDatabase() error {
 }
 
 // GetDB returns the database connection
-func GetDB() *sql.DB {
+func GetDB() *gorm.DB {
+	return GormDB
+}
+
+// GetSQLDB returns the raw SQL database connection
+func GetSQLDB() *sql.DB {
 	return DB
 }

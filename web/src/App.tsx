@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
+import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { ScanPage } from './pages/ScanPage';
 import { DevicesPage } from './pages/DevicesPage';
@@ -11,15 +14,21 @@ import { MaintenancePage } from './pages/MaintenancePage';
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/scan" element={<Layout><ScanPage /></Layout>} />
-        <Route path="/devices" element={<Layout><DevicesPage /></Layout>} />
-        <Route path="/zones" element={<Layout><ZonesPage /></Layout>} />
-        <Route path="/zones/:id" element={<Layout><ZoneDetailPage /></Layout>} />
-        <Route path="/jobs" element={<Layout><JobsPage /></Layout>} />
-        <Route path="/maintenance" element={<Layout><MaintenancePage /></Layout>} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          {/* Public route */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected routes */}
+          <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+          <Route path="/scan" element={<ProtectedRoute><Layout><ScanPage /></Layout></ProtectedRoute>} />
+          <Route path="/devices" element={<ProtectedRoute><Layout><DevicesPage /></Layout></ProtectedRoute>} />
+          <Route path="/zones" element={<ProtectedRoute><Layout><ZonesPage /></Layout></ProtectedRoute>} />
+          <Route path="/zones/:id" element={<ProtectedRoute><Layout><ZoneDetailPage /></Layout></ProtectedRoute>} />
+          <Route path="/jobs" element={<ProtectedRoute><Layout><JobsPage /></Layout></ProtectedRoute>} />
+          <Route path="/maintenance" element={<ProtectedRoute><Layout><MaintenancePage /></Layout></ProtectedRoute>} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

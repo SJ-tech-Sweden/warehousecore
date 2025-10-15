@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -24,13 +27,46 @@ func spaHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		// File doesn't exist - serve index.html for SPA routing
-		http.ServeFile(w, r, "./web/dist/index.html")
+		// File doesn't exist - serve index.html with injected config
+		serveIndexWithConfig(w, r)
 		return
 	}
 
 	// File exists - serve it
 	http.FileServer(http.Dir("./web/dist")).ServeHTTP(w, r)
+}
+
+// serveIndexWithConfig injects runtime configuration into index.html
+func serveIndexWithConfig(w http.ResponseWriter, r *http.Request) {
+	// Read the index.html file
+	file, err := os.Open("./web/dist/index.html")
+	if err != nil {
+		http.Error(w, "Could not open index.html", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Could not read index.html", http.StatusInternalServerError)
+		return
+	}
+
+	// Get domain configuration from environment variables
+	// These should be just the domain (e.g., "rent.server-nt.de")
+	// without protocol or port - the frontend will add the protocol
+	rentalCoreDomain := os.Getenv("RENTALCORE_DOMAIN")
+	storageCoreDomain := os.Getenv("STORAGECORE_DOMAIN")
+
+	// Create config injection script
+	configScript := fmt.Sprintf(`<script>window.__APP_CONFIG__={rentalCoreDomain:"%s",storageCoreDomain:"%s"};</script>`, rentalCoreDomain, storageCoreDomain)
+
+	// Inject the script before </head>
+	modifiedContent := bytes.Replace(content, []byte("</head>"), []byte(configScript+"</head>"), 1)
+
+	// Serve the modified content
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(modifiedContent)
 }
 
 func main() {
@@ -52,12 +88,21 @@ func main() {
 	// API v1 routes
 	api := router.PathPrefix("/api/v1").Subrouter()
 
-	// Health check
+	// Auth endpoints (public - no auth required)
+	api.HandleFunc("/auth/login", handlers.Login).Methods("POST")
+	api.HandleFunc("/auth/logout", handlers.Logout).Methods("POST")
+	api.HandleFunc("/auth/me", handlers.GetCurrentUser).Methods("GET")
+
+	// Health check (public)
 	api.HandleFunc("/health", handlers.HealthCheck).Methods("GET")
 
+	// Protected routes - apply auth middleware
+	protected := api.PathPrefix("").Subrouter()
+	protected.Use(middleware.AuthMiddleware)
+
 	// Scan endpoints (CRITICAL - core functionality)
-	api.HandleFunc("/scans", handlers.HandleScan).Methods("POST")
-	api.HandleFunc("/scans/history", handlers.GetScanHistory).Methods("GET")
+	protected.HandleFunc("/scans", handlers.HandleScan).Methods("POST")
+	protected.HandleFunc("/scans/history", handlers.GetScanHistory).Methods("GET")
 
 	// Device endpoints
 	api.HandleFunc("/devices", handlers.GetDevices).Methods("GET")

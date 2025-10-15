@@ -17,7 +17,7 @@ type ZoneService struct {
 // NewZoneService creates a new zone service
 func NewZoneService() *ZoneService {
 	return &ZoneService{
-		db: repository.GetDB(),
+		db: repository.GetSQLDB(),
 	}
 }
 

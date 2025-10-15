@@ -18,7 +18,7 @@ import (
 
 // HealthCheck returns server health status
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	if err := db.Ping(); err != nil {
 		respondJSON(w, http.StatusServiceUnavailable, map[string]interface{}{
 			"status": "unhealthy",
@@ -57,7 +57,7 @@ func GetScanHistory(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), 50)
 	deviceID := r.URL.Query().Get("device_id")
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	query := `SELECT scan_id, scan_code, device_id, action, success, timestamp
 	          FROM scan_events WHERE 1=1`
 	args := []interface{}{}
@@ -100,7 +100,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 	zoneID := r.URL.Query().Get("zone_id")
 	limit := parseInt(r.URL.Query().Get("limit"), 100)
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	query := `
 		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code, d.zone_id,
 		       COALESCE(p.name, '') as product_name,
@@ -145,7 +145,7 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	deviceID := vars["id"]
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	var device models.DeviceWithDetails
 	err := db.QueryRow(`
 		SELECT d.*, COALESCE(p.name, '') as product_name,
@@ -182,7 +182,7 @@ func UpdateDeviceStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	_, err := db.Exec(`UPDATE devices SET status = ? WHERE deviceID = ?`, req.Status, deviceID)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -197,7 +197,7 @@ func GetDeviceMovements(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	deviceID := vars["id"]
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	rows, err := db.Query(`
 		SELECT movement_id, device_id, action, from_zone_id, to_zone_id, to_job_id, timestamp
 		FROM device_movements
@@ -223,7 +223,7 @@ func GetDeviceMovements(w http.ResponseWriter, r *http.Request) {
 
 // GetZones returns all zones
 func GetZones(w http.ResponseWriter, r *http.Request) {
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	rows, err := db.Query(`
 		SELECT zone_id, code, barcode, name, type, description, parent_zone_id, capacity, is_active
 		FROM storage_zones
@@ -305,7 +305,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	zoneService := services.NewZoneService()
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	// Auto-generate name for shelves if not provided
 	var zoneName string
@@ -448,7 +448,7 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	zoneID := vars["id"]
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	rows, err := db.Query(`
 		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code,
 		       COALESCE(p.name, '') as product_name,
@@ -519,7 +519,7 @@ func UpdateZone(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	_, err := db.Exec(`
 		UPDATE storage_zones
 		SET code = ?, name = ?, type = ?, description = ?, parent_zone_id = ?, capacity = ?
@@ -538,7 +538,7 @@ func DeleteZone(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	_, err := db.Exec(`UPDATE storage_zones SET is_active = FALSE WHERE zone_id = ?`, id)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -556,7 +556,7 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	var zone models.Zone
 	err := db.QueryRow(`
 		SELECT zone_id, code, barcode, name, type, description, parent_zone_id, capacity, is_active
@@ -617,7 +617,7 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 func GetJobs(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	query := `
 		SELECT j.jobID, j.description, j.startDate, j.endDate, s.status,
 		       COALESCE(c.firstName, '') as customer_first_name,
@@ -687,7 +687,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["id"]
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	// Get job details
 	var (
@@ -815,7 +815,7 @@ func GetDefects(w http.ResponseWriter, r *http.Request) {
 	severity := r.URL.Query().Get("severity")
 	deviceID := r.URL.Query().Get("device_id")
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	query := `
 		SELECT dr.defect_id, dr.device_id, dr.severity, dr.status, dr.title, dr.description,
 		       dr.reported_at, dr.repair_cost, dr.repaired_at, dr.closed_at,
@@ -916,7 +916,7 @@ func CreateDefect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	// Set device status to defective
 	_, err := db.Exec(`UPDATE devices SET status = 'defective' WHERE deviceID = ?`, input.DeviceID)
@@ -960,7 +960,7 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	// Build dynamic UPDATE query
 	updates := []string{}
@@ -1021,7 +1021,7 @@ func GetInspections(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status") // upcoming, overdue, all
 	deviceID := r.URL.Query().Get("device_id")
 
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 	query := `
 		SELECT i.schedule_id, i.device_id, i.product_id, i.inspection_type,
 		       i.interval_days, i.last_inspection, i.next_inspection, i.is_active,
@@ -1107,7 +1107,7 @@ func GetInspections(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetDashboardStats(w http.ResponseWriter, r *http.Request) {
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	var inStorage, onJob, defective int
 	db.QueryRow(`SELECT COUNT(*) FROM devices WHERE status = 'in_storage'`).Scan(&inStorage)
@@ -1146,7 +1146,7 @@ func parseInt(s string, defaultVal int) int {
 
 // GetMaintenanceStats returns maintenance dashboard statistics  
 func GetMaintenanceStats(w http.ResponseWriter, r *http.Request) {
-	db := repository.GetDB()
+	db := repository.GetSQLDB()
 
 	var openDefects, inProgressDefects, repairedDefects int
 	var overdueInspections, upcomingInspections int

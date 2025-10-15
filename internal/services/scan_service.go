@@ -18,7 +18,7 @@ type ScanService struct {
 // NewScanService creates a new scan service
 func NewScanService() *ScanService {
 	return &ScanService{
-		db: repository.GetDB(),
+		db: repository.GetSQLDB(),
 	}
 }
 
