@@ -366,7 +366,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.16` - Complete mobile responsiveness for all pages (current)
+- `1.17` - Fixed mobile scrolling issues and button overlaps (current)
+- `1.16` - Complete mobile responsiveness for all pages
 - `1.15` - Complete maintenance module with defect tracking and inspections
 - `1.14` - Job-based outtake workflow with live scan tracking
 - `1.13` - Recursive device count for parent zones
@@ -429,13 +430,56 @@ For issues or questions:
 
 ---
 
-**Version:** 1.16
+**Version:** 1.17
 **Last Updated:** 2025-10-15
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.17 (2025-10-15)
+- **Bug Fix: Mobile Scrolling and Button Overlap Issues**
+  - Fixed horizontal scrolling on zone detail page
+  - Fixed unnecessary vertical scrolling on scan page
+  - Fixed button overlap issues on zone detail page
+- **Zone Detail Page Improvements:**
+  - Added `max-w-full overflow-x-hidden` to root container to prevent horizontal scroll
+  - Changed button container to `flex flex-wrap items-center gap-2 sm:gap-3` for proper wrapping
+  - Implemented responsive button text: Full text on desktop, icons only on mobile
+  - Delete button: Shows "Löschen" on desktop, "🗑️" emoji on mobile
+  - Shelf creation button: Shows "Fächer erstellen" on desktop, "Fächer" on mobile
+  - Subzone creation button: Shows "Unterzone erstellen" on desktop, "Unterzone" on mobile
+  - Added `whitespace-nowrap` to all buttons to prevent text wrapping within buttons
+- **Breadcrumb Navigation:**
+  - Added `overflow-x-auto` with horizontal scroll support
+  - Breadcrumb items use `flex-shrink-0` to prevent crushing
+  - Maintains proper spacing with `flex-wrap` fallback
+- **Device Table Responsiveness:**
+  - Table container with `overflow-x-auto` for horizontal scroll on small screens
+  - Set minimum table width to 640px to maintain readability
+  - Hidden columns on mobile for space efficiency:
+    - Manufacturer column: `hidden md:table-cell`
+    - Model column: `hidden md:table-cell`
+    - Barcode column: `hidden lg:table-cell`
+  - Responsive cell padding: `p-2 sm:p-4`
+  - Responsive text sizes: `text-xs sm:text-sm` and `text-xs sm:text-base`
+- **Scan Page Improvements:**
+  - Removed unnecessary `min-h-[calc(100vh-4rem)]` that caused vertical scrolling
+  - Changed to simple `flex items-center justify-center` for proper centering
+  - Form now fits perfectly without any unnecessary scroll
+- **Responsive Text and Spacing:**
+  - All headers use responsive sizing: `text-xl sm:text-3xl`, `text-lg sm:text-xl`
+  - Stats cards use adaptive padding: `p-3 sm:p-4`, `p-4 sm:p-6`
+  - Icon sizes adapt: `w-4 h-4`, `w-4 h-4 sm:w-5 sm:h-5`
+  - Gaps scale properly: `gap-2 sm:gap-3`, `gap-3 sm:gap-4`
+- **User Experience Enhancements:**
+  - No horizontal scrolling on any viewport width
+  - No unnecessary vertical scrolling
+  - All buttons stay visible and accessible on mobile
+  - Buttons never overlap or extend beyond screen width
+  - Table data remains accessible with horizontal scroll only when needed
+  - Clean, professional mobile interface
 
 ### Version 1.16 (2025-10-15)
 - **Feature: Complete Mobile Responsiveness**
