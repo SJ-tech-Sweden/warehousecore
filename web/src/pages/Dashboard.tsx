@@ -69,32 +69,32 @@ export function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-white mb-2">Dashboard</h2>
-        <p className="text-gray-400">Lagerübersicht und Statistiken</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Dashboard</h2>
+        <p className="text-sm sm:text-base text-gray-400">Lagerübersicht und Statistiken</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className="glass rounded-2xl p-6 hover:bg-white/20 transition-all duration-300 group"
+              className="glass rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:bg-white/20 transition-all duration-300 group"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl bg-gradient-to-br ${card.color} bg-opacity-20`}>
-                  <Icon className={`w-6 h-6 ${card.textColor}`} />
+              <div className="flex items-center justify-between mb-3 sm:mb-4">
+                <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br ${card.color} bg-opacity-20`}>
+                  <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.textColor}`} />
                 </div>
-                <div className="text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="text-xs sm:text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
                   Live
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-gray-400 text-sm font-medium">{card.title}</p>
-                <p className={`text-4xl font-bold ${card.textColor}`}>{card.value}</p>
+                <p className="text-gray-400 text-xs sm:text-sm font-medium">{card.title}</p>
+                <p className={`text-3xl sm:text-4xl font-bold ${card.textColor}`}>{card.value}</p>
               </div>
             </div>
           );
@@ -102,18 +102,18 @@ export function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="glass-dark rounded-2xl p-6">
-        <h3 className="text-xl font-bold text-white mb-4">Letzte Aktivität</h3>
-        <div className="space-y-3">
+      <div className="glass-dark rounded-xl sm:rounded-2xl p-4 sm:p-6">
+        <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">Letzte Aktivität</h3>
+        <div className="space-y-2 sm:space-y-3">
           {[1, 2, 3].map((item) => (
             <div
               key={item}
-              className="flex items-center gap-4 p-4 glass rounded-xl hover:bg-white/10 transition-colors"
+              className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 glass rounded-lg sm:rounded-xl hover:bg-white/10 transition-colors"
             >
-              <div className="w-2 h-2 rounded-full bg-accent-red animate-pulse"></div>
-              <div className="flex-1">
-                <p className="text-white font-medium">Gerät gescannt</p>
-                <p className="text-sm text-gray-400">vor {item} Minuten</p>
+              <div className="w-2 h-2 rounded-full bg-accent-red animate-pulse flex-shrink-0"></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm sm:text-base text-white font-medium truncate">Gerät gescannt</p>
+                <p className="text-xs sm:text-sm text-gray-400">vor {item} Minuten</p>
               </div>
             </div>
           ))}

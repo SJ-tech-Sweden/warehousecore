@@ -366,7 +366,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.15` - Complete maintenance module with defect tracking and inspections (current)
+- `1.16` - Complete mobile responsiveness for all pages (current)
+- `1.15` - Complete maintenance module with defect tracking and inspections
 - `1.14` - Job-based outtake workflow with live scan tracking
 - `1.13` - Recursive device count for parent zones
 - `1.12` - Two-step intake workflow with zone barcode scanning
@@ -428,13 +429,83 @@ For issues or questions:
 
 ---
 
-**Version:** 1.15
-**Last Updated:** 2025-10-14
+**Version:** 1.16
+**Last Updated:** 2025-10-15
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.16 (2025-10-15)
+- **Feature: Complete Mobile Responsiveness**
+  - Full mobile optimization for all pages and components
+  - Professional responsive design with breakpoints at 640px (sm) and 768px (md)
+- **Mobile Sidebar:**
+  - Hamburger menu with overlay backdrop on mobile
+  - Smooth slide-in/out animations
+  - Auto-close sidebar on navigation for mobile
+  - Desktop: Sidebar visible by default, persists on screen
+  - Mobile: Sidebar hidden by default, overlay mode
+  - Close button in sidebar header (mobile only)
+  - Touch-friendly tap targets
+- **Layout Optimizations:**
+  - Header: Responsive padding and font sizes (px-3 → px-6, text-lg → text-2xl)
+  - Company name hidden on mobile to save space
+  - Main content padding adapts (p-3 → p-6)
+  - Proper spacing adjustments (pt-14 → pt-16)
+- **Dashboard Page:**
+  - Stats grid: 1 column on mobile, 2 on sm, 4 on lg
+  - Card padding and text sizes scale responsively
+  - Icon sizes adjust (w-5 → w-6)
+  - Activity feed items with truncation
+- **Scan Page:**
+  - Scanner icon and titles scale (w-8 → w-12, text-2xl → text-4xl)
+  - Step indicator adapts sizing (w-7 → w-8)
+  - Input fields with responsive padding
+  - Action buttons grid adjusts (gap-2 → gap-4)
+  - Result cards with proper text wrapping
+- **Devices Page:**
+  - Search bar with responsive icon and input sizing
+  - Grid: 1 column → 2 columns (sm) → 3 columns (lg)
+  - Device cards with flexible layouts
+  - Status badges scale properly
+  - Truncation for long text
+- **Maintenance Page (All 3 Tabs):**
+  - **Overview:** Stats in 2-column grid (2 on mobile, 5 on lg)
+  - **Defects:** Mobile-friendly form with stacked inputs
+  - **Inspections:** Responsive filter tabs with horizontal scroll
+  - All cards adapt padding (p-3 → p-6)
+  - Text sizes scale across breakpoints
+  - Status buttons stack on mobile, inline on desktop
+  - Form buttons stack vertically on mobile
+- **Mobile-First Features:**
+  - Touch-friendly button sizes (44x44px minimum)
+  - Proper text wrapping and truncation
+  - Overflow-x-auto for filter tabs
+  - Flex-wrap for badges and tags
+  - Min-w-0 to allow flex item shrinking
+  - Line-clamp for multi-line text truncation
+- **Responsive Typography:**
+  - Headings: text-2xl sm:text-3xl or text-2xl sm:text-4xl
+  - Body text: text-xs sm:text-sm or text-sm sm:text-base
+  - Badges: text-[10px] sm:text-xs
+  - Proper hierarchy maintained across breakpoints
+- **Spacing System:**
+  - Gaps: gap-2 sm:gap-4, gap-3 sm:gap-6
+  - Padding: p-3 sm:p-6, p-4 sm:p-8
+  - Margins: mb-1 sm:mb-2, mb-3 sm:mb-4
+  - Consistent use of Tailwind spacing scale
+- **User Experience:**
+  - Smooth transitions for sidebar and modals
+  - No horizontal scrolling on any page
+  - All interactive elements easily tappable
+  - Proper keyboard focus management
+  - Maintains glassmorphism aesthetic on all devices
+- **Testing Notes:**
+  - Tested at breakpoints: 320px, 375px, 768px, 1024px, 1920px
+  - Works on iOS Safari, Chrome Mobile, Android Chrome
+  - Landscape and portrait orientations supported
 
 ### Version 1.15 (2025-10-14)
 - **Feature: Complete Maintenance Module Implementation**
