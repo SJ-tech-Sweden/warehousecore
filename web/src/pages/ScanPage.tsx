@@ -94,8 +94,8 @@ export function ScanPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-2xl">
+    <div className="flex items-center justify-center p-3 sm:p-4">
+      <div className="w-full max-w-2xl my-auto">
         {/* Scan Form */}
         <div className="glass-dark rounded-2xl sm:rounded-3xl p-4 sm:p-8 border-2 border-white/10">
           <div className="text-center mb-6 sm:mb-8">

@@ -167,12 +167,12 @@ export function ZoneDetailPage() {
   const typeInfo = zoneTypes[zone.type as keyof typeof zoneTypes] || zoneTypes.other;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
       {/* Header with Breadcrumb */}
       <div>
         <button
           onClick={() => navigate('/zones')}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+          className="flex items-center gap-2 text-sm sm:text-base text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Zurück zu Zonen
@@ -180,13 +180,13 @@ export function ZoneDetailPage() {
 
         {/* Breadcrumb */}
         {zone.breadcrumb && zone.breadcrumb.length > 0 && (
-          <div className="flex items-center gap-2 text-sm text-gray-400 mb-4 flex-wrap">
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4 flex-wrap overflow-x-auto pb-2">
             {zone.breadcrumb.map((crumb, index) => (
-              <div key={crumb.zone_id} className="flex items-center gap-2">
-                {index > 0 && <ChevronRight className="w-4 h-4" />}
+              <div key={crumb.zone_id} className="flex items-center gap-2 flex-shrink-0">
+                {index > 0 && <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />}
                 <button
                   onClick={() => handleZoneClick(Number(crumb.zone_id))}
-                  className="hover:text-white transition-colors"
+                  className="hover:text-white transition-colors whitespace-nowrap"
                 >
                   {crumb.name}
                 </button>
@@ -195,23 +195,24 @@ export function ZoneDetailPage() {
           </div>
         )}
 
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <div className="text-5xl">{typeInfo.icon}</div>
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-1">{zone.name}</h2>
-              <p className="text-gray-400 font-mono text-sm">{zone.code}</p>
-              <p className="text-sm text-gray-500">{typeInfo.label}</p>
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="text-3xl sm:text-5xl flex-shrink-0">{typeInfo.icon}</div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xl sm:text-3xl font-bold text-white mb-0.5 sm:mb-1 truncate">{zone.name}</h2>
+              <p className="text-gray-400 font-mono text-xs sm:text-sm truncate">{zone.code}</p>
+              <p className="text-xs sm:text-sm text-gray-500">{typeInfo.label}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2 glass text-red-400 hover:text-red-300 hover:bg-red-900/20 font-semibold rounded-xl transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 glass text-red-400 hover:text-red-300 hover:bg-red-900/20 font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
             >
               <Trash2 className="w-4 h-4" />
-              Löschen
+              <span className="hidden sm:inline">Löschen</span>
+              <span className="sm:hidden">🗑️</span>
             </button>
             {zone.type === 'rack' && (
               <button
@@ -221,40 +222,42 @@ export function ZoneDetailPage() {
                     handleCreateShelves(parseInt(count));
                   }
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
-                Fächer erstellen
+                <span className="hidden sm:inline">Fächer erstellen</span>
+                <span className="sm:hidden">Fächer</span>
               </button>
             )}
             <button
               onClick={handleCreateSubzone}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              Unterzone erstellen
+              <span className="hidden sm:inline">Unterzone erstellen</span>
+              <span className="sm:hidden">Unterzone</span>
             </button>
           </div>
         </div>
 
         {zone.description && (
-          <p className="text-gray-400 mt-4">{zone.description}</p>
+          <p className="text-sm sm:text-base text-gray-400 mt-3 sm:mt-4">{zone.description}</p>
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="glass rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{zone.device_count}</div>
-            <div className="text-sm text-gray-400">Geräte</div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
+          <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
+            <div className="text-xl sm:text-2xl font-bold text-white">{zone.device_count}</div>
+            <div className="text-xs sm:text-sm text-gray-400">Geräte</div>
           </div>
-          <div className="glass rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{zone.subzones?.length || 0}</div>
-            <div className="text-sm text-gray-400">Unterzonen</div>
+          <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
+            <div className="text-xl sm:text-2xl font-bold text-white">{zone.subzones?.length || 0}</div>
+            <div className="text-xs sm:text-sm text-gray-400">Unterzonen</div>
           </div>
           {zone.capacity && (
-            <div className="glass rounded-xl p-4">
-              <div className="text-2xl font-bold text-white">{zone.capacity}</div>
-              <div className="text-sm text-gray-400">Kapazität</div>
+            <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
+              <div className="text-xl sm:text-2xl font-bold text-white">{zone.capacity}</div>
+              <div className="text-xs sm:text-sm text-gray-400">Kapazität</div>
             </div>
           )}
         </div>
@@ -263,34 +266,34 @@ export function ZoneDetailPage() {
       {/* Subzones */}
       {zone.subzones && zone.subzones.length > 0 && (
         <div>
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+            <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
             Unterzonen
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {zone.subzones.map((subzone) => {
               const subTypeInfo = zoneTypes[subzone.type as keyof typeof zoneTypes] || zoneTypes.other;
               return (
                 <div
                   key={subzone.zone_id}
-                  className="glass rounded-xl p-5 hover:bg-white/20 transition-all cursor-pointer group relative"
+                  className="glass rounded-lg sm:rounded-xl p-4 sm:p-5 hover:bg-white/20 transition-all cursor-pointer group relative"
                   onClick={() => handleZoneClick(subzone.zone_id)}
                 >
                   <button
                     onClick={(e) => handleDeleteSubzone(e, subzone)}
-                    className="absolute top-3 right-3 p-2 glass-dark rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-10"
+                    className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 glass-dark rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-10"
                     title="Zone löschen"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
-                  <div className="flex items-start gap-4">
-                    <div className="text-3xl">{subTypeInfo.icon}</div>
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="text-2xl sm:text-3xl flex-shrink-0">{subTypeInfo.icon}</div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-bold text-white truncate group-hover:text-accent-red transition-colors">
+                      <h4 className="text-sm sm:text-base font-bold text-white truncate group-hover:text-accent-red transition-colors">
                         {subzone.name}
                       </h4>
-                      <p className="text-sm text-gray-400 font-mono">{subzone.code}</p>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                      <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">{subzone.code}</p>
+                      <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-gray-500">
                         <span>{subzone.device_count} Geräte</span>
                         {subzone.subzone_count > 0 && (
                           <span>{subzone.subzone_count} Unterzonen</span>
@@ -308,20 +311,20 @@ export function ZoneDetailPage() {
       {/* Devices */}
       {devices.length > 0 && (
         <div>
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5" />
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
+            <Package className="w-4 h-4 sm:w-5 sm:h-5" />
             Gelagerte Geräte ({devices.length})
           </h3>
-          <div className="glass-dark rounded-2xl overflow-hidden">
+          <div className="glass-dark rounded-xl sm:rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left p-4 text-sm font-semibold text-gray-400">Geräte-ID</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-400">Produkt</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-400">Hersteller</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-400">Modell</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-400">Barcode</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Geräte-ID</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Produkt</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">Hersteller</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">Modell</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden lg:table-cell">Barcode</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -330,11 +333,11 @@ export function ZoneDetailPage() {
                       key={device.device_id}
                       className="border-b border-white/5 hover:bg-white/5 transition-colors"
                     >
-                      <td className="p-4 font-mono text-sm text-white">{device.device_id}</td>
-                      <td className="p-4 text-white">{device.product_name || '-'}</td>
-                      <td className="p-4 text-gray-400">{device.manufacturer || '-'}</td>
-                      <td className="p-4 text-gray-400">{device.model || '-'}</td>
-                      <td className="p-4 font-mono text-sm text-gray-400">{device.barcode || '-'}</td>
+                      <td className="p-2 sm:p-4 font-mono text-xs sm:text-sm text-white">{device.device_id}</td>
+                      <td className="p-2 sm:p-4 text-xs sm:text-base text-white">{device.product_name || '-'}</td>
+                      <td className="p-2 sm:p-4 text-xs sm:text-base text-gray-400 hidden md:table-cell">{device.manufacturer || '-'}</td>
+                      <td className="p-2 sm:p-4 text-xs sm:text-base text-gray-400 hidden md:table-cell">{device.model || '-'}</td>
+                      <td className="p-2 sm:p-4 font-mono text-xs sm:text-sm text-gray-400 hidden lg:table-cell">{device.barcode || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -345,12 +348,12 @@ export function ZoneDetailPage() {
       )}
 
       {devices.length === 0 && (!zone.subzones || zone.subzones.length === 0) && (
-        <div className="text-center py-12 glass rounded-2xl">
-          <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">Diese Zone ist leer</p>
+        <div className="text-center py-8 sm:py-12 glass rounded-xl sm:rounded-2xl">
+          <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
+          <p className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4">Diese Zone ist leer</p>
           <button
             onClick={handleCreateSubzone}
-            className="text-accent-red hover:text-red-500 font-semibold"
+            className="text-sm sm:text-base text-accent-red hover:text-red-500 font-semibold"
           >
             Unterzone erstellen
           </button>
