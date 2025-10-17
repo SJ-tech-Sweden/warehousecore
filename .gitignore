@@ -50,5 +50,5 @@ temp/
 # MQTT Broker - Mosquitto
 mosquitto/data/
 mosquitto/log/
-mosquitto/config/passwords
 mosquitto/certs/
+# Note: mosquitto/config/passwords contains demo credentials and is committed for easy setup

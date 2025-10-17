@@ -281,40 +281,56 @@ You have two options for MQTT broker setup:
 
 If your StorageCore and ESP32 can both connect to the same server (e.g., both on-premises or both can reach your server), use the included Mosquitto container:
 
-**Quick Setup:**
+**Quick Setup (3 Steps):**
 
 ```bash
-# 1. Run the setup script to create MQTT user and password
-./mosquitto/setup-mqtt.sh
+# 1. Copy the example .env file
+cp .env.example .env
 
-# 2. Start Mosquitto broker
-docker-compose up -d mosquitto
+# 2. Edit .env with your database credentials (MQTT is pre-configured)
+nano .env  # or use your preferred editor
 
-# 3. Update your .env file
-LED_MQTT_HOST=mosquitto
-LED_MQTT_PORT=1883
-LED_MQTT_TLS=false
-LED_MQTT_USER=leduser
-LED_MQTT_PASS=<password_from_step_1>
-
-# 4. Restart StorageCore
-docker-compose restart storagecore
+# 3. Start everything
+docker-compose up -d
 ```
+
+**That's it!** The MQTT broker is pre-configured with demo credentials:
+- **Username:** `leduser`
+- **Password:** `ledpassword123`
+
+These credentials are already set in `.env.example` and work out of the box.
 
 **ESP32 Configuration:**
 
-In your ESP32 `secrets.h`, use your server's domain or IP:
+In your ESP32 `secrets.h`, use your server's domain or IP with the same demo credentials:
 
 ```cpp
-#define MQTT_HOST "your-server.example.com"  // or IP address
+#define MQTT_HOST "your-server.example.com"  // Replace with your server's domain or IP
 #define MQTT_PORT 1883
 #define MQTT_USER "leduser"
-#define MQTT_PASS "your_password"
+#define MQTT_PASS "ledpassword123"
 ```
 
-**Production with TLS:**
+**⚠️ Production Deployment:**
 
-For production deployments, enable TLS on port 8883. See `mosquitto/README.md` for detailed instructions on:
+For production, **change the default password** before deploying:
+
+```bash
+# Change password using the setup script
+./mosquitto/setup-mqtt.sh
+
+# Or manually
+docker run -it --rm -v $(pwd)/mosquitto/config:/mosquitto/config \
+  eclipse-mosquitto:2.0 mosquitto_passwd -c /mosquitto/config/passwords leduser
+
+# Update .env with new password
+nano .env  # Change LED_MQTT_PASS
+
+# Update ESP32 secrets.h with new password
+# Then restart: docker-compose restart
+```
+
+**Enable TLS for production** (port 8883). See `mosquitto/README.md` for detailed instructions on:
 - Setting up Let's Encrypt certificates
 - Configuring TLS in mosquitto.conf
 - Updating ESP32 firmware for TLS support
@@ -894,7 +910,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.26` - Self-hosted MQTT broker with Docker Compose (current)
+- `1.27` - Simplified zero-config MQTT setup with demo credentials (current)
+- `1.26` - Self-hosted MQTT broker with Docker Compose
 - `1.25` - LED warehouse bin highlighting system
 - `1.18` - User authentication and SSO with RentalCore
 - `1.17` - Fixed mobile scrolling issues and button overlaps
@@ -970,13 +987,37 @@ For issues or questions:
 
 ---
 
-**Version:** 1.26
+**Version:** 1.27
 **Last Updated:** 2025-10-17
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.27 (2025-10-17)
+- **Simplified MQTT Setup - Zero Configuration Required** 🚀
+  - Pre-configured password file with demo credentials (leduser/ledpassword123)
+  - No setup script required - just `docker-compose up -d` and it works
+  - Password file now committed to repository for instant deployment
+  - Default credentials in .env.example match mosquitto configuration
+  - ESP32 secrets.h.template updated with matching credentials
+  - Setup reduced from 4 steps to 3 steps (copy .env, edit DB credentials, start)
+- **Documentation Updates:**
+  - Simplified Quick Setup instructions in README
+  - mosquitto/README.md now emphasizes zero-config approach
+  - Custom password setup moved to "Optional" section
+  - Clear instructions for both demo and production use
+- **Developer Experience:**
+  - ✅ Clone repo → copy .env.example → docker-compose up → Done!
+  - ✅ No manual password creation needed
+  - ✅ Perfect for development and testing
+  - ✅ Production users can easily change credentials with documented steps
+- **Security Notes:**
+  - Demo credentials clearly marked in all files
+  - .gitignore updated to allow committing demo password file
+  - Production deployment guide includes password change instructions
+  - Optional setup script remains available for custom passwords
 
 ### Version 1.26 (2025-10-17)
 - **Feature: Self-Hosted MQTT Broker with Docker Compose** 🐳

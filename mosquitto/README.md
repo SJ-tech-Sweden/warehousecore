@@ -2,53 +2,61 @@
 
 This directory contains the configuration for the self-hosted Mosquitto MQTT broker used by StorageCore's LED warehouse highlighting system.
 
-## Quick Setup
+## Quick Setup (Pre-Configured)
 
-### 1. Create Password File
-
-Before starting the broker, you need to create a password file for authentication:
+The MQTT broker is **ready to use out of the box** with demo credentials:
 
 ```bash
-# Create initial password file with a user (replace 'leduser' and password as needed)
-docker run -it --rm -v $(pwd)/mosquitto/config:/mosquitto/config eclipse-mosquitto:2.0 \
-  mosquitto_passwd -c /mosquitto/config/passwords leduser
+# Just start the broker - no additional setup needed!
+docker-compose up -d
 ```
 
-You'll be prompted to enter the password twice.
+**Default Credentials:**
+- Username: `leduser`
+- Password: `ledpassword123`
 
-### 2. Add Additional Users (Optional)
+These credentials are pre-configured in:
+- `mosquitto/config/passwords` (password hash file)
+- `.env.example` (StorageCore configuration)
+- `firmware/esp32_sk6812_leds/secrets.h.template` (ESP32 configuration)
 
-To add more users:
-
-```bash
-# Add another user (without -c flag to append, not replace)
-docker run -it --rm -v $(pwd)/mosquitto/config:/mosquitto/config eclipse-mosquitto:2.0 \
-  mosquitto_passwd /mosquitto/config/passwords anotheruser
-```
-
-### 3. Set Correct Permissions
-
-```bash
-# Make sure mosquitto can read/write the files
-chmod -R 755 mosquitto/
-chmod 644 mosquitto/config/passwords
-```
-
-### 4. Start the Broker
-
-```bash
-docker-compose up -d mosquitto
-```
-
-### 5. Verify It's Running
+### Verify It's Running
 
 ```bash
 # Check logs
 docker-compose logs -f mosquitto
 
 # Test connection (requires mosquitto-clients installed locally)
-mosquitto_sub -h localhost -p 1883 -t test/topic -u leduser -P yourpassword
+mosquitto_sub -h localhost -p 1883 -t test/topic -u leduser -P ledpassword123
 ```
+
+## Custom Password Setup (Optional)
+
+If you want to change the default password or add additional users:
+
+### Option 1: Using the Setup Script
+
+```bash
+# Interactive setup wizard
+./mosquitto/setup-mqtt.sh
+```
+
+### Option 2: Manual Password Creation
+
+```bash
+# Create/replace password file with a new user
+docker run -it --rm -v $(pwd)/mosquitto/config:/mosquitto/config eclipse-mosquitto:2.0 \
+  mosquitto_passwd -c /mosquitto/config/passwords leduser
+
+# Add additional users (without -c flag to append)
+docker run -it --rm -v $(pwd)/mosquitto/config:/mosquitto/config eclipse-mosquitto:2.0 \
+  mosquitto_passwd /mosquitto/config/passwords anotheruser
+```
+
+After changing passwords, update:
+1. Your `.env` file with the new `LED_MQTT_PASS`
+2. Your ESP32 `secrets.h` with the new `MQTT_PASS`
+3. Restart the containers: `docker-compose restart`
 
 ## Configuration
 
