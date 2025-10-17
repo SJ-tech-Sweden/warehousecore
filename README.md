@@ -867,15 +867,15 @@ For issues or questions:
 
 ---
 
-**Version:** 1.18
-**Last Updated:** 2025-10-15
+**Version:** 1.25
+**Last Updated:** 2025-10-17
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
 
-### Version 1.19 (2025-10-17)
+### Version 1.25 (2025-10-17)
 - **Feature: LED Warehouse Bin Highlighting System** 🎨
   - Physical warehouse LED highlighting for job-based device picking
   - Real-time MQTT communication with ESP32 controllers
