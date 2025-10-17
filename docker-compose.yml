@@ -5,7 +5,7 @@ services:
     ports:
       - "8081:8081"
     env_file:
-      - .env
+      - .env  # Loads ALL variables from .env including LED_MQTT_HOST, LED_MQTT_USER, LED_MQTT_PASS, etc.
     restart: unless-stopped
     networks:
       - storagecore-network
