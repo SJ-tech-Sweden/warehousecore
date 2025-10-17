@@ -187,17 +187,19 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 
 **LED Mapping:** `internal/led/config/led_mapping.json`
 
-Defines which LED indices belong to which storage bins:
+Defines which LED indices belong to which storage bins.
+
+**The `bin_id` MUST be the exact `code` from your `storage_zones` database table:**
 
 ```json
 {
-  "warehouse_id": "weidelbach",
+  "warehouse_id": "WDL",
   "shelves": [
     {
-      "shelf_id": "A",
+      "shelf_id": "Regal-01",
       "bins": [
-        { "bin_id": "A-01", "pixels": [0, 1, 2, 3] },
-        { "bin_id": "A-02", "pixels": [4, 5, 6] }
+        { "bin_id": "WDL-RG-01-F-01", "pixels": [0, 1, 2, 3] },
+        { "bin_id": "WDL-RG-01-F-02", "pixels": [4, 5, 6] }
       ]
     }
   ],
@@ -213,6 +215,13 @@ Defines which LED indices belong to which storage bins:
   }
 }
 ```
+
+**How it works:**
+1. Job is selected with devices
+2. StorageCore looks up each device's `zone_id` in the database
+3. Gets the zone's `code` (e.g., "WDL-RG-01-F-01")
+4. Matches this code with `bin_id` in the mapping file
+5. Sends the corresponding `pixels` to the ESP32 to light up
 
 **JSON Schemas:** `internal/led/schema/led_command.schema.json`, `internal/led/schema/led_mapping.schema.json`
 
@@ -413,10 +422,19 @@ WAREHOUSE_ID=weidelbach
 
 Edit `internal/led/config/led_mapping.json`:
 
-1. Map storage bins to LED indices
-2. Support multiple LEDs per bin (e.g., `"pixels": [0, 1, 2, 3]`)
-3. Set defaults (color, pattern, intensity)
-4. Define LED strip parameters (length, pin, chipset)
+**IMPORTANT:** The `bin_id` must match the `code` from your `storage_zones` table in the database!
+
+Example:
+- Database has zone with `code = "WDL-RG-01-F-01"` (Weidelbach, Regal 01, Fach 01)
+- LED Mapping has `"bin_id": "WDL-RG-01-F-01"`
+- When a device in that zone is part of a job, the LEDs will light up
+
+1. Set `warehouse_id` to your main warehouse zone code (e.g., `"WDL"`)
+2. For each bin, use the exact `code` from `storage_zones` table as `bin_id`
+3. Map each bin to LED pixel indices (e.g., `"pixels": [0, 1, 2, 3]`)
+4. Support multiple LEDs per bin
+5. Set defaults (color, pattern, intensity)
+6. Define LED strip parameters (length, pin, chipset)
 
 **Testing Mapping:**
 ```bash
@@ -916,7 +934,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.28` - MQTT credentials via .env only, auto-generated password file (current)
+- `1.29` - LED mapping uses zone codes from database (current)
+- `1.28` - MQTT credentials via .env only, auto-generated password file
 - `1.27` - Simplified zero-config MQTT setup with demo credentials
 - `1.26` - Self-hosted MQTT broker with Docker Compose
 - `1.25` - LED warehouse bin highlighting system
@@ -994,13 +1013,48 @@ For issues or questions:
 
 ---
 
-**Version:** 1.28
+**Version:** 1.29
 **Last Updated:** 2025-10-17
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.29 (2025-10-17)
+- **LED Mapping Now Uses Zone Codes from Database** 🔗
+  - `bin_id` in LED mapping file must now match `code` from `storage_zones` table
+  - Example: `"bin_id": "WDL-RG-01-F-01"` matches zone code in database
+  - `WAREHOUSE_ID` environment variable is now the main warehouse zone code (e.g., "WDL")
+  - System automatically looks up device zones by code, not name
+- **Improved Database Integration:**
+  - Changed query from `z.name` to `z.code` in `getJobDeviceZones()`
+  - Zone codes are unique and hierarchical (e.g., WDL-RG-01-F-01)
+  - Direct mapping between database zones and LED pixels
+  - No manual zone name matching required
+- **Updated Configuration Examples:**
+  - LED mapping file now shows real zone codes: "WDL-RG-01-F-01", "WDL-RG-02-F-01"
+  - `WAREHOUSE_ID=WDL` instead of "weidelbach" in .env files
+  - ESP32 secrets.h.template updated with zone code examples
+  - Clear documentation on how bin_id must match database codes
+- **How It Works:**
+  1. Job is selected with devices
+  2. StorageCore queries device's `zone_id` from database
+  3. Gets the zone's `code` field (e.g., "WDL-RG-01-F-01")
+  4. Matches code with `bin_id` in LED mapping configuration
+  5. Sends corresponding pixel indices to ESP32
+  6. LEDs light up for the correct bins
+- **Documentation Updates:**
+  - Added clear explanation of zone code requirement
+  - Updated all examples to use database zone codes
+  - Added workflow diagram showing database → mapping → LEDs
+  - Commented environment variables with database reference
+- **Benefits:**
+  - ✅ Single source of truth (database zone codes)
+  - ✅ No manual synchronization between zones and LEDs
+  - ✅ Hierarchical zone codes work perfectly
+  - ✅ Easy to debug (zone codes are visible in both systems)
+  - ✅ Scalable to hundreds of bins
 
 ### Version 1.28 (2025-10-17)
 - **MQTT Credentials via .env Only - No Scripts Required** 🎯

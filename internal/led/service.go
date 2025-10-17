@@ -216,17 +216,19 @@ func (s *Service) GetStatus() map[string]interface{} {
 	return status
 }
 
-// getJobDeviceZones retrieves device zone mappings for a job from database
+// getJobDeviceZones retrieves device zone codes for a job from database
+// Returns a map of deviceID -> zone code (e.g., "WDL-06-RG-01-F-01")
 func (s *Service) getJobDeviceZones(jobID string) (map[string]string, error) {
 	db := repository.GetSQLDB()
 
-	// Query job devices with their zone information
+	// Query job devices with their zone CODE (not name!)
+	// The zone code matches the bin_id in the LED mapping configuration
 	query := `
-		SELECT jd.deviceID, COALESCE(z.name, '') as zone_name
+		SELECT jd.deviceID, COALESCE(z.code, '') as zone_code
 		FROM jobdevices jd
 		LEFT JOIN devices d ON jd.deviceID = d.deviceID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE jd.jobID = ? AND d.status = 'in_storage' AND z.name IS NOT NULL
+		WHERE jd.jobID = ? AND d.status = 'in_storage' AND z.code IS NOT NULL
 	`
 
 	rows, err := db.Query(query, jobID)
@@ -237,12 +239,13 @@ func (s *Service) getJobDeviceZones(jobID string) (map[string]string, error) {
 
 	deviceZones := make(map[string]string)
 	for rows.Next() {
-		var deviceID, zoneName string
-		if err := rows.Scan(&deviceID, &zoneName); err != nil {
+		var deviceID, zoneCode string
+		if err := rows.Scan(&deviceID, &zoneCode); err != nil {
 			log.Printf("[LED] Error scanning device row: %v", err)
 			continue
 		}
-		deviceZones[deviceID] = zoneName
+		deviceZones[deviceID] = zoneCode
+		log.Printf("[LED] Device %s is in zone %s", deviceID, zoneCode)
 	}
 
 	return deviceZones, nil
