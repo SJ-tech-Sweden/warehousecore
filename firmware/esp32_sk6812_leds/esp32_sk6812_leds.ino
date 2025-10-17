@@ -107,10 +107,10 @@ void setup() {
   mqttClient.setBufferSize(4096); // Increased buffer for JSON commands
 
   // Setup watchdog (10 seconds)
-  watchdogTimer = timerBegin(0, 80, true);
-  timerAttachInterrupt(watchdogTimer, &resetModule, true);
-  timerAlarmWrite(watchdogTimer, 10000000, false);
-  timerAlarmEnable(watchdogTimer);
+  // ESP32 Core 3.x API: timerBegin(frequency_in_hz)
+  watchdogTimer = timerBegin(1000000); // 1 MHz = 1 tick per microsecond
+  timerAttachInterrupt(watchdogTimer, &resetModule);
+  timerAlarm(watchdogTimer, 10000000, true, 0); // 10 seconds in microseconds, autoreload=true
   Serial.println("[WDT] Watchdog enabled (10s)");
 
   // Initial connection
@@ -120,8 +120,8 @@ void setup() {
 }
 
 void loop() {
-  // Reset watchdog
-  timerWrite(watchdogTimer, 0);
+  // Reset watchdog (ESP32 Core 3.x API)
+  timerRestart(watchdogTimer);
 
   // Maintain connections
   if (!mqttClient.connected()) {

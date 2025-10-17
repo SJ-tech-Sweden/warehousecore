@@ -51,6 +51,7 @@ GND      --->  GND (common ground!)
      ```
    - Go to Tools → Board → Boards Manager
    - Search for "esp32" and install "ESP32 by Espressif Systems"
+   - **Compatible with ESP32 Core 3.x** (uses new timer API)
 
 ### 2. Install Required Libraries
 
@@ -232,7 +233,7 @@ Options:
 - Electromagnetic interference (route data wire away from power)
 
 ### ESP32 crashes or reboots
-- Watchdog timeout (increase `timerAlarmWrite` value)
+- Watchdog timeout (increase timeout value in `timerAlarm()` call)
 - Insufficient power to ESP32 (use separate regulated 3.3V)
 - Memory issues (reduce `LED_LENGTH` or JSON buffer size)
 

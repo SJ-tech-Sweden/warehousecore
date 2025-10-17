@@ -10,23 +10,6 @@
         { "bin_id": "WDL-RG-01-F-04", "pixels": [11, 12, 13] },
         { "bin_id": "WDL-RG-01-F-05", "pixels": [14, 15, 16, 17] }
       ]
-    },
-    {
-      "shelf_id": "Regal-02",
-      "bins": [
-        { "bin_id": "WDL-RG-02-F-01", "pixels": [100, 101] },
-        { "bin_id": "WDL-RG-02-F-02", "pixels": [102, 103, 104] },
-        { "bin_id": "WDL-RG-02-F-03", "pixels": [105, 106] },
-        { "bin_id": "WDL-RG-02-F-04", "pixels": [107, 108, 109] }
-      ]
-    },
-    {
-      "shelf_id": "Regal-03",
-      "bins": [
-        { "bin_id": "WDL-RG-03-F-01", "pixels": [200, 201, 202] },
-        { "bin_id": "WDL-RG-03-F-02", "pixels": [203, 204] },
-        { "bin_id": "WDL-RG-03-F-03", "pixels": [205, 206, 207, 208] }
-      ]
     }
   ],
   "led_strip": {
