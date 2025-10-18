@@ -1126,6 +1126,232 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, []map[string]string{})
 }
 
+// GetDeviceTree returns devices organized in a hierarchical tree structure by categories
+func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
+	db := repository.GetSQLDB()
+
+	// Query for device tree with categories
+	query := `
+		SELECT
+			c.categoryID,
+			c.name as category_name,
+			sc.subCategoryID,
+			sc.name as subcategory_name,
+			sbc.subBierCategoryID,
+			sbc.name as subbiercategory_name,
+			d.deviceID,
+			d.status,
+			d.barcode,
+			d.serial_number,
+			COALESCE(p.name, '') as product_name,
+			d.zone_id,
+			COALESCE(z.code, '') as zone_code
+		FROM categories c
+		LEFT JOIN subCategories sc ON c.categoryID = sc.categoryID
+		LEFT JOIN subBierCategories sbc ON sc.subCategoryID = sbc.subCategoryID
+		LEFT JOIN products p ON sbc.subBierCategoryID = p.subBierCategoryID
+		LEFT JOIN devices d ON p.productID = d.productID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
+	`
+
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Printf("Error querying device tree: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	// Build tree structure
+	categories := make(map[int]*map[string]interface{})
+	subcategories := make(map[int]*map[string]interface{})
+	subbiercategories := make(map[int]*map[string]interface{})
+
+	for rows.Next() {
+		var categoryID, subcategoryID, subbiercategoryID sql.NullInt64
+		var categoryName, subcategoryName, subbiercategoryName sql.NullString
+		var deviceID, status, barcode, serialNumber, productName sql.NullString
+		var zoneID sql.NullInt64
+		var zoneCode sql.NullString
+
+		err := rows.Scan(&categoryID, &categoryName, &subcategoryID, &subcategoryName,
+			&subbiercategoryID, &subbiercategoryName, &deviceID, &status, &barcode,
+			&serialNumber, &productName, &zoneID, &zoneCode)
+		if err != nil {
+			log.Printf("Error scanning row: %v", err)
+			continue
+		}
+
+		// Skip if no category
+		if !categoryID.Valid {
+			continue
+		}
+
+		// Get or create category
+		catID := int(categoryID.Int64)
+		if _, exists := categories[catID]; !exists {
+			categories[catID] = &map[string]interface{}{
+				"id":              catID,
+				"name":            categoryName.String,
+				"subcategories":   []interface{}{},
+				"direct_devices":  []interface{}{},
+				"device_count":    0,
+			}
+		}
+
+		// Process subcategory if exists
+		if subcategoryID.Valid {
+			subCatID := int(subcategoryID.Int64)
+			if _, exists := subcategories[subCatID]; !exists {
+				subcategories[subCatID] = &map[string]interface{}{
+					"id":                 subCatID,
+					"name":               subcategoryName.String,
+					"subbiercategories":  []interface{}{},
+					"direct_devices":     []interface{}{},
+					"device_count":       0,
+				}
+				// Add subcategory to category
+				cat := *categories[catID]
+				cat["subcategories"] = append(cat["subcategories"].([]interface{}), subcategories[subCatID])
+			}
+
+			// Process subbiercategory if exists
+			if subbiercategoryID.Valid {
+				subBierCatID := int(subbiercategoryID.Int64)
+				if _, exists := subbiercategories[subBierCatID]; !exists {
+					subbiercategories[subBierCatID] = &map[string]interface{}{
+						"id":           subBierCatID,
+						"name":         subbiercategoryName.String,
+						"devices":      []interface{}{},
+						"device_count": 0,
+					}
+					// Add subbiercategory to subcategory
+					subCat := *subcategories[subCatID]
+					subCat["subbiercategories"] = append(subCat["subbiercategories"].([]interface{}), subbiercategories[subBierCatID])
+				}
+
+				// Add device to subbiercategory if exists
+				if deviceID.Valid {
+					device := map[string]interface{}{
+						"device_id":    deviceID.String,
+						"product_name": productName.String,
+						"status":       status.String,
+					}
+					if barcode.Valid {
+						device["barcode"] = barcode.String
+					}
+					if serialNumber.Valid {
+						device["serial_number"] = serialNumber.String
+					}
+					if zoneID.Valid {
+						device["zone_id"] = zoneID.Int64
+						device["zone_code"] = zoneCode.String
+					}
+
+					subBierCat := *subbiercategories[subBierCatID]
+					subBierCat["devices"] = append(subBierCat["devices"].([]interface{}), device)
+					subBierCat["device_count"] = subBierCat["device_count"].(int) + 1
+
+					// Update counts
+					subCat := *subcategories[subCatID]
+					subCat["device_count"] = subCat["device_count"].(int) + 1
+					cat := *categories[catID]
+					cat["device_count"] = cat["device_count"].(int) + 1
+				}
+			}
+		}
+	}
+
+	// Convert map to slice
+	treeData := []interface{}{}
+	for _, cat := range categories {
+		treeData = append(treeData, *cat)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"treeData": treeData,
+	})
+}
+
+// AssignDevicesToZone assigns multiple devices to a storage zone
+func AssignDevicesToZone(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	zoneID := vars["id"]
+
+	var input struct {
+		DeviceIDs []string `json:"device_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if len(input.DeviceIDs) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "No devices specified"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	// Verify zone exists
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM storage_zones WHERE zone_id = ?)", zoneID).Scan(&exists)
+	if err != nil || !exists {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Zone not found"})
+		return
+	}
+
+	// Update devices
+	successCount := 0
+	failedDevices := []string{}
+
+	for _, deviceID := range input.DeviceIDs {
+		result, err := db.Exec(`
+			UPDATE devices
+			SET zone_id = ?,
+			    status = CASE
+			        WHEN status = 'on_job' OR status = 'rented' THEN status
+			        ELSE 'in_storage'
+			    END
+			WHERE deviceID = ?
+		`, zoneID, deviceID)
+
+		if err != nil {
+			log.Printf("Error assigning device %s to zone %s: %v", deviceID, zoneID, err)
+			failedDevices = append(failedDevices, deviceID)
+			continue
+		}
+
+		rowsAffected, _ := result.RowsAffected()
+		if rowsAffected > 0 {
+			successCount++
+
+			// Log movement
+			_, _ = db.Exec(`
+				INSERT INTO device_movements (device_id, from_zone_id, to_zone_id, movement_type, moved_at)
+				SELECT ?, zone_id, ?, 'assignment', NOW()
+				FROM devices WHERE deviceID = ?
+			`, deviceID, zoneID, deviceID)
+		} else {
+			failedDevices = append(failedDevices, deviceID)
+		}
+	}
+
+	response := map[string]interface{}{
+		"success":       successCount,
+		"total":         len(input.DeviceIDs),
+		"failed_count":  len(failedDevices),
+	}
+
+	if len(failedDevices) > 0 {
+		response["failed_devices"] = failedDevices
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
 // Helper functions
 func respondJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")

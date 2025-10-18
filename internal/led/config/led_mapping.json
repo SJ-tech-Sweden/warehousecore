@@ -5,10 +5,10 @@
       "shelf_id": "WDL-06-RG-02",
       "bins": [
         { "bin_id": "WDL-06-RG-02-F-01", "pixels": [0, 1, 2, 3] },
-        { "bin_id": "WDL-06-RG-02-F-02", "pixels": [4, 5, 6] },
-        { "bin_id": "WDL-06-RG-02-F-03", "pixels": [7, 8, 9, 10] },
-        { "bin_id": "WDL-06-RG-02-F-04", "pixels": [11, 12, 13] },
-        { "bin_id": "WDL-06-RG-02-F-05", "pixels": [14, 15, 16, 17] }
+        { "bin_id": "WDL-06-RG-02-F-02", "pixels": [5, 6, 7, 8] },
+        { "bin_id": "WDL-06-RG-02-F-03", "pixels": [10, 11, 12, 13] },
+        { "bin_id": "WDL-06-RG-02-F-04", "pixels": [15, 16, 17, 18] },
+        { "bin_id": "WDL-06-RG-02-F-05", "pixels": [20, 21, 22, 23] }
       ]
     }
   ],

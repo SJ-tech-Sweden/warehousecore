@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Package, ChevronRight, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { zonesApi } from '../lib/api';
+import { DeviceTreeModal } from '../components/DeviceTreeModal';
 
 interface ZoneDetails {
   zone_id: number;
@@ -41,6 +42,7 @@ export function ZoneDetailPage() {
   const [zone, setZone] = useState<ZoneDetails | null>(null);
   const [devices, setDevices] = useState<DeviceInZone[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -140,6 +142,33 @@ export function ZoneDetailPage() {
     }
   };
 
+  const handleAssignDevices = async (deviceIds: string[]) => {
+    if (!id || deviceIds.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/v1/zones/${id}/devices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ device_ids: deviceIds }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        alert(`${result.success} von ${result.total} Geräten erfolgreich zugewiesen`);
+        loadDevices(); // Reload devices
+        loadZoneDetails(); // Reload zone details to update device count
+      } else {
+        alert(`Fehler beim Zuweisen der Geräte: ${result.error || 'Unbekannter Fehler'}`);
+      }
+    } catch (error) {
+      console.error('Failed to assign devices:', error);
+      alert('Fehler beim Zuweisen der Geräte');
+    }
+  };
+
   const zoneTypes = {
     warehouse: { label: 'Lager', icon: '🏭' },
     rack: { label: 'Regal', icon: '🗄️' },
@@ -214,6 +243,14 @@ export function ZoneDetailPage() {
               <span className="hidden sm:inline">Löschen</span>
               <span className="sm:hidden">🗑️</span>
             </button>
+            <button
+              onClick={() => setIsDeviceModalOpen(true)}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
+            >
+              <Package className="w-4 h-4" />
+              <span className="hidden sm:inline">Geräte hinzufügen</span>
+              <span className="sm:hidden">Geräte</span>
+            </button>
             {zone.type === 'rack' && (
               <button
                 onClick={() => {
@@ -222,7 +259,7 @@ export function ZoneDetailPage() {
                     handleCreateShelves(parseInt(count));
                   }
                 }}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Fächer erstellen</span>
@@ -359,6 +396,14 @@ export function ZoneDetailPage() {
           </button>
         </div>
       )}
+
+      {/* Device Tree Modal */}
+      <DeviceTreeModal
+        isOpen={isDeviceModalOpen}
+        onClose={() => setIsDeviceModalOpen(false)}
+        onConfirm={handleAssignDevices}
+        zoneId={zone.zone_id}
+      />
     </div>
   );
 }

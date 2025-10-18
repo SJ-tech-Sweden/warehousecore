@@ -114,6 +114,7 @@ func main() {
 
 	// Device endpoints
 	api.HandleFunc("/devices", handlers.GetDevices).Methods("GET")
+	api.HandleFunc("/devices/tree", handlers.GetDeviceTree).Methods("GET")
 	api.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
 	api.HandleFunc("/devices/{id}/status", handlers.UpdateDeviceStatus).Methods("PUT")
 	api.HandleFunc("/devices/{id}/movements", handlers.GetDeviceMovements).Methods("GET")
@@ -123,6 +124,7 @@ func main() {
 	api.HandleFunc("/zones", handlers.CreateZone).Methods("POST")
 	api.HandleFunc("/zones/scan", handlers.GetZoneByBarcode).Methods("GET") // Zone barcode lookup
 	api.HandleFunc("/zones/{id}/devices", handlers.GetZoneDevices).Methods("GET") // Must be before /zones/{id}
+	api.HandleFunc("/zones/{id}/devices", handlers.AssignDevicesToZone).Methods("POST") // Assign devices to zone
 	api.HandleFunc("/zones/{id}", handlers.GetZone).Methods("GET")
 	api.HandleFunc("/zones/{id}", handlers.UpdateZone).Methods("PUT")
 	api.HandleFunc("/zones/{id}", handlers.DeleteZone).Methods("DELETE")
