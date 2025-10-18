@@ -124,11 +124,18 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 		return nil, nil, err
 	}
 
-	// Remove from job assignment
+	// Reset pack status instead of removing from job
+	// This makes it appear as "not scanned" again in the job
 	if fromJobID != nil {
-		_, err = tx.Exec(`DELETE FROM jobdevices WHERE deviceID = ? AND jobID = ?`, device.DeviceID, *fromJobID)
+		_, err = tx.Exec(`
+			UPDATE jobdevices
+			SET pack_status = 'pending', pack_ts = NULL
+			WHERE deviceID = ? AND jobID = ?
+		`, device.DeviceID, *fromJobID)
 		if err != nil {
-			log.Printf("Warning: failed to remove job assignment: %v", err)
+			log.Printf("Warning: failed to reset pack status: %v", err)
+		} else {
+			log.Printf("Reset pack_status to 'pending' for device %s in job %d", device.DeviceID, *fromJobID)
 		}
 	}
 
