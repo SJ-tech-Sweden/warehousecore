@@ -119,7 +119,7 @@ export function Layout({ children }: LayoutProps) {
               </button>
             )}
             <h1 className="text-lg sm:text-2xl font-bold">
-              <span className="text-accent-red">Storage</span>
+              <span className="text-accent-red">Warehouse</span>
               <span className="text-white">Core</span>
             </h1>
           </div>
@@ -148,7 +148,7 @@ export function Layout({ children }: LayoutProps) {
         {/* Sidebar Header (Mobile only) */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 md:hidden">
           <h2 className="text-lg font-bold">
-            <span className="text-accent-red">Storage</span>
+            <span className="text-accent-red">Warehouse</span>
             <span className="text-white">Core</span>
           </h2>
           <button
