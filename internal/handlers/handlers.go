@@ -1135,21 +1135,21 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			c.categoryID,
 			c.name as category_name,
-			sc.subCategoryID,
+			sc.subcategoryID,
 			sc.name as subcategory_name,
-			sbc.subBierCategoryID,
+			sbc.subbiercategoryID,
 			sbc.name as subbiercategory_name,
 			d.deviceID,
 			d.status,
 			d.barcode,
-			d.serial_number,
+			d.serialnumber,
 			COALESCE(p.name, '') as product_name,
 			d.zone_id,
 			COALESCE(z.code, '') as zone_code
 		FROM categories c
-		LEFT JOIN subCategories sc ON c.categoryID = sc.categoryID
-		LEFT JOIN subBierCategories sbc ON sc.subCategoryID = sbc.subCategoryID
-		LEFT JOIN products p ON sbc.subBierCategoryID = p.subBierCategoryID
+		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
+		LEFT JOIN subbiercategories sbc ON sc.subcategoryID = sbc.subcategoryID
+		LEFT JOIN products p ON sbc.subbiercategoryID = p.subbiercategoryID
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
@@ -1165,11 +1165,12 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 
 	// Build tree structure
 	categories := make(map[int]*map[string]interface{})
-	subcategories := make(map[int]*map[string]interface{})
-	subbiercategories := make(map[int]*map[string]interface{})
+	subcategories := make(map[string]*map[string]interface{})
+	subbiercategories := make(map[string]*map[string]interface{})
 
 	for rows.Next() {
-		var categoryID, subcategoryID, subbiercategoryID sql.NullInt64
+		var categoryID sql.NullInt64
+		var subcategoryID, subbiercategoryID sql.NullString
 		var categoryName, subcategoryName, subbiercategoryName sql.NullString
 		var deviceID, status, barcode, serialNumber, productName sql.NullString
 		var zoneID sql.NullInt64
@@ -1202,7 +1203,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 
 		// Process subcategory if exists
 		if subcategoryID.Valid {
-			subCatID := int(subcategoryID.Int64)
+			subCatID := subcategoryID.String
 			if _, exists := subcategories[subCatID]; !exists {
 				subcategories[subCatID] = &map[string]interface{}{
 					"id":                 subCatID,
@@ -1218,7 +1219,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 
 			// Process subbiercategory if exists
 			if subbiercategoryID.Valid {
-				subBierCatID := int(subbiercategoryID.Int64)
+				subBierCatID := subbiercategoryID.String
 				if _, exists := subbiercategories[subBierCatID]; !exists {
 					subbiercategories[subBierCatID] = &map[string]interface{}{
 						"id":           subBierCatID,
