@@ -934,7 +934,8 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
-- `1.48` - Device detail modal with orange breathe LED locate (current)
+- `1.49` - Device detail modal on devices page (current)
+- `1.48` - Device detail modal with orange breathe LED locate
 - `1.47` - Auto-clear LEDs on page exit/browser close
 - `1.46` - Reset pack status on device intake
 - `1.45` - Complete LED refresh after device scan
@@ -1028,13 +1029,24 @@ For issues or questions:
 
 ---
 
-**Version:** 1.48
-**Last Updated:** 2025-10-18
+**Version:** 1.49
+**Last Updated:** 2025-10-19
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.49 (2025-10-19)
+- **Feature: Device Detail Modal on Devices Page** 📱
+  - Click any device on /devices page to open detail modal
+  - Same full device information popup as on zone detail page
+  - "Fach beleuchten" button with orange breathe LED
+  - Consistent UX across all device views
+- **User Experience:**
+  - Device cards now clickable on main devices page
+  - Quick access to device details from anywhere
+  - Instant LED location from device list
 
 ### Version 1.48 (2025-10-18)
 - **Feature: Device Detail Modal with LED Locate** 🔍💡
