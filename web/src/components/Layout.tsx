@@ -57,17 +57,24 @@ export function Layout({ children }: LayoutProps) {
     const hostname = window.location.hostname;
     const port = window.location.port;
 
-    // Check if we're on a subdomain setup (e.g., storage.server-nt.de)
-    if (hostname.startsWith('storage.')) {
-      // Replace 'storage' with 'rent'
-      const rentalHost = hostname.replace(/^storage\./, 'rent.');
+    // Check if we're on a subdomain setup (e.g., warehouse.server-nt.de)
+    if (hostname.startsWith('warehouse.')) {
+      // Replace 'warehouse' with 'rent'
+      const rentalHost = hostname.replace(/^warehouse\./, 'rent.');
       return `${protocol}//${rentalHost}`;
     } else if (port === '8082') {
       // Running on port 8082 -> go to 8081 on same host
       return `${protocol}//${hostname}:8081`;
     } else if (port === '') {
-      // No port specified (reverse proxy) - keep same host
-      return `${protocol}//${hostname}`;
+      // No port specified (reverse proxy) - assume different subdomain
+      // This handles cases like warehouse.example.com -> rent.example.com
+      if (hostname.includes('.')) {
+        // Try to replace warehouse with rent in hostname
+        const rentalHost = hostname.replace(/warehouse/i, 'rent');
+        return `${protocol}//${rentalHost}`;
+      }
+      // Fallback if no subdomain detected
+      return `${protocol}//${hostname}:8081`;
     } else {
       // Default fallback - try :8081 on same host
       return `${protocol}//${hostname}:8081`;
