@@ -216,29 +216,19 @@ func (s *Service) GetStatus() map[string]interface{} {
 	return status
 }
 
-// UpdateBinAfterScan updates LED color for a specific bin after a device scan
-// Green = still has devices needed for the job
-// Red = all devices from this bin have been taken
+// UpdateBinAfterScan refreshes ALL bins for a job after a device scan
+// This ensures all bins show correct colors: GREEN (has devices) or RED (empty/complete)
 func (s *Service) UpdateBinAfterScan(jobID string, zoneCode string) error {
-	if jobID == "" || zoneCode == "" {
-		return nil // Nothing to update
+	if jobID == "" {
+		return nil
 	}
 
-	db := repository.GetSQLDB()
+	log.Printf("[LED] Refreshing all bins for job %s after scan in zone %s", jobID, zoneCode)
 
-	// Check if there are still devices in this zone that are needed for this job
-	var count int
-	query := `
-		SELECT COUNT(*)
-		FROM jobdevices jd
-		JOIN devices d ON jd.deviceID = d.deviceID
-		JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE jd.jobID = ? AND z.code = ? AND d.status = 'in_storage'
-	`
-	err := db.QueryRow(query, jobID, zoneCode).Scan(&count)
+	// Get all device zones for this job with their current counts
+	deviceZones, err := s.getJobDeviceZonesWithCounts(jobID)
 	if err != nil {
-		log.Printf("[LED] Error checking remaining devices in zone %s: %v", zoneCode, err)
-		return err
+		return fmt.Errorf("failed to get job device zones: %w", err)
 	}
 
 	s.mu.RLock()
@@ -249,61 +239,89 @@ func (s *Service) UpdateBinAfterScan(jobID string, zoneCode string) error {
 		return fmt.Errorf("no mapping loaded")
 	}
 
-	// Find bin in mapping
-	var pixels []int
-	var shelfID string
-	found := false
+	// Build bins list with updated colors
+	shelvesMap := make(map[string][]Bin)
+
+	// Go through all bins in mapping
 	for _, shelf := range mapping.Shelves {
 		for _, bin := range shelf.Bins {
-			if bin.BinID == zoneCode {
-				pixels = bin.Pixels
-				shelfID = shelf.ShelfID
-				found = true
-				break
+			// Check if this bin has devices for the job
+			count, hasDevices := deviceZones[bin.BinID]
+
+			var color string
+			if hasDevices && count > 0 {
+				// Green - still has devices for this job
+				color = "#00FF00"
+				log.Printf("[LED] Bin %s: GREEN (%d devices remaining)", bin.BinID, count)
+			} else {
+				// Red - no devices or all taken
+				color = "#FF0000"
+				log.Printf("[LED] Bin %s: RED (complete or not needed)", bin.BinID)
 			}
+
+			ledBin := Bin{
+				BinID:     bin.BinID,
+				Pixels:    bin.Pixels,
+				Color:     color,
+				Pattern:   "solid",
+				Intensity: 255,
+			}
+
+			shelvesMap[shelf.ShelfID] = append(shelvesMap[shelf.ShelfID], ledBin)
 		}
-		if found {
-			break
-		}
 	}
 
-	if !found {
-		log.Printf("[LED] Zone code %s not found in LED mapping", zoneCode)
-		return nil // Not an error - zone might not have LEDs
+	// Convert map to shelves array
+	shelves := []Shelf{}
+	for shelfID, bins := range shelvesMap {
+		shelves = append(shelves, Shelf{
+			ShelfID: shelfID,
+			Bins:    bins,
+		})
 	}
 
-	// Determine color based on remaining devices
-	color := "#FF0000" // Red - bin is done
-	pattern := "solid"
-	if count > 0 {
-		color = "#00FF00" // Green - still has devices
-		pattern = "solid"
-		log.Printf("[LED] Zone %s still has %d devices for job %s - setting to GREEN", zoneCode, count, jobID)
-	} else {
-		log.Printf("[LED] Zone %s is now empty for job %s - setting to RED", zoneCode, jobID)
-	}
-
-	// Create update command for this specific bin
+	// Send complete update for all bins
 	cmd := LEDCommand{
 		Op:          "highlight",
 		WarehouseID: mapping.WarehouseID,
-		Shelves: []Shelf{
-			{
-				ShelfID: shelfID,
-				Bins: []Bin{
-					{
-						BinID:     zoneCode,
-						Pixels:    pixels,
-						Color:     color,
-						Pattern:   pattern,
-						Intensity: 255,
-					},
-				},
-			},
-		},
+		Shelves:     shelves,
 	}
 
 	return s.publisher.PublishCommand(cmd)
+}
+
+// getJobDeviceZonesWithCounts returns a map of zone_code -> device count for a job
+func (s *Service) getJobDeviceZonesWithCounts(jobID string) (map[string]int, error) {
+	db := repository.GetSQLDB()
+
+	query := `
+		SELECT z.code, COUNT(*) as device_count
+		FROM jobdevices jd
+		JOIN devices d ON jd.deviceID = d.deviceID
+		JOIN storage_zones z ON d.zone_id = z.zone_id
+		WHERE jd.jobID = ? AND d.status = 'in_storage' AND z.code IS NOT NULL
+		GROUP BY z.code
+	`
+
+	rows, err := db.Query(query, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	zoneCounts := make(map[string]int)
+	for rows.Next() {
+		var zoneCode string
+		var count int
+		if err := rows.Scan(&zoneCode, &count); err != nil {
+			log.Printf("[LED] Error scanning zone count: %v", err)
+			continue
+		}
+		zoneCounts[zoneCode] = count
+		log.Printf("[LED] Zone %s has %d devices for job %s", zoneCode, count, jobID)
+	}
+
+	return zoneCounts, nil
 }
 
 // getJobDeviceZones retrieves device zone codes for a job from database
