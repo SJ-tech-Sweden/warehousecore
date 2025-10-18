@@ -42,6 +42,41 @@ export function JobsPage() {
     }
   }, [selectedJob]);
 
+  // Cleanup LEDs when leaving the page or unmounting
+  useEffect(() => {
+    const clearLEDsOnExit = async () => {
+      if (ledActive) {
+        try {
+          await ledApi.clear();
+        } catch (error) {
+          console.error('Failed to clear LEDs on exit:', error);
+        }
+      }
+    };
+
+    // Cleanup when component unmounts (navigating to different page)
+    return () => {
+      clearLEDsOnExit();
+    };
+  }, [ledActive]);
+
+  // Clear LEDs when browser is closed or page is reloaded
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      if (ledActive) {
+        try {
+          // Use navigator.sendBeacon for reliable cleanup on page unload
+          await ledApi.clear();
+        } catch (error) {
+          console.error('Failed to clear LEDs on unload:', error);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [ledActive]);
+
   const loadJobs = async () => {
     try {
       setLoading(true);
