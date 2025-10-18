@@ -193,6 +193,62 @@ func (s *Service) TestBin(shelfID, binID string) error {
 	return s.publisher.PublishCommand(cmd)
 }
 
+// LocateBin highlights a single bin with orange breathe pattern to help locate it
+func (s *Service) LocateBin(binCode string) error {
+	s.mu.RLock()
+	mapping := s.mapping
+	s.mu.RUnlock()
+
+	if mapping == nil {
+		return fmt.Errorf("no mapping loaded")
+	}
+
+	// Find bin by code (binCode is the zone code like "WDL-06-RG-02-F-01")
+	var pixels []int
+	var shelfID string
+	found := false
+	for _, shelf := range mapping.Shelves {
+		for _, bin := range shelf.Bins {
+			if bin.BinID == binCode {
+				pixels = bin.Pixels
+				shelfID = shelf.ShelfID
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("bin with code %s not found in LED mapping", binCode)
+	}
+
+	// Create locate command (orange breathe pattern)
+	cmd := LEDCommand{
+		Op:          "highlight",
+		WarehouseID: mapping.WarehouseID,
+		Shelves: []Shelf{
+			{
+				ShelfID: shelfID,
+				Bins: []Bin{
+					{
+						BinID:     binCode,
+						Pixels:    pixels,
+						Color:     "#FF8C00", // Orange
+						Pattern:   "breathe",
+						Intensity: 200,
+					},
+				},
+			},
+		},
+	}
+
+	log.Printf("[LED] Locating bin %s with orange breathe pattern", binCode)
+	return s.publisher.PublishCommand(cmd)
+}
+
 // GetStatus returns the current LED system status
 func (s *Service) GetStatus() map[string]interface{} {
 	s.mu.RLock()

@@ -77,6 +77,28 @@ func TestBin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// LocateBin highlights a specific bin with orange breathe pattern to help locate a device
+func LocateBin(w http.ResponseWriter, r *http.Request) {
+	binCode := r.URL.Query().Get("bin_code")
+
+	if binCode == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "bin_code parameter required"})
+		return
+	}
+
+	service := led.GetService()
+	if err := service.LocateBin(binCode); err != nil {
+		log.Printf("[LED] Failed to locate bin %s: %v", binCode, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message":  "Bin location command sent (orange breathe)",
+		"bin_code": binCode,
+	})
+}
+
 // GetLEDStatus returns current LED system status
 func GetLEDStatus(w http.ResponseWriter, r *http.Request) {
 	service := led.GetService()

@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Package, ChevronRight, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { zonesApi } from '../lib/api';
 import { DeviceTreeModal } from '../components/DeviceTreeModal';
+import { DeviceDetailModal } from '../components/DeviceDetailModal';
+import type { Device } from '../lib/api';
 
 interface ZoneDetails {
   zone_id: number;
@@ -29,11 +31,15 @@ interface DeviceInZone {
   device_id: string;
   product_id?: number;
   product_name: string;
+  serial_number?: string;
   manufacturer?: string;
   model?: string;
   status: string;
   barcode?: string;
   qr_code?: string;
+  zone_code?: string;
+  condition_rating: number;
+  usage_hours: number;
 }
 
 export function ZoneDetailPage() {
@@ -43,6 +49,8 @@ export function ZoneDetailPage() {
   const [devices, setDevices] = useState<DeviceInZone[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -140,6 +148,26 @@ export function ZoneDetailPage() {
       console.error('Failed to delete subzone:', error);
       alert('Fehler beim Löschen der Zone. Prüfe ob die Zone Unterzonen oder Geräte enthält.');
     }
+  };
+
+  const handleDeviceClick = (device: DeviceInZone) => {
+    // Convert DeviceInZone to Device type
+    const deviceForModal: Device = {
+      device_id: device.device_id,
+      product_id: device.product_id,
+      product_name: device.product_name,
+      serial_number: device.serial_number,
+      barcode: device.barcode,
+      qr_code: device.qr_code,
+      status: device.status,
+      zone_name: zone?.name,
+      zone_code: device.zone_code,
+      zone_id: zone?.zone_id,
+      condition_rating: device.condition_rating,
+      usage_hours: device.usage_hours,
+    };
+    setSelectedDevice(deviceForModal);
+    setIsDetailModalOpen(true);
   };
 
   const handleAssignDevices = async (deviceIds: string[]) => {
@@ -368,7 +396,8 @@ export function ZoneDetailPage() {
                   {devices.map((device) => (
                     <tr
                       key={device.device_id}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      onClick={() => handleDeviceClick(device)}
+                      className="border-b border-white/5 hover:bg-white/5 hover:cursor-pointer transition-colors"
                     >
                       <td className="p-2 sm:p-4 font-mono text-xs sm:text-sm text-white">{device.device_id}</td>
                       <td className="p-2 sm:p-4 text-xs sm:text-base text-white">{device.product_name || '-'}</td>
@@ -403,6 +432,13 @@ export function ZoneDetailPage() {
         onClose={() => setIsDeviceModalOpen(false)}
         onConfirm={handleAssignDevices}
         zoneId={zone.zone_id}
+      />
+
+      {/* Device Detail Modal */}
+      <DeviceDetailModal
+        device={selectedDevice}
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
       />
     </div>
   );

@@ -102,9 +102,11 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 	query := `
-		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code, d.zone_id,
+		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
+		       d.zone_id, d.condition_rating, d.usage_hours,
 		       COALESCE(p.name, '') as product_name,
-		       COALESCE(z.name, '') as zone_name
+		       COALESCE(z.name, '') as zone_name,
+		       COALESCE(z.code, '') as zone_code
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
@@ -133,7 +135,8 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 	devices := []models.DeviceWithDetails{}
 	for rows.Next() {
 		var d models.DeviceWithDetails
-		rows.Scan(&d.DeviceID, &d.ProductID, &d.Status, &d.Barcode, &d.QRCode, &d.ZoneID, &d.ProductName, &d.ZoneName)
+		rows.Scan(&d.DeviceID, &d.ProductID, &d.SerialNumber, &d.Status, &d.Barcode, &d.QRCode,
+			&d.ZoneID, &d.ConditionRating, &d.UsageHours, &d.ProductName, &d.ZoneName, &d.ZoneCode)
 		devices = append(devices, d)
 	}
 
@@ -148,14 +151,18 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	var device models.DeviceWithDetails
 	err := db.QueryRow(`
-		SELECT d.*, COALESCE(p.name, '') as product_name,
-		       COALESCE(z.name, '') as zone_name
+		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
+		       d.zone_id, d.condition_rating, d.usage_hours,
+		       COALESCE(p.name, '') as product_name,
+		       COALESCE(z.name, '') as zone_name,
+		       COALESCE(z.code, '') as zone_code
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		WHERE d.deviceID = ?
 	`, deviceID).Scan(&device.DeviceID, &device.ProductID, &device.SerialNumber, &device.Status,
-		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ProductName, &device.ZoneName)
+		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ConditionRating, &device.UsageHours,
+		&device.ProductName, &device.ZoneName, &device.ZoneCode)
 
 	if err == sql.ErrNoRows {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Device not found"})
@@ -450,14 +457,17 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 	rows, err := db.Query(`
-		SELECT d.deviceID, d.productID, d.status, d.barcode, d.qr_code,
+		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
+		       d.condition_rating, d.usage_hours,
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(m.name, '') as manufacturer,
-		       COALESCE(b.name, '') as model
+		       COALESCE(b.name, '') as model,
+		       COALESCE(z.code, '') as zone_code
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		LEFT JOIN brands b ON p.brandID = b.brandID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		WHERE d.zone_id = ? AND d.status = 'in_storage'
 		ORDER BY p.name, d.deviceID
 	`, zoneID)
@@ -469,24 +479,28 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type DeviceInZone struct {
-		DeviceID     string  `json:"device_id"`
-		ProductID    *int    `json:"product_id"`
-		ProductName  string  `json:"product_name"`
-		Manufacturer string  `json:"manufacturer,omitempty"`
-		Model        string  `json:"model,omitempty"`
-		Status       string  `json:"status"`
-		Barcode      *string `json:"barcode,omitempty"`
-		QRCode       *string `json:"qr_code,omitempty"`
+		DeviceID        string  `json:"device_id"`
+		ProductID       *int    `json:"product_id"`
+		ProductName     string  `json:"product_name"`
+		SerialNumber    *string `json:"serial_number,omitempty"`
+		Manufacturer    string  `json:"manufacturer,omitempty"`
+		Model           string  `json:"model,omitempty"`
+		Status          string  `json:"status"`
+		Barcode         *string `json:"barcode,omitempty"`
+		QRCode          *string `json:"qr_code,omitempty"`
+		ZoneCode        string  `json:"zone_code,omitempty"`
+		ConditionRating float64 `json:"condition_rating"`
+		UsageHours      float64 `json:"usage_hours"`
 	}
 
 	devices := []DeviceInZone{}
 	for rows.Next() {
 		var d DeviceInZone
 		var productID sql.NullInt64
-		var barcode, qrCode sql.NullString
+		var barcode, qrCode, serialNumber sql.NullString
 
-		if err := rows.Scan(&d.DeviceID, &productID, &d.Status, &barcode, &qrCode,
-			&d.ProductName, &d.Manufacturer, &d.Model); err != nil {
+		if err := rows.Scan(&d.DeviceID, &productID, &serialNumber, &d.Status, &barcode, &qrCode,
+			&d.ConditionRating, &d.UsageHours, &d.ProductName, &d.Manufacturer, &d.Model, &d.ZoneCode); err != nil {
 			log.Printf("Error scanning device row: %v", err)
 			continue
 		}
@@ -500,6 +514,9 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 		}
 		if qrCode.Valid {
 			d.QRCode = &qrCode.String
+		}
+		if serialNumber.Valid {
+			d.SerialNumber = &serialNumber.String
 		}
 
 		devices = append(devices, d)

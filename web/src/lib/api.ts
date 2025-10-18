@@ -17,10 +17,12 @@ export interface Device {
   product_name?: string;
   barcode?: string;
   qr_code?: string;
+  serial_number?: string;
   status: string;
   current_location?: string;
   zone_id?: number;
   zone_name?: string;
+  zone_code?: string;
   case_name?: string;
   job_number?: string;
   condition_rating: number;
@@ -219,6 +221,8 @@ export const ledApi = {
   identify: () => api.post('/led/identify'),
   testBin: (shelfId: string, binId: string) =>
     api.post(`/led/test?shelf_id=${shelfId}&bin_id=${binId}`),
+  locateBin: (binCode: string) =>
+    api.post(`/led/locate?bin_code=${binCode}`),
   getMapping: () => api.get<LEDMapping>('/led/mapping'),
   updateMapping: (mapping: LEDMapping) => api.put('/led/mapping', mapping),
   validateMapping: (mapping: LEDMapping) => api.post('/led/mapping/validate', mapping),
