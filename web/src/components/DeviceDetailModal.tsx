@@ -1,7 +1,7 @@
-import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb } from 'lucide-react';
+import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb, LightbulbOff } from 'lucide-react';
 import { ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface DeviceDetailModalProps {
   device: Device | null;
@@ -12,6 +12,15 @@ interface DeviceDetailModalProps {
 export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModalProps) {
   const [locating, setLocating] = useState(false);
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
+  const [ledActive, setLedActive] = useState(false);
+
+  // Cleanup LEDs when modal closes
+  useEffect(() => {
+    if (!isOpen && ledActive) {
+      ledApi.clear().catch(err => console.error('Failed to clear LEDs:', err));
+      setLedActive(false);
+    }
+  }, [isOpen, ledActive]);
 
   if (!isOpen || !device) return null;
 
@@ -27,11 +36,30 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
 
     try {
       await ledApi.locateBin(device.zone_code);
+      setLedActive(true);
       setLocateMessage(`✓ Fach ${device.zone_code} leuchtet jetzt orange`);
       setTimeout(() => setLocateMessage(null), 5000);
     } catch (error: any) {
       console.error('Failed to locate bin:', error);
       setLocateMessage('Fehler beim Beleuchten des Fachs');
+      setTimeout(() => setLocateMessage(null), 3000);
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleClearLED = async () => {
+    setLocating(true);
+    setLocateMessage(null);
+
+    try {
+      await ledApi.clear();
+      setLedActive(false);
+      setLocateMessage('✓ LEDs ausgeschaltet');
+      setTimeout(() => setLocateMessage(null), 3000);
+    } catch (error: any) {
+      console.error('Failed to clear LEDs:', error);
+      setLocateMessage('Fehler beim Ausschalten');
       setTimeout(() => setLocateMessage(null), 3000);
     } finally {
       setLocating(false);
@@ -196,21 +224,40 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
             </div>
           </div>
 
-          {/* Locate Button */}
+          {/* LED Control Buttons */}
           {device.zone_code && (
             <div className="pt-4 border-t border-white/10">
-              <button
-                onClick={handleLocate}
-                disabled={locating}
-                className={`w-full py-3 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${
-                  locating
-                    ? 'bg-gray-600 cursor-not-allowed opacity-50'
-                    : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105 active:scale-95'
-                }`}
-              >
-                <Lightbulb className="w-5 h-5" />
-                <span>{locating ? 'Beleuchte Fach...' : 'Fach beleuchten (Orange)'}</span>
-              </button>
+              <div className="flex gap-3">
+                {/* Locate Button */}
+                <button
+                  onClick={handleLocate}
+                  disabled={locating || ledActive}
+                  className={`flex-1 py-3 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${
+                    locating || ledActive
+                      ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                      : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:shadow-lg hover:shadow-orange-500/50 hover:scale-105 active:scale-95'
+                  }`}
+                >
+                  <Lightbulb className="w-5 h-5" />
+                  <span>{locating ? 'Beleuchte...' : 'Fach beleuchten'}</span>
+                </button>
+
+                {/* Clear LEDs Button */}
+                {ledActive && (
+                  <button
+                    onClick={handleClearLED}
+                    disabled={locating}
+                    className={`flex-1 py-3 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${
+                      locating
+                        ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                        : 'bg-gradient-to-r from-red-600 to-red-700 hover:shadow-lg hover:shadow-red-500/50 hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    <LightbulbOff className="w-5 h-5" />
+                    <span>Ausschalten</span>
+                  </button>
+                )}
+              </div>
 
               {/* Locate Message */}
               {locateMessage && (

@@ -285,7 +285,7 @@ void handleHighlightCommand(JsonDocument& doc) {
           led.pattern = pattern;
           led.intensity = intensity;
           led.lastUpdate = millis();
-          led.phaseOffset = random(0, 255);
+          led.phaseOffset = 0; // Synchronous breathe for all LEDs in same bin
           activeLEDs.push_back(led);
           totalPixels++;
         }

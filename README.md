@@ -1029,13 +1029,29 @@ For issues or questions:
 
 ---
 
-**Version:** 1.52
+**Version:** 1.54
 **Last Updated:** 2025-10-19
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.54 (2025-10-19)
+- **Feature: LED Control Improvements** 💡
+  - Added manual "Ausschalten" button to turn off orange locate LEDs
+  - LEDs automatically turn off when closing device detail modal
+  - Improved UX with visual feedback for LED state
+  - Dual-button layout: "Fach beleuchten" (orange) and "Ausschalten" (red)
+  - Disabled "Fach beleuchten" button while LEDs are active
+
+### Version 1.53 (2025-10-19)
+- **Enhancement: Synchronous LED Breathe Effect** 🎨
+  - Changed orange color from #FF8C00 to #FF4500 (more vibrant OrangeRed)
+  - Increased LED intensity from 200 to 255 for maximum brightness
+  - Fixed ESP32 firmware to synchronize breathe animation across all LEDs in bin
+  - Changed phaseOffset from random to 0 for perfect synchronization
+  - All LEDs in the same bin now breathe in perfect harmony
 
 ### Version 1.52 (2025-10-19)
 - **Bug Fix: Device API JSON Serialization** 🐛

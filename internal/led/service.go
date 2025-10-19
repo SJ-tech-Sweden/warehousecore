@@ -236,9 +236,9 @@ func (s *Service) LocateBin(binCode string) error {
 					{
 						BinID:     binCode,
 						Pixels:    pixels,
-						Color:     "#FF8C00", // Orange
+						Color:     "#FF4500", // Vibrant Orange (OrangeRed)
 						Pattern:   "breathe",
-						Intensity: 200,
+						Intensity: 255,
 					},
 				},
 			},
