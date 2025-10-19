@@ -54,8 +54,51 @@ WarehouseCore manages the physical warehouse operations for Tsunami Events, sync
 3. **Scan System**
    - Barcode and QR code support
    - Intake/outtake/transfer/check actions
-   - Duplicate scan detection
-   - Complete event logging with IP/user-agent
+  - Duplicate scan detection
+  - Complete event logging with IP/user-agent
+
+## Admin-Dashboard & Rollen
+
+- Admin: verwaltet Zonentypen, LED-Defaults, Rollen; sieht Profilseite.
+- Manager: darf Zonentypen lesen/listen; keine Änderungen/Löschungen.
+- Worker/Viewer: kein Zugriff auf Admin-Routen.
+
+API Endpoints (unter `\`/api/v1\``):
+- `GET /admin/zone-types` (admin|manager), `POST/PUT/DELETE /admin/zone-types/:id` (admin)
+- `GET /admin/led/single-bin-default` (admin|manager), `PUT /admin/led/single-bin-default` (admin)
+- `GET /admin/roles` (admin|manager), `GET /admin/users` (admin|manager)
+- `GET /admin/users/:id/roles` (admin|manager), `PUT /admin/users/:id/roles` (admin)
+- `GET /profile/me`, `PUT /profile/me`
+
+RBAC Matrix (vereinfacht):
+- admin: Vollzugriff
+- manager: Lesen (ZoneTypes, Rollenliste/Benutzerliste)
+- worker/viewer: kein Adminzugriff
+
+Auto-Admin Seed:
+- ENV `ADMIN_NAME_MATCH` (Default: `N. Thielmann`)
+- Beim Start werden Benutzer, deren Name/Username/Email diesen String enthält, automatisch mit der Rolle `admin` versehen.
+
+Cross-Links Navbar:
+- Domains werden via Backend in `window.__APP_CONFIG__` injiziert.
+- ENV: `RENTALCORE_DOMAIN`, `WAREHOUSECORE_DOMAIN` (ohne Protokoll/Port).
+
+Screens (Beschreibung):
+- Admin > Zonentypen: Tabelle mit CRUD, Validierung (Pattern, Farbe Hex, Intensität 0–255)
+- Admin > LED-Verhalten: Radio solid/breathe/blink, Color-Picker, Intensitäts-Slider, Vorschau
+- Admin > Rollen: Benutzerliste, Rollen-Chips, Speichern
+- Profil: Avatar-URL, Anzeigename, UI-Prefs (dark-mode default on)
+
+LED Single-Bin Defaults:
+- Setting Key: `app_settings(scope='warehousecore', k='led.single_bin.default')`
+- JSON Beispiel: `{ "color": "#FF7A00", "pattern": "breathe", "intensity": 180 }`
+- Fallback bei fehlender Einstellung: Orange `#FF7A00`, `breathe`, Intensität `180`.
+
+Migrations
+- Siehe Ordner `migrations/`:
+  - `007_rbac_system.sql` (+ down) – Zone Types, App Settings, User Profiles, WH-RBAC Seeds
+  - `008_assign_auto_admin.sql` – initialer Auto-Admin (Thielmann)
+  - `009_update_led_defaults.sql` (+ down) – LED-Default Orange/Breathe/180
 
 4. **Job Integration**
    - Real-time job assignment

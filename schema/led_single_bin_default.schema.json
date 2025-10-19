@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LEDSingleBinDefault",
+  "type": "object",
+  "properties": {
+    "color": { "type": "string", "pattern": "^#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$" },
+    "pattern": { "type": "string", "enum": ["solid", "breathe", "blink"] },
+    "intensity": { "type": "integer", "minimum": 0, "maximum": 255 }
+  },
+  "required": ["color", "pattern", "intensity"],
+  "additionalProperties": false
+}
+

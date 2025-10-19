@@ -1,13 +1,14 @@
 package led
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-	"sync"
+    "encoding/json"
+    "fmt"
+    "log"
+    "os"
+    "sync"
 
-	"warehousecore/internal/repository"
+    "warehousecore/internal/repository"
+    "warehousecore/internal/models"
 )
 
 // Service handles LED-related business logic
@@ -193,7 +194,7 @@ func (s *Service) TestBin(shelfID, binID string) error {
 	return s.publisher.PublishCommand(cmd)
 }
 
-// LocateBin highlights a single bin with orange breathe pattern to help locate it
+// LocateBin highlights a single bin with configurable pattern to help locate it
 func (s *Service) LocateBin(binCode string) error {
 	s.mu.RLock()
 	mapping := s.mapping
@@ -225,7 +226,34 @@ func (s *Service) LocateBin(binCode string) error {
 		return fmt.Errorf("bin with code %s not found in LED mapping", binCode)
 	}
 
-	// Create locate command (orange breathe pattern)
+    // Get LED defaults from settings (with fallback to defaults)
+    color := "#FF7A00"
+    pattern := "breathe"
+    intensity := uint8(180)
+
+	// Try to load from app_settings
+    gormDB := repository.GetDB()
+    if gormDB != nil {
+        var setting models.AppSetting
+        if err := gormDB.Where("scope = ? AND k = ?", "warehousecore", "led.single_bin.default").First(&setting).Error; err == nil {
+            // Parse JSON to defaults
+            bytes, _ := json.Marshal(setting.Value)
+            var defaults map[string]interface{}
+            if err := json.Unmarshal(bytes, &defaults); err == nil {
+                if c, ok := defaults["color"].(string); ok {
+                    color = c
+                }
+                if p, ok := defaults["pattern"].(string); ok {
+                    pattern = p
+                }
+                if i, ok := defaults["intensity"].(float64); ok {
+                    intensity = uint8(i)
+                }
+            }
+        }
+    }
+
+	// Create locate command with configurable settings
 	cmd := LEDCommand{
 		Op:          "highlight",
 		WarehouseID: mapping.WarehouseID,
@@ -236,16 +264,16 @@ func (s *Service) LocateBin(binCode string) error {
 					{
 						BinID:     binCode,
 						Pixels:    pixels,
-						Color:     "#FF4500", // Vibrant Orange (OrangeRed)
-						Pattern:   "breathe",
-						Intensity: 255,
+						Color:     color,
+						Pattern:   pattern,
+                    Intensity: int(intensity),
 					},
 				},
 			},
 		},
 	}
 
-	log.Printf("[LED] Locating bin %s with orange breathe pattern", binCode)
+	log.Printf("[LED] Locating bin %s with %s %s pattern (intensity: %d)", binCode, color, pattern, intensity)
 	return s.publisher.PublishCommand(cmd)
 }
 

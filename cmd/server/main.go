@@ -18,6 +18,7 @@ import (
 	"warehousecore/internal/handlers"
 	"warehousecore/internal/led"
 	"warehousecore/internal/middleware"
+	"warehousecore/internal/services"
 	"warehousecore/internal/repository"
 )
 
@@ -83,10 +84,19 @@ func main() {
 	}
 	defer repository.CloseDatabase()
 
-	// Initialize LED service
-	log.Println("[LED] Initializing LED service...")
-	_ = led.GetService() // Initialize singleton at startup
-	log.Println("[LED] LED service initialization complete")
+    // Initialize LED service
+    log.Println("[LED] Initializing LED service...")
+    _ = led.GetService() // Initialize singleton at startup
+    log.Println("[LED] LED service initialization complete")
+
+    // Ensure auto-admin assignment based on ENV (ADMIN_NAME_MATCH)
+    go func() {
+        // Run asynchronously to not block startup
+        r := services.NewRBACService()
+        if err := r.EnsureAutoAdminFromEnv(); err != nil {
+            log.Printf("[RBAC] Auto-admin assignment failed: %v", err)
+        }
+    }()
 
 	// Setup router
 	router := mux.NewRouter()
@@ -160,6 +170,32 @@ func main() {
 	api.HandleFunc("/led/mapping", handlers.GetLEDMapping).Methods("GET")
 	api.HandleFunc("/led/mapping", handlers.UpdateLEDMapping).Methods("PUT")
 	api.HandleFunc("/led/mapping/validate", handlers.ValidateLEDMapping).Methods("POST")
+
+    // Admin routes (RBAC protected)
+    // Read-only admin routes (admin or manager)
+    adminRead := api.PathPrefix("/admin").Subrouter()
+    adminRead.Use(middleware.AuthMiddleware)
+    adminRead.Use(middleware.RequireAdminOrManager)
+    adminRead.HandleFunc("/zone-types", handlers.GetZoneTypes).Methods("GET")
+    adminRead.HandleFunc("/zone-types/{id}", handlers.GetZoneType).Methods("GET")
+    adminRead.HandleFunc("/led/single-bin-default", handlers.GetLEDSingleBinDefault).Methods("GET")
+    adminRead.HandleFunc("/roles", handlers.GetRoles).Methods("GET")
+    adminRead.HandleFunc("/users", handlers.GetUsersWithRoles).Methods("GET")
+    adminRead.HandleFunc("/users/{id}/roles", handlers.GetUserRoles).Methods("GET")
+
+    // Admin-only routes (write operations)
+    admin := api.PathPrefix("/admin").Subrouter()
+    admin.Use(middleware.AuthMiddleware)
+    admin.Use(middleware.RequireAdmin)
+    admin.HandleFunc("/zone-types", handlers.CreateZoneType).Methods("POST")
+    admin.HandleFunc("/zone-types/{id}", handlers.UpdateZoneType).Methods("PUT")
+    admin.HandleFunc("/zone-types/{id}", handlers.DeleteZoneType).Methods("DELETE")
+    admin.HandleFunc("/led/single-bin-default", handlers.UpdateLEDSingleBinDefault).Methods("PUT")
+    admin.HandleFunc("/users/{id}/roles", handlers.UpdateUserRoles).Methods("PUT")
+
+	// Profile endpoints (authenticated users)
+	protected.HandleFunc("/profile/me", handlers.GetMyProfile).Methods("GET")
+	protected.HandleFunc("/profile/me", handlers.UpdateMyProfile).Methods("PUT")
 
 	// Apply middleware
 	api.Use(middleware.Logger)

@@ -93,10 +93,10 @@ func LocateBin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"message":  "Bin location command sent (orange breathe)",
-		"bin_code": binCode,
-	})
+    respondJSON(w, http.StatusOK, map[string]interface{}{
+        "message":  "Bin location command sent",
+        "bin_code": binCode,
+    })
 }
 
 // GetLEDStatus returns current LED system status

@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-// ZoneType represents the type of storage zone
-type ZoneType string
+// ZoneKind represents the type of storage zone
+type ZoneKind string
 
 const (
-	ZoneTypeShelf    ZoneType = "shelf"
-	ZoneTypeRack     ZoneType = "rack"
-	ZoneTypeCase     ZoneType = "case"
-	ZoneTypeVehicle  ZoneType = "vehicle"
-	ZoneTypeStage    ZoneType = "stage"
-	ZoneTypeWarehouse ZoneType = "warehouse"
-	ZoneTypeOther    ZoneType = "other"
+    ZoneKindShelf     ZoneKind = "shelf"
+    ZoneKindRack      ZoneKind = "rack"
+    ZoneKindCase      ZoneKind = "case"
+    ZoneKindVehicle   ZoneKind = "vehicle"
+    ZoneKindStage     ZoneKind = "stage"
+    ZoneKindWarehouse ZoneKind = "warehouse"
+    ZoneKindOther     ZoneKind = "other"
 )
 
 // Zone represents a logical storage area in the warehouse

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Package, MapPin, ScanLine, Wrench, Menu, Briefcase, X, LogOut, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, Package, MapPin, ScanLine, Wrench, Menu, Briefcase, X, LogOut, User, ChevronLeft, ChevronRight, Settings, UserCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -93,6 +93,8 @@ export function Layout({ children }: LayoutProps) {
     { path: '/zones', icon: MapPin, label: 'Zonen' },
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/maintenance', icon: Wrench, label: 'Wartung' },
+    { path: '/profile', icon: UserCircle, label: 'Profil' },
+    { path: '/admin', icon: Settings, label: 'Admin' },
   ];
 
   return (
@@ -139,7 +141,7 @@ export function Layout({ children }: LayoutProps) {
       {/* Mobile Backdrop */}
       {isMobile && sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/70 z-40"
           onClick={closeSidebar}
         />
       )}

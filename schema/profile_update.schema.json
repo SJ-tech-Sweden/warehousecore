@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ProfileUpdate",
+  "type": "object",
+  "properties": {
+    "display_name": { "type": ["string", "null"], "maxLength": 128 },
+    "avatar_url": { "type": ["string", "null"], "maxLength": 512 },
+    "prefs": { "type": ["object", "null"] }
+  },
+  "additionalProperties": false
+}
+

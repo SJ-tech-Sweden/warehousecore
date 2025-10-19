@@ -10,6 +10,8 @@ import { ZonesPage } from './pages/ZonesPage';
 import { ZoneDetailPage } from './pages/ZoneDetailPage';
 import { JobsPage } from './pages/JobsPage';
 import { MaintenancePage } from './pages/MaintenancePage';
+import { AdminPage } from './pages/AdminPage';
+import { ProfilePage } from './pages/ProfilePage';
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
           <Route path="/zones/:id" element={<ProtectedRoute><Layout><ZoneDetailPage /></Layout></ProtectedRoute>} />
           <Route path="/jobs" element={<ProtectedRoute><Layout><JobsPage /></Layout></ProtectedRoute>} />
           <Route path="/maintenance" element={<ProtectedRoute><Layout><MaintenancePage /></Layout></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute><Layout><AdminPage /></Layout></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Layout><ProfilePage /></Layout></ProtectedRoute>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>
