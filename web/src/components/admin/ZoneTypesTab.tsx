@@ -12,10 +12,16 @@ interface ZoneType {
   default_intensity: number;
 }
 
+type ZoneTypeForm = {
+  key: string;
+  label: string;
+  description?: string;
+};
+
 export function ZoneTypesTab() {
   const [zoneTypes, setZoneTypes] = useState<ZoneType[]>([]);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
-  const [formData, setFormData] = useState<Partial<ZoneType>>({});
+  const [formData, setFormData] = useState<ZoneTypeForm>({ key: '', label: '', description: '' });
 
   useEffect(() => {
     loadZoneTypes();
@@ -32,14 +38,20 @@ export function ZoneTypesTab() {
 
   const handleSave = async () => {
     try {
+      const payload = {
+        key: formData.key,
+        label: formData.label,
+        description: formData.description,
+      };
+
       if (editing === 'new') {
-        await api.post('/admin/zone-types', formData);
+        await api.post('/admin/zone-types', payload);
       } else if (typeof editing === 'number') {
-        await api.put(`/admin/zone-types/${editing}`, formData);
+        await api.put(`/admin/zone-types/${editing}`, payload);
       }
       loadZoneTypes();
       setEditing(null);
-      setFormData({});
+      setFormData({ key: '', label: '', description: '' });
     } catch (error: any) {
       alert('Fehler: ' + (error.response?.data?.error || error.message));
     }
@@ -57,16 +69,16 @@ export function ZoneTypesTab() {
 
   const startEdit = (zoneType: ZoneType) => {
     setEditing(zoneType.id);
-    setFormData(zoneType);
+    setFormData({
+      key: zoneType.key,
+      label: zoneType.label,
+      description: zoneType.description,
+    });
   };
 
   const startNew = () => {
     setEditing('new');
-    setFormData({
-      default_led_pattern: 'breathe',
-      default_led_color: '#FF7A00',
-      default_intensity: 180,
-    });
+    setFormData({ key: '', label: '', description: '' });
   };
 
   return (
@@ -86,18 +98,22 @@ export function ZoneTypesTab() {
       {/* Edit Form */}
       {editing && (
         <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
+          <p className="text-sm text-gray-400">
+            LED-Farbe, Muster und Intensität verwaltest du jetzt unter{' '}
+            <span className="text-white font-semibold">Admin &gt; LED-Verhalten</span>.
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <input
               type="text"
               placeholder="Key (z.B. shelf)"
-              value={formData.key || ''}
+              value={formData.key ?? ''}
               onChange={(e) => setFormData({ ...formData, key: e.target.value })}
               className="px-3 py-2 rounded-lg glass text-white"
             />
             <input
               type="text"
               placeholder="Label (z.B. Regal)"
-              value={formData.label || ''}
+              value={formData.label ?? ''}
               onChange={(e) => setFormData({ ...formData, label: e.target.value })}
               className="px-3 py-2 rounded-lg glass text-white"
             />
@@ -105,42 +121,16 @@ export function ZoneTypesTab() {
           <input
             type="text"
             placeholder="Beschreibung"
-            value={formData.description || ''}
+            value={formData.description ?? ''}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             className="w-full px-3 py-2 rounded-lg glass text-white"
           />
-          <div className="grid grid-cols-3 gap-3">
-            <select
-              value={formData.default_led_pattern || 'breathe'}
-              onChange={(e) => setFormData({ ...formData, default_led_pattern: e.target.value })}
-              className="px-3 py-2 rounded-lg glass text-white"
-            >
-              <option value="solid">Solid</option>
-              <option value="breathe">Breathe</option>
-              <option value="blink">Blink</option>
-            </select>
-            <input
-              type="color"
-              value={formData.default_led_color || '#FF4500'}
-              onChange={(e) => setFormData({ ...formData, default_led_color: e.target.value })}
-              className="h-full rounded-lg"
-            />
-            <input
-              type="number"
-              min="0"
-              max="255"
-              value={formData.default_intensity || 255}
-              onChange={(e) => setFormData({ ...formData, default_intensity: parseInt(e.target.value) })}
-              className="px-3 py-2 rounded-lg glass text-white"
-              placeholder="Intensität"
-            />
-          </div>
           <div className="flex gap-2">
             <button onClick={handleSave} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
               <Save className="w-4 h-4" />
               Speichern
             </button>
-            <button onClick={() => {setEditing(null); setFormData({});}} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
+            <button onClick={() => {setEditing(null); setFormData({ key: '', label: '', description: '' });}} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
               <X className="w-4 h-4" />
               Abbrechen
             </button>

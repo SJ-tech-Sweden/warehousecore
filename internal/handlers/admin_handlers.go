@@ -61,21 +61,39 @@ func CreateZoneType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    // Validate LED defaults if provided
-    if zoneType.DefaultLEDPattern != "" && !validation.ValidatePattern(zoneType.DefaultLEDPattern) {
-        respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid LED pattern. Must be solid, breathe, or blink"})
-        return
-    }
-    if zoneType.DefaultLEDColor != "" && !validation.ValidateColorHex(zoneType.DefaultLEDColor) {
-        respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid color. Use #RRGGBB or #AARRGGBB"})
-        return
-    }
-    if zoneType.DefaultIntensity > 255 {
-        respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid intensity. Must be 0-255"})
-        return
-    }
-
 	adminService := services.NewAdminService()
+
+	// Apply safe LED defaults if none were provided in the payload
+	ledDefaults, err := adminService.GetLEDSingleBinDefault()
+	if err != nil || ledDefaults == nil {
+		ledDefaults = &models.LEDSingleBinDefault{
+			Color:     "#FF7A00",
+			Pattern:   "breathe",
+			Intensity: 180,
+		}
+	}
+
+	if zoneType.DefaultLEDPattern == "" {
+		zoneType.DefaultLEDPattern = ledDefaults.Pattern
+	} else if !validation.ValidatePattern(zoneType.DefaultLEDPattern) {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid LED pattern. Must be solid, breathe, or blink"})
+		return
+	}
+
+	if zoneType.DefaultLEDColor == "" {
+		zoneType.DefaultLEDColor = ledDefaults.Color
+	} else if !validation.ValidateColorHex(zoneType.DefaultLEDColor) {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid color. Use #RRGGBB or #AARRGGBB"})
+		return
+	}
+
+	if zoneType.DefaultIntensity == 0 {
+		zoneType.DefaultIntensity = ledDefaults.Intensity
+	} else if zoneType.DefaultIntensity > 255 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid intensity. Must be 0-255"})
+		return
+	}
+
 	if err := adminService.CreateZoneType(&zoneType); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

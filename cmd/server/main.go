@@ -138,6 +138,7 @@ func main() {
 	api.HandleFunc("/zones/{id}", handlers.GetZone).Methods("GET")
 	api.HandleFunc("/zones/{id}", handlers.UpdateZone).Methods("PUT")
 	api.HandleFunc("/zones/{id}", handlers.DeleteZone).Methods("DELETE")
+	api.HandleFunc("/zone-types", handlers.GetZoneTypes).Methods("GET")
 
 	// Job endpoints
 	api.HandleFunc("/jobs", handlers.GetJobs).Methods("GET")

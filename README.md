@@ -84,8 +84,8 @@ Cross-Links Navbar:
 - ENV: `RENTALCORE_DOMAIN`, `WAREHOUSECORE_DOMAIN` (ohne Protokoll/Port).
 
 Screens (Beschreibung):
-- Admin > Zonentypen: Tabelle mit CRUD, Validierung (Pattern, Farbe Hex, Intensität 0–255)
-- Admin > LED-Verhalten: Radio solid/breathe/blink, Color-Picker, Intensitäts-Slider, Vorschau
+- Admin > Zonentypen: Tabelle mit CRUD für Key/Label/Beschreibung; LED-Defaults werden auf der LED-Seite gepflegt.
+- Admin > LED-Verhalten: Globale Defaults plus zonentypspezifische Muster/Farben/Intensitäten inkl. Vorschau
 - Admin > Rollen: Benutzerliste, Rollen-Chips, Speichern
 - Profil: Avatar-URL, Anzeigename, UI-Prefs (dark-mode default on)
 - Sidebar: Profilseite wird ausschließlich über den Username im Benutzerbereich geöffnet, kein separater Menüeintrag.

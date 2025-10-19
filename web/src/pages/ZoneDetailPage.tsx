@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Package, ChevronRight, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { zonesApi } from '../lib/api';
 import { DeviceTreeModal } from '../components/DeviceTreeModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
 import type { Device } from '../lib/api';
+import { useZoneTypes } from '../lib/useZoneTypes';
 
 interface ZoneDetails {
   zone_id: number;
@@ -51,6 +52,31 @@ export function ZoneDetailPage() {
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const { zoneTypes: zoneTypeDefs } = useZoneTypes();
+
+  const zoneTypeMap = useMemo(() => {
+    const iconMap: Record<string, string> = {
+      warehouse: '🏭',
+      rack: '🗄️',
+      gitterbox: '📦',
+      shelf: '📚',
+      vehicle: '🚚',
+      stage: '🎤',
+      case: '🧳',
+      other: '📍',
+    };
+
+    const map: Record<string, { label: string; icon: string }> = {};
+
+    zoneTypeDefs.forEach((type) => {
+      map[type.key] = {
+        label: type.label,
+        icon: iconMap[type.key] || iconMap.other,
+      };
+    });
+
+    return map;
+  }, [zoneTypeDefs]);
 
   useEffect(() => {
     if (id) {
@@ -197,14 +223,6 @@ export function ZoneDetailPage() {
     }
   };
 
-  const zoneTypes = {
-    warehouse: { label: 'Lager', icon: '🏭' },
-    rack: { label: 'Regal', icon: '🗄️' },
-    gitterbox: { label: 'Gitterbox', icon: '📦' },
-    shelf: { label: 'Fach', icon: '📚' },
-    other: { label: 'Sonstige', icon: '📍' },
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -221,7 +239,8 @@ export function ZoneDetailPage() {
     );
   }
 
-  const typeInfo = zoneTypes[zone.type as keyof typeof zoneTypes] || zoneTypes.other;
+  const defaultTypeInfo = { label: 'Sonstige', icon: '📍' };
+  const typeInfo = zoneTypeMap[zone.type] || defaultTypeInfo;
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
@@ -337,7 +356,7 @@ export function ZoneDetailPage() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {zone.subzones.map((subzone) => {
-              const subTypeInfo = zoneTypes[subzone.type as keyof typeof zoneTypes] || zoneTypes.other;
+              const subTypeInfo = zoneTypeMap[subzone.type] || defaultTypeInfo;
               return (
                 <div
                   key={subzone.zone_id}

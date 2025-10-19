@@ -40,6 +40,16 @@ export interface Zone {
   is_active: boolean;
 }
 
+export interface ZoneTypeDefinition {
+  id: number;
+  key: string;
+  label: string;
+  description?: string | null;
+  default_led_pattern?: string;
+  default_led_color?: string;
+  default_intensity?: number;
+}
+
 export interface ScanRequest {
   scan_code: string;
   action: 'intake' | 'outtake' | 'check' | 'transfer';
@@ -117,6 +127,10 @@ export const zonesApi = {
   create: (data: Partial<Zone>) => api.post<Zone>('/zones', data),
   update: (id: number, data: Partial<Zone>) => api.put(`/zones/${id}`, data),
   delete: (id: number) => api.delete(`/zones/${id}`),
+};
+
+export const zoneTypesApi = {
+  getAll: () => api.get<ZoneTypeDefinition[]>('/zone-types'),
 };
 
 export const scansApi = {
