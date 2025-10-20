@@ -168,6 +168,7 @@ func main() {
 	api.HandleFunc("/led/identify", handlers.IdentifyLEDs).Methods("POST")
 	api.HandleFunc("/led/test", handlers.TestBin).Methods("POST")
 	api.HandleFunc("/led/locate", handlers.LocateBin).Methods("POST")
+	api.HandleFunc("/led/controllers/{controller_id}/heartbeat", handlers.LEDControllerHeartbeat).Methods("POST")
 
     // Admin routes (RBAC protected)
     // Read-only admin routes (admin or manager)
@@ -179,6 +180,7 @@ func main() {
 	adminRead.HandleFunc("/led/single-bin-default", handlers.GetLEDSingleBinDefault).Methods("GET")
 	adminRead.HandleFunc("/led/job-highlights", handlers.GetLEDJobHighlightSettings).Methods("GET")
 	adminRead.HandleFunc("/led/mapping", handlers.GetLEDMapping).Methods("GET")
+	adminRead.HandleFunc("/led/controllers", handlers.ListLEDControllers).Methods("GET")
 	adminRead.HandleFunc("/roles", handlers.GetRoles).Methods("GET")
 	adminRead.HandleFunc("/users", handlers.GetUsersWithRoles).Methods("GET")
 	adminRead.HandleFunc("/users/{id}/roles", handlers.GetUserRoles).Methods("GET")
@@ -195,6 +197,9 @@ func main() {
 	admin.HandleFunc("/led/mapping", handlers.UpdateLEDMapping).Methods("PUT")
 	admin.HandleFunc("/led/mapping/validate", handlers.ValidateLEDMapping).Methods("POST")
 	admin.HandleFunc("/led/preview", handlers.PreviewLEDSettings).Methods("POST")
+	admin.HandleFunc("/led/controllers", handlers.CreateLEDController).Methods("POST")
+	admin.HandleFunc("/led/controllers/{id}", handlers.UpdateLEDController).Methods("PUT")
+	admin.HandleFunc("/led/controllers/{id}", handlers.DeleteLEDController).Methods("DELETE")
 	admin.HandleFunc("/users/{id}/roles", handlers.UpdateUserRoles).Methods("PUT")
 
 	// Profile endpoints (authenticated users)
