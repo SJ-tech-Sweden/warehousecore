@@ -979,6 +979,7 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
+- `1.57` - Vorschau lässt LEDs an; Clear-Befehl entfällt
 - `1.55` - Vorschau mit Fachcode hält übrige Bins aktiv (Job-Highlight-Verhalten)
 - `1.54` - Vorschau nutzt Job-Highlight-Logik (optional mit gezieltem Fachcode + Fehlerfeedback)
 - `1.53` - Admin-UI bietet Fachauswahl für LED-Vorschau (Datalist + Eingabefeld)
