@@ -4,6 +4,7 @@ import { Package, Search, Lightbulb, MapPin } from 'lucide-react';
 import { devicesApi, ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
 import { getStatusColor, formatStatus } from '../lib/utils';
+import { DeviceDetailModal } from '../components/DeviceDetailModal';
 
 interface ProductGroup {
   key: string;
@@ -20,6 +21,8 @@ export function DevicesPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     loadDevices();
@@ -124,6 +127,16 @@ export function DevicesPage() {
     } else if (device.zone_code) {
       navigate(`/zones?parent=${device.zone_code}`);
     }
+  };
+
+  const handleOpenDevice = (device: Device) => {
+    setSelectedDevice(device);
+    setDetailOpen(true);
+  };
+
+  const handleCloseDevice = () => {
+    setSelectedDevice(null);
+    setDetailOpen(false);
   };
 
   if (loading) {
@@ -231,7 +244,8 @@ export function DevicesPage() {
             {activeProduct.devices.map((device) => (
               <div
                 key={device.device_id}
-                className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-white/10"
+                onClick={() => handleOpenDevice(device)}
+                className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -257,13 +271,19 @@ export function DevicesPage() {
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleLocateDevice(device)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLocateDevice(device);
+                    }}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors"
                   >
                     <Lightbulb className="w-4 h-4 text-yellow-300" /> Fach aufleuchten
                   </button>
                   <button
-                    onClick={() => handleOpenZone(device)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenZone(device);
+                    }}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white"
                   >
                     <MapPin className="w-4 h-4" /> Zone öffnen
@@ -274,6 +294,8 @@ export function DevicesPage() {
           </div>
         </div>
       )}
+
+      <DeviceDetailModal device={selectedDevice} isOpen={detailOpen} onClose={handleCloseDevice} />
     </div>
   );
 }
