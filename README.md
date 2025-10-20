@@ -979,6 +979,7 @@ mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.s
 
 **Tags:**
 - `latest` - Latest stable build
+- `1.51` - Geräte-Liste öffnet wieder Detailmodal per Klick
 - `1.50` - Admin LED preview always lights the first bin
 - `1.49` - Device detail modal on devices page (current)
 - `1.48` - Device detail modal with orange breathe LED locate
