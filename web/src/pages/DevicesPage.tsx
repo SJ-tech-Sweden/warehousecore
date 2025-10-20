@@ -4,6 +4,7 @@ import { Package, Search, Lightbulb, MapPin } from 'lucide-react';
 import { devicesApi, ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
 import { getStatusColor, formatStatus } from '../lib/utils';
+import { ProductDevicesModal } from '../components/ProductDevicesModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
 
 interface ProductGroup {
@@ -23,6 +24,8 @@ export function DevicesPage() {
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<ProductGroup | null>(null);
+  const [productModalOpen, setProductModalOpen] = useState(false);
 
   useEffect(() => {
     loadDevices();
@@ -139,6 +142,17 @@ export function DevicesPage() {
     setDetailOpen(false);
   };
 
+  const handleOpenProduct = (product: ProductGroup) => {
+    setActiveProductKey(product.key);
+    setSelectedProduct(product);
+    setProductModalOpen(true);
+  };
+
+  const handleCloseProduct = () => {
+    setProductModalOpen(false);
+    setSelectedProduct(null);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -182,7 +196,7 @@ export function DevicesPage() {
           return (
             <div
               key={group.key}
-              onClick={() => setActiveProductKey(group.key)}
+              onClick={() => handleOpenProduct(group)}
               className={`glass-dark rounded-lg sm:rounded-xl p-4 sm:p-5 transition-all cursor-pointer group border border-white/10 ${
                 activeProductKey === group.key ? 'ring-2 ring-accent-red bg-white/10' : 'hover:bg-white/10'
               }`}
@@ -206,15 +220,7 @@ export function DevicesPage() {
                 </div>
               </div>
               {group.devices.length > 0 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenDevice(group.devices[0]);
-                  }}
-                  className="mt-3 w-full px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
-                >
-                  Erstes Gerät anzeigen
-                </button>
+                <p className="mt-3 text-xs text-gray-500">Tap für Geräte-Details</p>
               )}
             </div>
           );
@@ -316,6 +322,17 @@ export function DevicesPage() {
       )}
 
       <DeviceDetailModal device={selectedDevice} isOpen={detailOpen} onClose={handleCloseDevice} />
+      {selectedProduct && (
+        <ProductDevicesModal
+          isOpen={productModalOpen}
+          onClose={handleCloseProduct}
+          productName={selectedProduct.productName}
+          devices={selectedProduct.devices}
+          onLocate={handleLocateDevice}
+          onOpenZone={handleOpenZone}
+          onOpenDevice={handleOpenDevice}
+        />
+      )}
     </div>
   );
 }
