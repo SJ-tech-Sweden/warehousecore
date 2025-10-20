@@ -279,10 +279,16 @@ export const ledApi = {
   getMapping: () => api.get<LEDMapping>('/admin/led/mapping'),
   updateMapping: (mapping: LEDMapping) => api.put('/admin/led/mapping', mapping),
   validateMapping: (mapping: LEDMapping) => api.post('/admin/led/mapping/validate', mapping),
-  preview: (appearances: LEDAppearance[], clearBefore: boolean = true, targetBinId?: string) =>
-    api.post('/admin/led/preview', {
+  preview: (appearances: LEDAppearance[], clearBefore: boolean = false, targetBinId?: string) => {
+    const payload: Record<string, unknown> = {
       appearances,
-      clear_before: clearBefore,
-      target_bin_id: targetBinId && targetBinId.trim().length > 0 ? targetBinId.trim() : undefined,
-    }),
+    };
+    if (clearBefore) {
+      payload.clear_before = true;
+    }
+    if (targetBinId && targetBinId.trim().length > 0) {
+      payload.target_bin_id = targetBinId.trim();
+    }
+    return api.post('/admin/led/preview', payload);
+  },
 };

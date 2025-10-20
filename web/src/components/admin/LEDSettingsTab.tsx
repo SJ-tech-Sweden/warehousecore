@@ -385,7 +385,7 @@ export function LEDSettingsTab() {
     speed: speed && speed > 0 ? speed : 1200,
   });
 
-  const triggerPreview = async (appearances: LEDAppearance[], clearBefore: boolean = true) => {
+  const triggerPreview = async (appearances: LEDAppearance[], clearBefore: boolean = false) => {
     if (appearances.length === 0) {
       return;
     }
@@ -620,8 +620,7 @@ export function LEDSettingsTab() {
                       defaults.intensity,
                       defaults.pattern === 'solid' ? 1200 : 1200
                     ),
-                  ],
-                  true
+                  ]
                 )
               }
               disabled={previewLoading}
@@ -842,8 +841,7 @@ export function LEDSettingsTab() {
                             ),
                           ]
                         : []),
-                    ],
-                    true
+                    ]
                   )
                 }
                 disabled={previewLoading}
@@ -1009,8 +1007,7 @@ export function LEDSettingsTab() {
                           mapping.defaults.intensity,
                           mapping.defaults.speed
                         ),
-                      ],
-                      true
+                      ]
                     )
                   }
                   disabled={previewLoading}
@@ -1116,8 +1113,7 @@ export function LEDSettingsTab() {
                                           mapping.defaults.intensity,
                                           mapping.defaults.speed
                                         ),
-                                      ],
-                                      true
+                                      ]
                                     )
                                   }
                                   disabled={previewLoading}
