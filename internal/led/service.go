@@ -575,7 +575,7 @@ func (s *Service) PreviewAppearances(appearances []models.LEDAppearance, clearBe
 			}
 		}
 		if !found {
-			log.Printf("[LED] Preview bin '%s' not found in mapping, falling back to first available bin", targetBinID)
+			return fmt.Errorf("preview bin '%s' not found in mapping", targetBinID)
 		}
 	}
 
@@ -627,7 +627,12 @@ func (s *Service) PreviewAppearances(appearances []models.LEDAppearance, clearBe
 		},
 	}
 
-	return s.publisher.PublishCommand(cmd)
+	if err := s.publisher.PublishCommand(cmd); err != nil {
+		return err
+	}
+
+	log.Printf("[LED] Preview command sent for bin %s (shelf %s, %d pixels)", selectedBin.BinID, selectedShelf.ShelfID, len(selectedBin.Pixels))
+	return nil
 }
 
 // countTotalBins counts total bins in current mapping (must be called with lock held)
