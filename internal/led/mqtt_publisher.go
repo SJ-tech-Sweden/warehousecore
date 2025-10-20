@@ -78,8 +78,31 @@ func NewPublisher() *Publisher {
 		dryRun: false,
 	}
 
-	if err := pub.connect(); err != nil {
-		log.Printf("[LED] Failed to connect to MQTT broker: %v - falling back to DRY-RUN mode", err)
+	retries := getEnvInt("LED_MQTT_CONNECT_RETRIES", 10)
+	if retries < 0 {
+		retries = 0
+	}
+	delayMS := getEnvInt("LED_MQTT_CONNECT_RETRY_DELAY_MS", 2000)
+	if delayMS < 100 {
+		delayMS = 100
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= retries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(delayMS) * time.Millisecond)
+		}
+		if err := pub.connect(); err != nil {
+			lastErr = err
+			log.Printf("[LED] MQTT connect attempt %d/%d failed: %v", attempt+1, retries+1, err)
+			continue
+		}
+		lastErr = nil
+		break
+	}
+
+	if lastErr != nil {
+		log.Printf("[LED] Failed to connect to MQTT broker after %d attempts: %v - falling back to DRY-RUN mode", retries+1, lastErr)
 		pub.dryRun = true
 	}
 
@@ -163,10 +186,13 @@ func (p *Publisher) PublishCommand(cmd LEDCommand) error {
 		cmd.WarehouseID = p.config.WarehouseID
 	}
 
-	// Serialize command to JSON
-	payload, err := json.MarshalIndent(cmd, "", "  ")
+	// Serialize command to JSON (compact to avoid exceeding firmware buffer)
+	payload, err := json.Marshal(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to marshal command: %w", err)
+	}
+	if len(payload) > 3800 {
+		log.Printf("[LED] Warning: command payload size %d bytes approaches firmware limit", len(payload))
 	}
 
 	// Build topic: <prefix>/<warehouse_id>/cmd
@@ -174,7 +200,7 @@ func (p *Publisher) PublishCommand(cmd LEDCommand) error {
 
 	// Dry-run mode: just log
 	if p.dryRun {
-		log.Printf("[LED] DRY-RUN: Would publish to topic '%s':\n%s", topic, string(payload))
+		log.Printf("[LED] DRY-RUN: Would publish to topic '%s': %s", topic, string(payload))
 		return nil
 	}
 
