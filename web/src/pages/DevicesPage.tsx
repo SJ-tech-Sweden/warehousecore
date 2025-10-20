@@ -205,6 +205,17 @@ export function DevicesPage() {
                   </div>
                 </div>
               </div>
+              {group.devices.length > 0 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenDevice(group.devices[0]);
+                  }}
+                  className="mt-3 w-full px-3 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
+                >
+                  Erstes Gerät anzeigen
+                </button>
+              )}
             </div>
           );
         })}
