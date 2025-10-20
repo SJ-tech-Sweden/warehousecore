@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Save, Lightbulb, RefreshCcw, SlidersHorizontal, FileText } from 'lucide-react';
+import { Save, Lightbulb, RefreshCcw, SlidersHorizontal, FileText, Square } from 'lucide-react';
 import { api, ledApi, zonesApi, type LEDAppearance, type LEDJobHighlightSettings, type LEDMapping, type Zone } from '../../lib/api';
+
+const ZONE_KEYWORDS = ['bin', 'fach', 'slot', 'compartment', 'shelf'];
+
+const zoneLabelForOption = (zone: Zone): string => {
+  const zoneName = zone.name || zone.code || 'Unbenanntes Fach';
+  const code = zone.code || '';
+  return code ? `${zoneName} (${code})` : zoneName;
+};
 
 interface LEDDefault {
   color: string;
@@ -57,12 +65,36 @@ export function LEDSettingsTab() {
   const [mappingMessage, setMappingMessage] = useState('');
   const [pixelsInput, setPixelsInput] = useState<Record<string, string>>({});
   const [zones, setZones] = useState<Zone[]>([]);
+
   const zoneOptions = useMemo(() => {
-    return [...zones].sort((a, b) =>
-      (a.name || '').localeCompare(b.name || '', 'de', { sensitivity: 'base' })
+    const filtered = zones.filter((zone) => {
+      const type = (zone.type || '').toLowerCase();
+      if (!type) return false;
+      return ZONE_KEYWORDS.some((keyword) => type.includes(keyword));
+    });
+    const list = filtered.length > 0 ? filtered : zones;
+    return [...list].sort((a, b) =>
+      zoneLabelForOption(a).localeCompare(zoneLabelForOption(b), 'de', { sensitivity: 'base' })
     );
   }, [zones]);
+  const previewBinOptions = useMemo(() => {
+    if (!mapping) return [];
+    const seen = new Set<string>();
+    const entries: string[] = [];
+    mapping.shelves.forEach((shelf) => {
+      shelf.bins.forEach((bin) => {
+        if (bin.bin_id && !seen.has(bin.bin_id)) {
+          seen.add(bin.bin_id);
+          entries.push(bin.bin_id);
+        }
+      });
+    });
+    return entries.sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }));
+  }, [mapping]);
+  const [previewBinId, setPreviewBinId] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewActive, setPreviewActive] = useState(false);
+  const [stopLoading, setStopLoading] = useState(false);
   const [previewMessage, setPreviewMessage] = useState('');
 
   useEffect(() => {
@@ -132,6 +164,15 @@ export function LEDSettingsTab() {
       const { data } = await ledApi.getMapping();
       setMapping(data);
       setPixelsInput(rebuildPixelInputs(data));
+      if (!previewBinId.trim()) {
+        const firstShelf = data.shelves.find((shelf) => shelf.bins.length > 0);
+        if (firstShelf) {
+          const firstBin = firstShelf.bins[0]?.bin_id;
+          if (firstBin) {
+            setPreviewBinId(firstBin);
+          }
+        }
+      }
       setMappingMessage('');
     } catch (error) {
       console.error('Failed to load LED mapping:', error);
@@ -350,14 +391,35 @@ export function LEDSettingsTab() {
     }
     setPreviewLoading(true);
     setPreviewMessage('');
+    const target = previewBinId.trim();
     try {
-      await ledApi.preview(appearances, clearBefore);
-      setPreviewMessage('✓ Vorschau gestartet – zum Stoppen ggf. „LEDs löschen“ verwenden.');
+      await ledApi.preview(appearances, clearBefore, target || undefined);
+      setPreviewActive(true);
+      setPreviewMessage(
+        target
+          ? `✓ Vorschau für ${target} gestartet – „Vorschau stoppen“ beendet das Leuchten.`
+          : '✓ Vorschau gestartet – „Vorschau stoppen“ beendet das Leuchten.'
+      );
       setTimeout(() => setPreviewMessage(''), 4000);
     } catch (error: any) {
       setPreviewMessage('Fehler bei der Vorschau: ' + (error.response?.data?.error || error.message));
+      setPreviewActive(false);
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const handlePreviewStop = async () => {
+    setStopLoading(true);
+    try {
+      await ledApi.clear();
+      setPreviewActive(false);
+      setPreviewMessage('✓ Vorschau gestoppt.');
+      setTimeout(() => setPreviewMessage(''), 3000);
+    } catch (error: any) {
+      setPreviewMessage('Fehler beim Stoppen: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setStopLoading(false);
     }
   };
 
@@ -432,16 +494,6 @@ export function LEDSettingsTab() {
           <p className="text-gray-400 text-sm">Diese Einstellungen gelten für die "Fach beleuchten" Funktion</p>
         </div>
       </div>
-
-      {previewMessage && (
-        <div
-          className={`px-4 py-3 rounded-lg text-sm font-semibold ${
-            previewMessage.startsWith('✓') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-          }`}
-        >
-          {previewMessage}
-        </div>
-      )}
 
       <div className="glass rounded-xl p-6 space-y-6">
         {/* Pattern Selection */}
@@ -524,6 +576,27 @@ export function LEDSettingsTab() {
 
         {/* Save Button */}
         <div className="pt-4 border-t border-white/10">
+          <div className="mb-3">
+            <label className="block text-sm font-semibold text-gray-400 mb-2">
+              Fachcode für Vorschau (optional)
+            </label>
+            <input
+              type="text"
+              list="preview-bin-options"
+              value={previewBinId}
+              onChange={(e) => setPreviewBinId(e.target.value)}
+              placeholder="z. B. WDL-06-RG-02-F-01"
+              className="w-full px-3 py-2 rounded-lg glass text-white font-mono"
+            />
+            <datalist id="preview-bin-options">
+              {previewBinOptions.map((bin) => (
+                <option key={bin} value={bin} />
+              ))}
+            </datalist>
+            <p className="text-xs text-gray-500 mt-2">
+              Leer lassen, um automatisch das erste Fach aus dem Mapping zu verwenden.
+            </p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleSave}
@@ -561,6 +634,18 @@ export function LEDSettingsTab() {
               <Lightbulb className="w-5 h-5 text-yellow-300" />
               <span>{previewLoading ? 'Vorschau läuft…' : 'LED Vorschau'}</span>
             </button>
+            <button
+              onClick={handlePreviewStop}
+              disabled={(!previewActive && !previewLoading) || stopLoading}
+              className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                (!previewActive && !previewLoading) || stopLoading
+                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                  : 'bg-white/5 text-white hover:bg-white/10'
+              }`}
+            >
+              <Square className="w-5 h-5 text-red-300" />
+              <span>{stopLoading ? 'Stoppt…' : 'Vorschau stoppen'}</span>
+            </button>
           </div>
 
           {message && (
@@ -570,6 +655,16 @@ export function LEDSettingsTab() {
                 : 'bg-red-500/20 text-red-400'
             }`}>
               {message}
+            </div>
+          )}
+
+          {previewMessage && (
+            <div className={`mt-3 p-3 rounded-lg text-center text-sm font-semibold ${
+              previewMessage.startsWith('✓')
+                ? 'bg-green-500/15 text-green-300'
+                : 'bg-red-500/20 text-red-400'
+            }`}>
+              {previewMessage}
             </div>
           )}
         </div>
@@ -760,6 +855,18 @@ export function LEDSettingsTab() {
               >
                 <Lightbulb className="w-4 h-4 text-yellow-300" />
                 <span>{previewLoading ? 'Vorschau läuft…' : 'Job-Highlight Vorschau'}</span>
+              </button>
+              <button
+                onClick={handlePreviewStop}
+                disabled={(!previewActive && !previewLoading) || stopLoading}
+                className={`flex-1 px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                  (!previewActive && !previewLoading) || stopLoading
+                    ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                    : 'bg-white/5 text-white hover:bg-white/10'
+                }`}
+              >
+                <Square className="w-4 h-4 text-red-300" />
+                <span>{stopLoading ? 'Stoppt…' : 'Vorschau stoppen'}</span>
               </button>
             </div>
             {jobMessage && (
@@ -975,8 +1082,8 @@ export function LEDSettingsTab() {
                                 >
                                   <option value="">-- Fach wählen --</option>
                                   {zoneOptions.map((zone) => (
-                                    <option key={zone.zone_id} value={zone.code} className="bg-dark">
-                                      {zone.name} ({zone.code})
+                                    <option key={zone.zone_id} value={zone.code ?? ''} className="bg-dark">
+                                      {zoneLabelForOption(zone)}
                                     </option>
                                   ))}
                                 </select>
@@ -1029,7 +1136,14 @@ export function LEDSettingsTab() {
                               </div>
                             </div>
                             {selectedZone && (
-                              <p className="text-xs text-gray-500">{selectedZone.name} ({selectedZone.code})</p>
+                              <p className="text-xs text-gray-500">
+                                {selectedZone.name}{' '}
+                                {selectedZone.code && (
+                                  <span className="italic text-gray-400">
+                                    ({selectedZone.code})
+                                  </span>
+                                )}
+                              </p>
                             )}
                           </div>
                         );
@@ -1207,11 +1321,23 @@ export function LEDSettingsTab() {
                     <Lightbulb className="w-4 h-4 text-yellow-300" />
                     <span>{previewLoading ? 'Vorschau läuft…' : 'LED Vorschau'}</span>
                   </button>
-                </div>
-                {zoneTypeMessages[zoneType.id] && (
-                  <div
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold ${
-                      zoneTypeMessages[zoneType.id].startsWith('✓')
+                  <button
+                    onClick={handlePreviewStop}
+                    disabled={(!previewActive && !previewLoading) || stopLoading}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                      (!previewActive && !previewLoading) || stopLoading
+                        ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                        : 'bg-white/5 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Square className="w-4 h-4 text-red-300" />
+                    <span>{stopLoading ? 'Stoppt…' : 'Vorschau stoppen'}</span>
+                  </button>
+            </div>
+            {zoneTypeMessages[zoneType.id] && (
+              <div
+                className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                  zoneTypeMessages[zoneType.id].startsWith('✓')
                         ? 'bg-green-500/20 text-green-400'
                         : 'bg-red-500/20 text-red-400'
                     }`}

@@ -75,8 +75,28 @@ export interface DashboardStats {
   total: number;
 }
 
+export interface Movement {
+  movement_id: number;
+  device_id: string;
+  action: 'intake' | 'outtake' | 'transfer' | 'return' | 'move' | string;
+  timestamp: string;
+  from_zone_id?: number;
+  to_zone_id?: number;
+  from_job_id?: number;
+  to_job_id?: number;
+  barcode?: string;
+  serial_number?: string;
+  product_name?: string;
+  from_zone_name?: string;
+  to_zone_name?: string;
+  from_job_description?: string;
+  to_job_description?: string;
+  performed_by?: string;
+}
+
 export interface Job {
   job_id: number;
+  job_code: string;
   description?: string;
   start_date?: string;
   end_date?: string;
@@ -98,7 +118,8 @@ export interface JobDevice {
 }
 
 export interface JobSummary {
-  job_id: string;
+  job_id: number;
+  job_code: string;
   description?: string;
   start_date?: string;
   end_date?: string;
@@ -111,6 +132,8 @@ export interface JobSummary {
 // API Functions
 export const dashboardApi = {
   getStats: () => api.get<DashboardStats>('/dashboard/stats'),
+  getRecentMovements: (limit: number = 10) =>
+    api.get<Movement[]>('/movements', { params: { limit } }),
 };
 
 export const devicesApi = {
@@ -256,6 +279,10 @@ export const ledApi = {
   getMapping: () => api.get<LEDMapping>('/admin/led/mapping'),
   updateMapping: (mapping: LEDMapping) => api.put('/admin/led/mapping', mapping),
   validateMapping: (mapping: LEDMapping) => api.post('/admin/led/mapping/validate', mapping),
-  preview: (appearances: LEDAppearance[], clearBefore: boolean = true) =>
-    api.post('/admin/led/preview', { appearances, clear_before: clearBefore }),
+  preview: (appearances: LEDAppearance[], clearBefore: boolean = true, targetBinId?: string) =>
+    api.post('/admin/led/preview', {
+      appearances,
+      clear_before: clearBefore,
+      target_bin_id: targetBinId && targetBinId.trim().length > 0 ? targetBinId.trim() : undefined,
+    }),
 };

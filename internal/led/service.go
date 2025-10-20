@@ -538,7 +538,7 @@ func (s *Service) getJobDeviceZones(jobID string) (map[string]string, error) {
 }
 
 // PreviewAppearances highlights sample bins using the provided appearances for live preview
-func (s *Service) PreviewAppearances(appearances []models.LEDAppearance, clearBefore bool) error {
+func (s *Service) PreviewAppearances(appearances []models.LEDAppearance, clearBefore bool, overrideBinID string) error {
 	if len(appearances) == 0 {
 		return fmt.Errorf("no appearances provided")
 	}
@@ -551,7 +551,10 @@ func (s *Service) PreviewAppearances(appearances []models.LEDAppearance, clearBe
 		return fmt.Errorf("no mapping loaded")
 	}
 
-	targetBinID := strings.TrimSpace(os.Getenv("LED_PREVIEW_BIN_ID"))
+	targetBinID := strings.TrimSpace(overrideBinID)
+	if targetBinID == "" {
+		targetBinID = strings.TrimSpace(os.Getenv("LED_PREVIEW_BIN_ID"))
+	}
 
 	var selectedShelf ShelfConfig
 	var selectedBin BinConfig

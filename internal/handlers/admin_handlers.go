@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"warehousecore/internal/led"
@@ -218,6 +219,7 @@ func PreviewLEDSettings(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Appearances []models.LEDAppearance `json:"appearances"`
 		ClearBefore bool                   `json:"clear_before"`
+		TargetBinID string                 `json:"target_bin_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
@@ -250,7 +252,7 @@ func PreviewLEDSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := led.GetService()
-	if err := service.PreviewAppearances(payload.Appearances, payload.ClearBefore); err != nil {
+	if err := service.PreviewAppearances(payload.Appearances, payload.ClearBefore, payload.TargetBinID); err != nil {
 		log.Printf("[LED] Failed to run preview: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -412,7 +414,80 @@ func UpdateUserRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	currentUser, ok := middleware.GetUserFromContext(r)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+		return
+	}
+
 	rbacService := services.NewRBACService()
+
+	currentRoles := currentUser.Roles
+	if len(currentRoles) == 0 {
+		var loadErr error
+		currentRoles, loadErr = rbacService.GetUserRoles(currentUser.UserID)
+		if loadErr != nil {
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": loadErr.Error()})
+			return
+		}
+	}
+
+	allRoles, err := rbacService.GetAllRoles()
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	existingRoles, err := rbacService.GetUserRoles(uint(userID))
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// Build helper lookups
+	restrictedNames := map[string]struct{}{
+		"admin":       {},
+		"manager":     {},
+		"super_admin": {},
+	}
+	restrictedIDs := make(map[int]struct{})
+	for _, role := range allRoles {
+		if _, restricted := restrictedNames[strings.ToLower(role.Name)]; restricted {
+			restrictedIDs[role.ID] = struct{}{}
+		}
+	}
+
+	existingSet := make(map[int]struct{}, len(existingRoles))
+	for _, role := range existingRoles {
+		existingSet[role.ID] = struct{}{}
+	}
+
+	payloadSet := make(map[int]struct{}, len(payload.RoleIDs))
+	for _, id := range payload.RoleIDs {
+		payloadSet[id] = struct{}{}
+	}
+
+	hasAdminPrivilege := false
+	for _, role := range currentRoles {
+		if strings.EqualFold(role.Name, "admin") || strings.EqualFold(role.Name, "super_admin") {
+			hasAdminPrivilege = true
+			break
+		}
+	}
+
+	if !hasAdminPrivilege {
+		for restrictedID := range restrictedIDs {
+			_, hadRole := existingSet[restrictedID]
+			_, wantsRole := payloadSet[restrictedID]
+			if hadRole != wantsRole {
+				respondJSON(w, http.StatusForbidden, map[string]string{
+					"error": "Insufficient permissions to modify elevated roles",
+				})
+				return
+			}
+		}
+	}
+
 	if err := rbacService.SetUserRoles(uint(userID), payload.RoleIDs); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
