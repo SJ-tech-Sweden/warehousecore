@@ -86,7 +86,8 @@ export function DevicesPage() {
     try {
       const { data } = await devicesApi.getTree();
       const tree = data.treeData || [];
-      setTreeData(tree);
+      const sortedTree = sortDeviceTree(tree);
+      setTreeData(sortedTree);
       if (tree.length > 0) {
         setExpandedNodes((prev) => {
           if (prev.size > 0) {
@@ -663,6 +664,43 @@ function countProductGroups(categories: DeviceTreeCategory[]): number {
 
     return categorySum + subcategoryGroups + categoryUngrouped;
   }, 0);
+}
+
+function sortDeviceTree(tree: DeviceTreeCategory[]): DeviceTreeCategory[] {
+  return [...tree]
+    .map((category) => ({
+      ...category,
+      subcategories: sortSubcategories(category.subcategories ?? []),
+      direct_devices: sortDevices(category.direct_devices ?? []),
+    }))
+    .sort((a, b) => compareAlpha(a.name, b.name));
+}
+
+function sortSubcategories(subcategories: DeviceTreeSubcategory[]): DeviceTreeSubcategory[] {
+  return [...subcategories]
+    .map((subcategory) => ({
+      ...subcategory,
+      subbiercategories: sortGroups(subcategory.subbiercategories ?? []),
+      direct_devices: sortDevices(subcategory.direct_devices ?? []),
+    }))
+    .sort((a, b) => compareAlpha(a.name, b.name));
+}
+
+function sortGroups(groups: DeviceTreeSubbiercategory[]): DeviceTreeSubbiercategory[] {
+  return [...groups]
+    .map((group) => ({
+      ...group,
+      devices: sortDevices(group.devices ?? []),
+    }))
+    .sort((a, b) => compareAlpha(a.name, b.name));
+}
+
+function sortDevices(devices: DeviceTreeDevice[]): DeviceTreeDevice[] {
+  return [...devices].sort((a, b) => compareAlpha(a.device_id, b.device_id));
+}
+
+function compareAlpha(a: string, b: string): number {
+  return a.localeCompare(b, 'de', { sensitivity: 'base' });
 }
 
 function filterTreeData(treeData: DeviceTreeCategory[], term: string) {
