@@ -88,16 +88,6 @@ export function DevicesPage() {
       const tree = data.treeData || [];
       const sortedTree = sortDeviceTree(tree);
       setTreeData(sortedTree);
-      if (tree.length > 0) {
-        setExpandedNodes((prev) => {
-          if (prev.size > 0) {
-            return prev;
-          }
-          const next = new Set<string>(prev);
-          next.add(categoryNodeKey(tree[0].id));
-          return next;
-        });
-      }
     } catch (error: any) {
       console.error('Failed to load device tree:', error);
       setTreeError(error?.response?.data?.error || 'Gerätebaum konnte nicht geladen werden.');
