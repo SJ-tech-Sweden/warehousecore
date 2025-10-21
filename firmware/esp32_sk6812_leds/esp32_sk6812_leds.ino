@@ -19,9 +19,22 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_NeoPixel.h>
+#include <HTTPClient.h>
 
 // Include secrets (copy secrets.h.template to secrets.h and fill in your credentials)
 #include "secrets.h"
+
+#ifndef CONTROLLER_ID_PREFIX
+#define CONTROLLER_ID_PREFIX "esp"
+#endif
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "1.1.0"
+#endif
+
+#ifndef API_BASE_URL
+#define API_BASE_URL ""
+#endif
 
 // Pin configuration
 #ifndef LED_PIN
@@ -44,7 +57,10 @@ WiFiClient espClient;
 
 PubSubClient mqttClient(espClient);
 
-// MQTT topics
+// Controller identity & MQTT topics
+String controllerId;
+String controllerTopic;
+String apiBaseUrl = String(API_BASE_URL);
 String cmdTopic;
 String statusTopic;
 
@@ -76,6 +92,34 @@ void IRAM_ATTR resetModule() {
   esp_restart();
 }
 
+String makeShortMAC() {
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toLowerCase();
+  if (mac.length() > 6) {
+    mac = mac.substring(mac.length() - 6);
+  }
+  return mac;
+}
+
+String determineControllerId() {
+#ifdef CONTROLLER_ID
+  return String(CONTROLLER_ID);
+#else
+  return String(CONTROLLER_ID_PREFIX) + "-" + makeShortMAC();
+#endif
+}
+
+String determineTopicSuffix(const String& id) {
+#ifdef TOPIC_SUFFIX
+  return String(TOPIC_SUFFIX);
+#else
+  return id;
+#endif
+}
+
+void sendHTTPHeartbeat(const String& payload);
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -85,18 +129,32 @@ void setup() {
   Serial.println("StorageCore Warehouse Highlighting");
   Serial.println("=================================\n");
 
+  controllerId = determineControllerId();
+  controllerTopic = determineTopicSuffix(controllerId);
+
+  if (apiBaseUrl.length() > 0) {
+    apiBaseUrl.trim();
+    if (apiBaseUrl.endsWith("/")) {
+      apiBaseUrl = apiBaseUrl.substring(0, apiBaseUrl.length() - 1);
+    }
+    Serial.printf("[HTTP] API base URL: %s\n", apiBaseUrl.c_str());
+  }
+
+  cmdTopic = String(TOPIC_PREFIX) + "/" + controllerTopic + "/cmd";
+  statusTopic = String(TOPIC_PREFIX) + "/" + controllerTopic + "/status";
+
+  Serial.printf("[ID] Controller ID: %s\n", controllerId.c_str());
+  Serial.printf("[MQTT] Topic suffix: %s\n", controllerTopic.c_str());
+  Serial.printf("[MQTT] Command topic: %s\n", cmdTopic.c_str());
+  Serial.printf("[MQTT] Status topic: %s\n", statusTopic.c_str());
+  Serial.printf("[MQTT] Warehouse ID: %s\n", WAREHOUSE_ID);
+
   // Initialize LED strip
   strip.begin();
   strip.clear();
   strip.show();
   strip.setBrightness(255);
   Serial.println("[LED] Strip initialized");
-
-  // Build MQTT topics
-  cmdTopic = String(TOPIC_PREFIX) + "/" + String(WAREHOUSE_ID) + "/cmd";
-  statusTopic = String(TOPIC_PREFIX) + "/" + String(WAREHOUSE_ID) + "/status";
-  Serial.printf("[MQTT] Command topic: %s\n", cmdTopic.c_str());
-  Serial.printf("[MQTT] Status topic: %s\n", statusTopic.c_str());
 
   // Connect to WiFi
   connectWiFi();
@@ -183,9 +241,9 @@ void connectMQTT() {
   #endif
 
   // Set Last Will
-  String lwt = "{\"status\":\"offline\",\"warehouse_id\":\"" + String(WAREHOUSE_ID) + "\"}";
+  String lwt = "{\"status\":\"offline\",\"controller_id\":\"" + controllerId + "\",\"warehouse_id\":\"" + String(WAREHOUSE_ID) + "\"}";
 
-  String clientId = "ESP32-" + String(WAREHOUSE_ID) + "-" + String(random(0xffff), HEX);
+  String clientId = "ESP32-" + controllerId + "-" + String(random(0xffff), HEX);
 
   if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS,
                          statusTopic.c_str(), 1, true, lwt.c_str())) {
@@ -378,20 +436,76 @@ uint32_t parseColor(const char* hexColor) {
   return color;
 }
 
-void sendHeartbeat() {
-  if (!mqttClient.connected()) return;
+void sendHTTPHeartbeat(const String& payload) {
+  if (apiBaseUrl.length() == 0) {
+    return;
+  }
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
 
-  StaticJsonDocument<256> doc;
+  HTTPClient http;
+  String url = apiBaseUrl;
+  if (!url.endsWith("/")) {
+    url += "/";
+  }
+  url += "led/controllers/" + controllerId + "/heartbeat";
+
+  bool began = false;
+  if (url.startsWith("https://")) {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    secureClient.setTimeout(4000);
+    began = http.begin(secureClient, url);
+  } else {
+    began = http.begin(url);
+  }
+
+  if (!began) {
+    Serial.println("[HTTP] Failed to initialise heartbeat request");
+    return;
+  }
+
+  http.setTimeout(4000);
+  http.addHeader("Content-Type", "application/json");
+
+  int code = http.POST(payload);
+  if (code <= 0 || code >= 400) {
+    Serial.printf("[HTTP] Heartbeat POST failed (%d): %s\n", code, http.errorToString(code).c_str());
+  }
+  http.end();
+}
+
+void sendHeartbeat() {
+  StaticJsonDocument<512> doc;
   doc["status"] = "online";
+  doc["controller_id"] = controllerId;
+  doc["topic_suffix"] = controllerTopic;
   doc["warehouse_id"] = WAREHOUSE_ID;
   doc["active_leds"] = activeLEDs.size();
   doc["wifi_rssi"] = WiFi.RSSI();
-  doc["uptime"] = millis() / 1000;
+  doc["uptime_seconds"] = millis() / 1000;
+  doc["ip_address"] = WiFi.localIP().toString();
+
+  const char* host = WiFi.getHostname();
+  if (host != nullptr) {
+    doc["hostname"] = host;
+  }
+
+  doc["firmware_version"] = FIRMWARE_VERSION;
+  doc["mac_address"] = WiFi.macAddress();
+  doc["led_count"] = LED_LENGTH;
 
   String payload;
   serializeJson(doc, payload);
 
-  if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), true)) {
-    Serial.printf("[HEARTBEAT] Sent (uptime: %lu s)\n", millis() / 1000);
+  if (mqttClient.connected()) {
+    if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), true)) {
+      Serial.printf("[HEARTBEAT] MQTT sent (uptime: %lu s)\n", millis() / 1000);
+    } else {
+      Serial.println("[HEARTBEAT] MQTT publish failed");
+    }
   }
+
+  sendHTTPHeartbeat(payload);
 }

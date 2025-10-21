@@ -273,6 +273,11 @@ export interface LEDController {
   is_active: boolean;
   last_seen?: string | null;
   metadata?: Record<string, unknown> | null;
+  ip_address?: string | null;
+  hostname?: string | null;
+  firmware_version?: string | null;
+  mac_address?: string | null;
+  status_data?: Record<string, unknown> | null;
   zone_types?: ZoneTypeDefinition[];
 }
 

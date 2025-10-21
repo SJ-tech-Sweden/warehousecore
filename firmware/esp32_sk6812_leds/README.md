@@ -9,7 +9,8 @@ Firmware for ESP32 microcontroller to control SK6812 GRBW LED strips for warehou
 - JSON command parsing from StorageCore
 - Multiple LEDs per storage bin
 - Animation patterns: solid, blink, breathe
-- Heartbeat status reporting
+- Automatic controller ID + topic suffix generation (shared firmware for unlimited ESP32s)
+- Dual heartbeat (MQTT + REST) with IP/hostname/RSSI/uptime telemetry
 - Watchdog timer for robust operation
 - Supports SK6812 GRBW LED chipset
 
@@ -107,11 +108,13 @@ Go to Sketch → Include Library → Manage Libraries, then install:
 
 ### Command Topic (Subscribe)
 ```
-{TOPIC_PREFIX}/{WAREHOUSE_ID}/cmd
-Example: weidelbach/weidelbach/cmd
+{TOPIC_PREFIX}/{TOPIC_SUFFIX}/cmd
+Example: weidelbach/esp-a1b2c3/cmd
 ```
 
-Receives JSON commands from StorageCore:
+> `TOPIC_SUFFIX` = `controller_id` (auto) unless overridden in `secrets.h`. Each ESP32 listens on its own topic so that WarehouseCore can route zone-spezifische Befehle.
+
+Receives JSON commands from WarehouseCore:
 
 **Highlight Command:**
 ```json
@@ -153,18 +156,25 @@ Receives JSON commands from StorageCore:
 
 ### Status Topic (Publish)
 ```
-{TOPIC_PREFIX}/{WAREHOUSE_ID}/status
-Example: weidelbach/weidelbach/status
+{TOPIC_PREFIX}/{TOPIC_SUFFIX}/status
+Example: weidelbach/esp-a1b2c3/status
 ```
 
-ESP32 publishes heartbeat every 15 seconds:
+Firmware publishes MQTT heartbeat every 15 s **and** mirrors the payload to the WarehouseCore REST API (optional, see below):
 ```json
 {
   "status": "online",
+  "controller_id": "esp-a1b2c3",
+  "topic_suffix": "esp-a1b2c3",
   "warehouse_id": "weidelbach",
   "active_leds": 12,
   "wifi_rssi": -45,
-  "uptime": 3600
+  "uptime_seconds": 3600,
+  "ip_address": "192.168.10.25",
+  "hostname": "esp-a1b2c3",
+  "firmware_version": "1.1.0",
+  "mac_address": "24:6F:28:A1:B2:C3",
+  "led_count": 600
 }
 ```
 
@@ -172,9 +182,25 @@ Last Will Testament (offline):
 ```json
 {
   "status": "offline",
+  "controller_id": "esp-a1b2c3",
   "warehouse_id": "weidelbach"
 }
 ```
+
+### REST Heartbeat Endpoint (optional)
+
+Set `API_BASE_URL` in `secrets.h` to the WarehouseCore URL (e.g. `https://warehouse.server-nt.de/api/v1`). The firmware will mirror the heartbeat payload via HTTP `POST`:
+
+```
+POST {API_BASE_URL}/led/controllers/{controller_id}/heartbeat
+Content-Type: application/json
+
+{ ...payload wie oben... }
+```
+
+- Blank `API_BASE_URL` disables HTTP heartbeats (only MQTT remains).
+- HTTPS is supported; certificates are accepted via `setInsecure()` by default. Provide your own trust anchors for production.
+- WarehouseCore persists the payload (`status_data`) and aktualisiert `last_seen` / `is_active`.
 
 ## LED Patterns
 
@@ -183,6 +209,20 @@ Last Will Testament (offline):
 - **breathe**: Sine wave brightness variation (2-second cycle)
 
 ## Configuration
+
+### Controller Identity & Topics
+
+`secrets.h` steuert, wie sich der Controller meldet:
+
+- `CONTROLLER_ID_PREFIX`: Präfix für automatisch generierte IDs (`esp-<macsuffix>`). Gleiche Firmware kann so auf beliebig viele Boards geflasht werden.
+- Optional `CONTROLLER_ID`: Erzwingt eine feste ID (z. B. `esp-regal-1`).
+- Optional `TOPIC_SUFFIX`: Überschreibt das Topic (Default = Controller-ID). Kommandos werden an `{TOPIC_PREFIX}/{TOPIC_SUFFIX}/cmd` gesendet.
+
+### REST Heartbeat (API Base)
+
+- Setze `API_BASE_URL` (z. B. `https://warehouse.server-nt.de/api/v1`), damit die Firmware zusätzlich eine HTTP-Heartbeat-Anfrage sendet.
+- Leer lassen, falls nur MQTT genutzt werden soll.
+- SSL ist möglich; standardmäßig wird `setInsecure()` verwendet (für produktiven Einsatz Zertifikate hinterlegen).
 
 ### LED Strip Settings
 

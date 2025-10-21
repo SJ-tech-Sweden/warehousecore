@@ -140,23 +140,68 @@ func (s *LEDControllerService) DeleteController(id int) error {
 	})
 }
 
-// RecordHeartbeat updates last_seen timestamp for controller ID
-func (s *LEDControllerService) RecordHeartbeat(identifier string) error {
+// RecordHeartbeat updates last_seen timestamp for controller ID and stores telemetry data
+func (s *LEDControllerService) RecordHeartbeat(identifier string, payload *models.LEDControllerHeartbeat) (*models.LEDController, error) {
 	if s.db == nil {
-		return errors.New("database not initialised")
+		return nil, errors.New("database not initialised")
 	}
 
 	now := time.Now()
+	updates := map[string]interface{}{
+		"last_seen": now,
+		"is_active": true,
+	}
+
+	var status models.JSONMap
+	if payload != nil {
+		if payload.TopicSuffix != "" {
+			updates["topic_suffix"] = payload.TopicSuffix
+		}
+		if payload.IPAddress != "" {
+			updates["ip_address"] = payload.IPAddress
+		}
+		if payload.Hostname != "" {
+			updates["hostname"] = payload.Hostname
+		}
+		if payload.FirmwareVersion != "" {
+			updates["firmware_version"] = payload.FirmwareVersion
+		}
+		if payload.MacAddress != "" {
+			updates["mac_address"] = payload.MacAddress
+		}
+
+		status = make(models.JSONMap)
+		if payload.WifiRSSI != nil {
+			status["wifi_rssi"] = *payload.WifiRSSI
+		}
+		if payload.UptimeSeconds != nil {
+			status["uptime_seconds"] = *payload.UptimeSeconds
+		}
+		if payload.LedCount != nil {
+			status["led_count"] = *payload.LedCount
+		}
+		if payload.Status != nil {
+			for k, v := range payload.Status {
+				status[k] = v
+			}
+		}
+		if len(status) > 0 {
+			status["heartbeat_received_at"] = now.UTC().Format(time.RFC3339)
+			updates["status_data"] = status
+		} else {
+			status = nil
+		}
+	}
+
 	result := s.db.Model(&models.LEDController{}).
 		Where("controller_id = ?", identifier).
-		Updates(map[string]interface{}{"last_seen": now, "is_active": true})
+		Updates(updates)
 
 	if result.Error != nil {
-		return result.Error
+		return nil, result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		// Auto-register controller with minimal data
 		controller := models.LEDController{
 			ControllerID: identifier,
 			DisplayName:  identifier,
@@ -164,9 +209,48 @@ func (s *LEDControllerService) RecordHeartbeat(identifier string) error {
 			IsActive:     true,
 			LastSeen:     &now,
 		}
-		return s.db.Create(&controller).Error
+
+		if payload != nil {
+			if payload.TopicSuffix != "" {
+				controller.TopicSuffix = payload.TopicSuffix
+			}
+			if payload.IPAddress != "" {
+				value := payload.IPAddress
+				controller.IPAddress = &value
+			}
+			if payload.Hostname != "" {
+				value := payload.Hostname
+				controller.Hostname = &value
+			}
+			if payload.FirmwareVersion != "" {
+				value := payload.FirmwareVersion
+				controller.FirmwareVersion = &value
+			}
+			if payload.MacAddress != "" {
+				value := payload.MacAddress
+				controller.MacAddress = &value
+			}
+			if status != nil && len(status) > 0 {
+				// Create copy to avoid shared reference
+				statusCopy := make(models.JSONMap, len(status))
+				for k, v := range status {
+					statusCopy[k] = v
+				}
+				controller.StatusData = statusCopy
+			}
+		}
+
+		if controller.TopicSuffix == "" {
+			controller.TopicSuffix = identifier
+		}
+
+		if err := s.db.Create(&controller).Error; err != nil {
+			return nil, err
+		}
+		return &controller, nil
 	}
-	return nil
+
+	return s.GetControllerByIdentifier(identifier)
 }
 
 // GetPrimaryControllerForZoneType returns the first controller assigned to the given zone type ID

@@ -172,15 +172,16 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 
 ### Key Features
 
+- **Unlimited ESP Controllers**: Jede ESP32-Firmware erzeugt automatisch eine eindeutige `controller_id` und erhält ein eigenes MQTT-Topic. Zone-Typen lassen sich pro Controller routen.
+- **Admin ESP-Dashboard**: Neuer Tab „ESP-Controller“ zeigt IP, Hostname, Firmware, RSSI und Uptime an, erlaubt freundliche Namen und Mehrfach-Zonentypzuweisungen per Checkbox.
+- **Telemetry Heartbeats**: MQTT + REST Heartbeat (`/api/v1/led/controllers/{id}/heartbeat`) halten Statusdaten im Backend aktuell – inklusive LED-Anzahl, WiFi-RSSI, Firmwarestand.
 - **No Port Forwarding Required**: ESP32 uses outbound MQTT connection, works from any network
 - **Cloud-Ready**: WarehouseCore can run on external servers, ESP32 connects via internet
 - **Multiple LEDs per Bin**: Support for 2-4 LEDs per storage compartment
 - **Flexible Patterns**: Solid, blink, breathe animations
 - **Real-Time Control**: Toggle LEDs on/off from job panel
-- **Status Monitoring**: MQTT heartbeat shows ESP32 online/offline status
 - **Dry-Run Mode**: Backend works without MQTT for testing
 - **Admin Mapping Editor**: JSON-based bin-to-LED configuration
-- **Multi-Controller Support**: Mehrere ESP32-Controller können registriert und Zonentypen zugewiesen werden
 
 ### Components
 
@@ -192,6 +193,8 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 - `mqtt_publisher.go` - MQTT client with TLS support, reconnect logic
 - `service.go` - Business logic (Job → Bins → Pixels mapping)
 - `handlers/led_handlers.go` - REST API endpoints
+- `services/led_controller_service.go` - Verwaltung mehrerer LED-Controller inkl. Telemetrie & Zonenzuweisung
+- `handlers/led_controller_handlers.go` - Admin-CRUD & Heartbeat-Endpunkte für ESP-Controller
 
 **Endpoints:**
 - `GET /api/v1/led/status` - MQTT connection status
@@ -202,15 +205,21 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 - `GET /api/v1/led/mapping` - Get current mapping config
 - `PUT /api/v1/led/mapping` - Update mapping config
 - `POST /api/v1/led/mapping/validate` - Validate mapping JSON
+- `POST /api/v1/led/controllers/{controller_id}/heartbeat` - Telemetrie-Heartbeat (öffentlich, keine Auth)
+- `GET /api/v1/admin/led/controllers` - Liste registrierter Controller (Admin/Manager)
+- `POST /api/v1/admin/led/controllers` - Controller manuell anlegen (Admin)
+- `PUT /api/v1/admin/led/controllers/{id}` - Eigenschaften & Zonentypen pflegen (Admin)
+- `DELETE /api/v1/admin/led/controllers/{id}` - Controller löschen (Admin)
 
 #### 2. Frontend (React/TypeScript)
 
-**Location:** `web/src/pages/JobsPage.tsx`, `web/src/lib/api.ts`
+**Location:** `web/src/pages/JobsPage.tsx`, `web/src/components/admin/LEDControllersTab.tsx`, `web/src/lib/api.ts`
 
 - Toggle button in Job Panel: "Fächer hervorheben"
 - Visual indicators: MQTT connection status, bin count
 - Auto-clear LEDs when exiting job
 - Real-time status updates
+- Admin > „ESP-Controller“: Übersicht mit Telemetriedaten, Namensvergabe, Topic-Suffix und Zonentyp-Zuordnung
 
 #### 3. ESP32 Firmware (Arduino C++)
 
@@ -222,32 +231,36 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 
 #### 4. Controller-Registry & Heartbeat
 
-- **Admin > Mikrocontroller** (neuer Tab): Controller anlegen, bearbeiten, löschen, online/offline-Status einsehen und Zonentypen zuweisen.
-- Jeder Controller besitzt:
-  - `Controller ID` (z. B. `esp-regal-1`) – eindeutiger Identifier & Default-Topic-Suffix
-  - `Topic-Suffix` – überschreibt optional die ID beim Publizieren (`<LED_MQTT_TOPIC_PREFIX>/<suffix>/cmd`)
-  - `Zone-Typen` – legen fest, welche Speicherbereiche über diesen Controller angesteuert werden (z. B. Regale vs. Gitterboxen)
-- **Heartbeat**: Controller senden regelmäßig `POST /api/v1/led/controllers/{controller_id}/heartbeat`; bei unbekannter ID wird ein Datensatz auto-registriert.
-- LED-Kommandos werden automatisch pro Zone zum passenden Controller geroutet. Wird kein Controller gefunden, fällt das System auf das globale Topic (`LED_WAREHOUSE_ID`) zurück.
-- Vorschau-, Locate- und Job-Highlight-Befehle berücksichtigen nun Controller-Zuordnungen: das Ziel-Fach bleibt exklusiv auf „seinem“ Controller.
+- **Admin > ESP-Controller**: Kartenansicht mit Online-Status, IP, Hostname, Firmware, WiFi-RSSI, Uptime. Zonentypen lassen sich per Checkbox zuweisen; Anzeigename/Topic können editiert werden.
+- Jeder Controller verwaltet:
+  - `controller_id` – automatisch generiert (`<PREFIX>-<macsuffix>`) oder manuell überschreibbar
+  - `topic_suffix` – Ziel-Topic für Kommandos (`<LED_MQTT_TOPIC_PREFIX>/<suffix>/cmd`)
+  - `zone_types` – definieren, für welche Lagerbereiche der Controller leuchtet
+- **Heartbeat Workflow**:
+  - ESP sendet alle 15 s `POST /api/v1/led/controllers/{controller_id}/heartbeat` (ohne Auth) mit JSON-Payload
+  - Unbekannte IDs werden automatisch angelegt (Displayname = ID, Topic = ID)
+  - Telemetriedaten (RSSI, Uptime, LED-Länge, Firmware, IP, Hostname, MAC) werden persistiert (`status_data`)
+- LED-Kommandos werden auf Basis des Zonen-Typs automatisch zum passenden Controller geroutet; fällt keiner zu, nutzt das System das globale Warehouse-Topic (`LED_WAREHOUSE_ID`).
+- Locate-/Preview-/Job-Highlights berücksichtigen Controller-Zuordnung, sodass nur relevanten Streifen angesprochen werden.
 
-##### Firmware-Anpassungen für mehrere Controller
+**Heartbeat Payload Beispiel**
 
-```cpp
-// Beispiel MQTT Setup (Arduino)
-const char* topicCmd   = "weidelbach/esp-regal-1/cmd";
-const char* topicState = "weidelbach/esp-regal-1/status";
-
-// Heartbeat alle 30s
-HTTPClient http;
-http.begin("https://<server>/api/v1/led/controllers/esp-regal-1/heartbeat");
-http.POST("");
-http.end();
+```json
+{
+  "controller_id": "esp-a1b2c3",
+  "topic_suffix": "esp-a1b2c3",
+  "ip_address": "192.168.10.25",
+  "hostname": "esp-a1b2c3",
+  "firmware_version": "1.1.0",
+  "mac_address": "24:6F:28:A1:B2:C3",
+  "wifi_rssi": -51,
+  "uptime_seconds": 4821,
+  "led_count": 600
+}
 ```
 
-- Jeder Controller hört auf das eigene Topic (`LED_MQTT_TOPIC_PREFIX/<suffix>/cmd`).
-- Heartbeat kann via HTTPS (empfohlen) oder plain HTTP erfolgen; bei Ausfall markiert das Backend den Controller als „Offline“.
-- Zonen-Typen in WarehouseCore (`storage_zones.type`) müssen dem Controller zugeordnet sein, damit Highlights / Locate-Befehle ankommen.
+- HTTP-Heartbeat funktioniert über HTTP oder HTTPS (Empfehlung: TLS aktivieren). Bei Kommunikationsverlust markiert das Backend den Controller automatisch als offline (`last_seen` + `is_active`).
+- Zonen-Typen in WarehouseCore (`storage_zones.type`) müssen einem Controller zugewiesen sein, damit Highlights / Locate-Befehle ankommen.
 
 **Features:**
 - WiFi auto-reconnect

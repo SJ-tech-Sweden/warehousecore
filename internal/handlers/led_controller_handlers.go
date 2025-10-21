@@ -133,8 +133,26 @@ func LEDControllerHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var payload *models.LEDControllerHeartbeat
+	if r.Body != nil && r.ContentLength != 0 {
+		var body models.LEDControllerHeartbeat
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid heartbeat payload"})
+			return
+		}
+		if body.ControllerID != "" {
+			identifier = body.ControllerID
+		}
+		// ensure empty maps treated as nil
+		if body.Status != nil && len(body.Status) == 0 {
+			body.Status = nil
+		}
+		payload = &body
+	}
+
 	service := services.NewLEDControllerService()
-	if err := service.RecordHeartbeat(identifier); err != nil {
+	controller, err := service.RecordHeartbeat(identifier, payload)
+	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
@@ -142,6 +160,7 @@ func LEDControllerHeartbeat(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":        "ok",
 		"controller_id": identifier,
+		"controller":    controller,
 		"received_at":   time.Now().UTC(),
 	})
 }

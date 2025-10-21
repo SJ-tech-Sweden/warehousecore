@@ -13,7 +13,7 @@ export function AdminPage() {
   const tabs = [
     { id: 'zonetypes' as TabType, label: 'Zonentypen', icon: Layers },
     { id: 'led' as TabType, label: 'LED-Verhalten', icon: Lightbulb },
-    { id: 'controllers' as TabType, label: 'Mikrocontroller', icon: Cpu },
+    { id: 'controllers' as TabType, label: 'ESP-Controller', icon: Cpu },
     { id: 'roles' as TabType, label: 'Rollen & Benutzer', icon: Users },
   ];
 

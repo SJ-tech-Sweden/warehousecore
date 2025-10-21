@@ -24,6 +24,23 @@ const defaultForm: ControllerForm = {
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
+const formatUptime = (seconds?: number): string | null => {
+  if (seconds === undefined || seconds === null || Number.isNaN(seconds)) return null;
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (parts.length === 0) {
+    const secs = totalSeconds % 60;
+    parts.push(`${secs}s`);
+  }
+  return parts.join(' ');
+};
+
 export function LEDControllersTab() {
   const [controllers, setControllers] = useState<LEDController[]>([]);
   const [zoneTypes, setZoneTypes] = useState<ZoneTypeDefinition[]>([]);
@@ -279,6 +296,19 @@ export function LEDControllersTab() {
         ) : (
           controllers.map((controller) => {
             const status = controllerStatus(controller);
+            const statusData = controller.status_data as Record<string, unknown> | undefined;
+            const wifiRSSI =
+              typeof statusData?.['wifi_rssi'] === 'number' ? (statusData['wifi_rssi'] as number) : undefined;
+            const uptimeSeconds =
+              typeof statusData?.['uptime_seconds'] === 'number' ? (statusData['uptime_seconds'] as number) : undefined;
+            const ledCount =
+              typeof statusData?.['led_count'] === 'number' ? (statusData['led_count'] as number) : undefined;
+            const heartbeatAtRaw =
+              typeof statusData?.['heartbeat_received_at'] === 'string'
+                ? (statusData['heartbeat_received_at'] as string)
+                : undefined;
+            const heartbeatAt = heartbeatAtRaw ? new Date(heartbeatAtRaw) : undefined;
+            const uptimeLabel = formatUptime(uptimeSeconds);
             return (
               <div key={controller.id} className="glass rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-white/10">
                 <div className="flex-1 min-w-0">
@@ -301,6 +331,16 @@ export function LEDControllersTab() {
                       {controller.last_seen && (
                         <p className="text-xs text-gray-500">Letzter Kontakt: {new Date(controller.last_seen).toLocaleString()}</p>
                       )}
+                      <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-y-1 text-xs text-gray-400">
+                        {controller.hostname && <span>Hostname: <span className="font-mono text-gray-300">{controller.hostname}</span></span>}
+                        {controller.ip_address && <span>IP: <span className="font-mono text-gray-300">{controller.ip_address}</span></span>}
+                        {controller.mac_address && <span>MAC: <span className="font-mono text-gray-300">{controller.mac_address}</span></span>}
+                        {controller.firmware_version && <span>Firmware: <span className="font-mono text-gray-300">{controller.firmware_version}</span></span>}
+                        {typeof ledCount === 'number' && <span>LEDs: <span className="font-mono text-gray-300">{ledCount}</span></span>}
+                        {wifiRSSI !== undefined && <span>WiFi RSSI: <span className="font-mono text-gray-300">{wifiRSSI} dBm</span></span>}
+                        {uptimeLabel && <span>Uptime: <span className="font-mono text-gray-300">{uptimeLabel}</span></span>}
+                        {heartbeatAt && <span>Heartbeat: <span className="font-mono text-gray-300">{heartbeatAt.toLocaleTimeString()}</span></span>}
+                      </div>
                     </div>
                   </div>
                 </div>
