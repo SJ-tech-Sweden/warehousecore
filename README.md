@@ -1149,13 +1149,38 @@ For issues or questions:
 
 ---
 
-**Version:** 1.57
+**Version:** 1.58
 **Last Updated:** 2025-10-23
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.58 (2025-10-23)
+- **Feature: Barcode & Label Generation System** 🏷️
+  - Full barcode/QR-code generation API with Go libraries (skip2/go-qrcode, boombuler/barcode)
+  - Label template system with database storage (label_templates table)
+  - CRUD API for label templates with JSON-based element definitions
+  - Canvas-based Label Designer UI with live preview
+  - Support for QR codes, Code128 barcodes, text, and images on labels
+  - Customizable label sizes (62x29mm, 100x50mm, custom dimensions)
+  - Template elements support positioning, rotation, styling
+  - Field mapping for device data (device_id, product name, category)
+  - Bulk export: Generate and download labels for multiple devices as PNG
+  - Print functionality with browser print dialog integration
+  - Pre-seeded templates: Standard device label (62x29mm QR), Large label (100x50mm barcode)
+  - New navigation menu item: "Labels" with Tag icon
+  - API endpoints: /labels/qrcode, /labels/barcode, /labels/templates, /labels/device/{id}
+  - Addresses GitLab Issue #5: Barcode generation & label designer
+
+  **New Files:**
+  - internal/models/label.go - Label template models
+  - internal/services/label_service.go - Label generation service
+  - internal/handlers/label_handler.go - API handlers
+  - migrations/016_create_label_templates.sql - Database migration
+  - web/src/pages/LabelDesignerPage.tsx - Designer UI component
+  - web/src/pages/LabelDesignerPage.css - Designer styling
 
 ### Version 1.57 (2025-10-23)
 - **Feature: Comprehensive Multi-ESP32 Setup Guide** 📚

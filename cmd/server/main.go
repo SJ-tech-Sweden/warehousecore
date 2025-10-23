@@ -170,6 +170,16 @@ func main() {
 	api.HandleFunc("/led/locate", handlers.LocateBin).Methods("POST")
 	api.HandleFunc("/led/controllers/{controller_id}/heartbeat", handlers.LEDControllerHeartbeat).Methods("POST")
 
+	// Label generation endpoints
+	api.HandleFunc("/labels/qrcode", handlers.GenerateQRCode).Methods("POST")
+	api.HandleFunc("/labels/barcode", handlers.GenerateBarcode).Methods("POST")
+	api.HandleFunc("/labels/templates", handlers.GetLabelTemplates).Methods("GET")
+	api.HandleFunc("/labels/templates", handlers.CreateLabelTemplate).Methods("POST")
+	api.HandleFunc("/labels/templates/{id}", handlers.GetLabelTemplate).Methods("GET")
+	api.HandleFunc("/labels/templates/{id}", handlers.UpdateLabelTemplate).Methods("PUT")
+	api.HandleFunc("/labels/templates/{id}", handlers.DeleteLabelTemplate).Methods("DELETE")
+	api.HandleFunc("/labels/device/{device_id}", handlers.GenerateDeviceLabel).Methods("POST")
+
     // Admin routes (RBAC protected)
     // Read-only admin routes (admin or manager)
     adminRead := api.PathPrefix("/admin").Subrouter()

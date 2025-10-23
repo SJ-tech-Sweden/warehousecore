@@ -401,3 +401,48 @@ export const ledApi = {
   updateController: (id: number, payload: LEDControllerPayload) => api.put(`/admin/led/controllers/${id}`, payload),
   deleteController: (id: number) => api.delete(`/admin/led/controllers/${id}`),
 };
+
+// Label API
+export interface LabelTemplate {
+  id?: number;
+  name: string;
+  description: string;
+  width: number;
+  height: number;
+  template_json: string;
+  is_default: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LabelElement {
+  type: 'barcode' | 'qrcode' | 'text' | 'image';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  content: string;
+  style: {
+    font_size?: number;
+    font_weight?: string;
+    font_family?: string;
+    color?: string;
+    alignment?: string;
+    format?: string;
+  };
+}
+
+export const labelsApi = {
+  generateQRCode: (content: string, size: number = 256) =>
+    api.post<{ image_data: string }>('/labels/qrcode', { content, size }),
+  generateBarcode: (content: string, width: number = 300, height: number = 100) =>
+    api.post<{ image_data: string }>('/labels/barcode', { content, width, height }),
+  getTemplates: () => api.get<LabelTemplate[]>('/labels/templates'),
+  getTemplate: (id: number) => api.get<LabelTemplate>(`/labels/templates/${id}`),
+  createTemplate: (template: LabelTemplate) => api.post<LabelTemplate>('/labels/templates', template),
+  updateTemplate: (id: number, updates: Partial<LabelTemplate>) => api.put(`/labels/templates/${id}`, updates),
+  deleteTemplate: (id: number) => api.delete(`/labels/templates/${id}`),
+  generateDeviceLabel: (deviceId: string, templateId: number) =>
+    api.post(`/labels/device/${deviceId}`, { template_id: templateId }),
+};

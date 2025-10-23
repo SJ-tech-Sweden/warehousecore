@@ -1,0 +1,259 @@
+package services
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"image/png"
+
+	"github.com/skip2/go-qrcode"
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/code128"
+
+	"warehousecore/internal/models"
+	"warehousecore/internal/repository"
+)
+
+type LabelService struct{}
+
+func NewLabelService() *LabelService {
+	return &LabelService{}
+}
+
+// GenerateQRCode generates a QR code and returns it as base64-encoded PNG
+func (s *LabelService) GenerateQRCode(content string, size int) (string, error) {
+	if size == 0 {
+		size = 256 // default size
+	}
+
+	// Generate QR code
+	qr, err := qrcode.New(content, qrcode.Medium)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate QR code: %w", err)
+	}
+
+	// Convert to PNG bytes
+	pngBytes, err := qr.PNG(size)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert QR code to PNG: %w", err)
+	}
+
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString(pngBytes)
+	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
+}
+
+// GenerateBarcode generates a Code128 barcode and returns it as base64-encoded PNG
+func (s *LabelService) GenerateBarcode(content string, width, height int) (string, error) {
+	if width == 0 {
+		width = 300
+	}
+	if height == 0 {
+		height = 100
+	}
+
+	// Generate Code128 barcode
+	bc, err := code128.Encode(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate barcode: %w", err)
+	}
+
+	// Scale barcode
+	scaled, err := barcode.Scale(bc, width, height)
+	if err != nil {
+		return "", fmt.Errorf("failed to scale barcode: %w", err)
+	}
+
+	// Convert to PNG
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, scaled); err != nil {
+		return "", fmt.Errorf("failed to encode barcode to PNG: %w", err)
+	}
+
+	// Encode to base64
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
+}
+
+// GetAllTemplates retrieves all label templates
+func (s *LabelService) GetAllTemplates() ([]models.LabelTemplate, error) {
+	db := repository.GetDB()
+	var templates []models.LabelTemplate
+
+	if err := db.Order("is_default DESC, name ASC").Find(&templates).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch templates: %w", err)
+	}
+
+	return templates, nil
+}
+
+// GetTemplateByID retrieves a specific template
+func (s *LabelService) GetTemplateByID(id int) (*models.LabelTemplate, error) {
+	db := repository.GetDB()
+	var template models.LabelTemplate
+
+	if err := db.Where("id = ?", id).First(&template).Error; err != nil {
+		return nil, fmt.Errorf("template not found: %w", err)
+	}
+
+	return &template, nil
+}
+
+// CreateTemplate creates a new label template
+func (s *LabelService) CreateTemplate(template *models.LabelTemplate) error {
+	db := repository.GetDB()
+
+	// Validate template JSON
+	var elements []models.LabelElement
+	if err := json.Unmarshal([]byte(template.TemplateJSON), &elements); err != nil {
+		return fmt.Errorf("invalid template JSON: %w", err)
+	}
+
+	// If this is set as default, unset other defaults
+	if template.IsDefault {
+		if err := db.Model(&models.LabelTemplate{}).Where("is_default = ?", true).Update("is_default", false).Error; err != nil {
+			return fmt.Errorf("failed to unset other defaults: %w", err)
+		}
+	}
+
+	if err := db.Create(template).Error; err != nil {
+		return fmt.Errorf("failed to create template: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateTemplate updates an existing label template
+func (s *LabelService) UpdateTemplate(id int, updates map[string]interface{}) error {
+	db := repository.GetDB()
+
+	// Validate template JSON if provided
+	if templateJSON, ok := updates["template_json"].(string); ok {
+		var elements []models.LabelElement
+		if err := json.Unmarshal([]byte(templateJSON), &elements); err != nil {
+			return fmt.Errorf("invalid template JSON: %w", err)
+		}
+	}
+
+	// If setting as default, unset other defaults
+	if isDefault, ok := updates["is_default"].(bool); ok && isDefault {
+		if err := db.Model(&models.LabelTemplate{}).Where("is_default = ? AND id != ?", true, id).Update("is_default", false).Error; err != nil {
+			return fmt.Errorf("failed to unset other defaults: %w", err)
+		}
+	}
+
+	if err := db.Model(&models.LabelTemplate{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		return fmt.Errorf("failed to update template: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteTemplate deletes a label template
+func (s *LabelService) DeleteTemplate(id int) error {
+	db := repository.GetDB()
+
+	result := db.Where("id = ?", id).Delete(&models.LabelTemplate{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete template: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("template not found")
+	}
+
+	return nil
+}
+
+// GenerateLabelForDevice generates a complete label for a device
+func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (map[string]interface{}, error) {
+	// Get template
+	template, err := s.GetTemplateByID(templateID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse template elements
+	var elements []models.LabelElement
+	if err := json.Unmarshal([]byte(template.TemplateJSON), &elements); err != nil {
+		return nil, fmt.Errorf("invalid template JSON: %w", err)
+	}
+
+	// Get device data
+	db := repository.GetDB()
+	var device struct {
+		DeviceID   string `json:"device_id"`
+		DeviceName string `json:"device_name"`
+		Product    string `json:"product"`
+		Category   string `json:"category"`
+	}
+
+	query := `
+		SELECT
+			d.device_id,
+			d.name as device_name,
+			sb.name as product,
+			c.name as category
+		FROM devices d
+		LEFT JOIN subbiercategories sb ON d.subbiercategory_id = sb.id
+		LEFT JOIN categories c ON d.category_id = c.id
+		WHERE d.device_id = ?
+	`
+
+	if err := db.Raw(query, deviceID).Scan(&device).Error; err != nil {
+		return nil, fmt.Errorf("device not found: %w", err)
+	}
+
+	// Process elements and generate barcodes/QR codes
+	processedElements := make([]map[string]interface{}, 0, len(elements))
+	for _, elem := range elements {
+		processed := map[string]interface{}{
+			"type":     elem.Type,
+			"x":        elem.X,
+			"y":        elem.Y,
+			"width":    elem.Width,
+			"height":   elem.Height,
+			"rotation": elem.Rotation,
+			"style":    elem.Style,
+		}
+
+		// Resolve content from field names
+		content := elem.Content
+		switch elem.Content {
+		case "device_id":
+			content = device.DeviceID
+		case "device_name":
+			content = device.DeviceName
+		case "product":
+			content = device.Product
+		case "category":
+			content = device.Category
+		}
+
+		processed["content"] = content
+
+		// Generate barcode/QR code if needed
+		if elem.Type == "qrcode" {
+			qrData, err := s.GenerateQRCode(content, int(elem.Width))
+			if err != nil {
+				return nil, err
+			}
+			processed["image_data"] = qrData
+		} else if elem.Type == "barcode" {
+			barcodeData, err := s.GenerateBarcode(content, int(elem.Width), int(elem.Height))
+			if err != nil {
+				return nil, err
+			}
+			processed["image_data"] = barcodeData
+		}
+
+		processedElements = append(processedElements, processed)
+	}
+
+	return map[string]interface{}{
+		"template": template,
+		"elements": processedElements,
+		"device":   device,
+	}, nil
+}
