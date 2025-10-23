@@ -225,6 +225,42 @@ export default function LabelDesignerPage() {
     }
   }, [elements, labelWidth, labelHeight, previewDevice]);
 
+  const generateAllLabels = async () => {
+    if (devices.length === 0) {
+      alert('Keine Devices gefunden!');
+      return;
+    }
+
+    setExporting(true);
+    let successCount = 0;
+    try {
+      for (const device of devices) {
+        setPreviewDevice(device);
+        await new Promise((r) => setTimeout(r, 300));
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          try {
+            await labelsApi.saveLabel(device.device_id, imageData);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to save label for ${device.device_id}:`, error);
+          }
+        }
+      }
+      alert(`${successCount}/${devices.length} Labels erfolgreich generiert und gespeichert!`);
+    } catch (error) {
+      console.error('Generation failed:', error);
+      alert('Fehler beim Generieren');
+    } finally {
+      setExporting(false);
+      if (devices.length > 0) {
+        setPreviewDevice(devices[0]);
+      }
+    }
+  };
+
   const exportAllLabels = async () => {
     if (devices.length === 0) {
       alert('Keine Devices gefunden!');
@@ -235,12 +271,12 @@ export default function LabelDesignerPage() {
     try {
       for (const device of devices) {
         setPreviewDevice(device);
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 300));
 
         const canvas = canvasRef.current;
         if (canvas) {
           const link = document.createElement('a');
-          link.download = `label-${device.device_id}.png`;
+          link.download = `${device.device_id}_label.png`;
           link.href = canvas.toDataURL('image/png');
           link.click();
         }
@@ -548,8 +584,11 @@ export default function LabelDesignerPage() {
               <button onClick={handlePrint} disabled={!previewDevice} className="btn-action">
                 <Printer size={18} /> Vorschau Drucken
               </button>
-              <button onClick={exportAllLabels} disabled={exporting || devices.length === 0} className="btn-action btn-primary">
-                <Download size={18} /> {exporting ? `Exportiere ${devices.length}...` : `Alle ${devices.length} Labels Exportieren`}
+              <button onClick={generateAllLabels} disabled={exporting || devices.length === 0} className="btn-action btn-primary">
+                <Save size={18} /> {exporting ? `Generiere ${devices.length}...` : `Alle ${devices.length} Labels Generieren`}
+              </button>
+              <button onClick={exportAllLabels} disabled={exporting || devices.length === 0} className="btn-action">
+                <Download size={18} /> {exporting ? `Exportiere ${devices.length}...` : `Alle Labels Exportieren`}
               </button>
             </div>
           </div>

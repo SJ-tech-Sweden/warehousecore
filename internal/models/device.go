@@ -42,12 +42,13 @@ type Device struct {
 // DeviceWithDetails includes related product and location information
 type DeviceWithDetails struct {
 	Device
-	ProductName     string `json:"product_name" db:"product_name"`
-	ProductCategory string `json:"product_category,omitempty" db:"product_category"`
-	ZoneName        string `json:"zone_name,omitempty" db:"zone_name"`
-	ZoneCode        string `json:"zone_code,omitempty" db:"zone_code"`
-	CaseName        string `json:"case_name,omitempty" db:"case_name"`
-	JobNumber       string `json:"job_number,omitempty" db:"job_number"`
+	ProductName     string         `json:"product_name" db:"product_name"`
+	ProductCategory string         `json:"product_category,omitempty" db:"product_category"`
+	ZoneName        string         `json:"zone_name,omitempty" db:"zone_name"`
+	ZoneCode        string         `json:"zone_code,omitempty" db:"zone_code"`
+	CaseName        string         `json:"case_name,omitempty" db:"case_name"`
+	JobNumber       string         `json:"job_number,omitempty" db:"job_number"`
+	LabelPath       sql.NullString `json:"label_path,omitempty" db:"label_path"`
 }
 
 // DeviceFilter represents query filters for devices

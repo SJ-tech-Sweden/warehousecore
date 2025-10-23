@@ -1157,6 +1157,36 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.81 (2025-10-23)
+- **Major Refactor: Label Generation & Storage System** 🏷️
+  - Labels are now pre-generated and stored as PNG files on disk
+  - New "Generate All Labels" button in Label Designer
+  - Labels saved to `/root/web/dist/labels/` with naming `{device_id}_label.png`
+  - Added `label_path` column to devices table (migration 017)
+  - Device detail modal shows pre-generated label image instead of canvas rendering
+  - Much faster label display and consistent rendering
+  - Fixed ESC key to close device detail modal
+  - Separate "Generate All Labels" (saves to disk) and "Export All Labels" (downloads) buttons
+
+- **Backend Changes:**
+  - New `SaveDeviceLabel` API endpoint: POST `/api/v1/labels/save`
+  - `SaveLabelImage()` function in LabelService saves base64 images to filesystem
+  - Database updated with label file path after generation
+  - GORM-based label path updates
+
+- **Frontend Changes:**
+  - Device Modal: Shows `<img>` tag with stored label instead of canvas rendering
+  - Label Designer: `generateAllLabels()` function sends labels to backend for storage
+  - API: `saveLabel()` function added to labelsApi
+  - Device interface extended with `label_path` field
+  - Fixed label designer preview dropdown to show all devices (not limited to 20)
+
+- **User Workflow:**
+  1. Design label template in Label Designer
+  2. Click "Generate All Labels" → Labels are rendered and saved for all devices
+  3. Open device details → See the pre-generated label immediately
+  4. Download individual labels or bulk export
+
 ### Version 1.80 (2025-10-23)
 - **Bug Fix: Label Display Scaling in Device Modal** 🐛
   - Fixed oversized label preview in device detail modal

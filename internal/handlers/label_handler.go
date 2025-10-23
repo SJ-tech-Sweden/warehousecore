@@ -206,3 +206,35 @@ func GenerateDeviceLabel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(labelData)
 }
+
+// SaveDeviceLabel saves a generated label image for a device
+// POST /api/v1/labels/save
+// Body: {"device_id": "DEV001", "image_data": "data:image/png;base64,..."}
+func SaveDeviceLabel(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		DeviceID  string `json:"device_id"`
+		ImageData string `json:"image_data"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.DeviceID == "" || req.ImageData == "" {
+		http.Error(w, "Device ID and image data are required", http.StatusBadRequest)
+		return
+	}
+
+	labelPath, err := labelService.SaveLabelImage(req.DeviceID, req.ImageData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"label_path": labelPath,
+		"message":    "Label saved successfully",
+	})
+}

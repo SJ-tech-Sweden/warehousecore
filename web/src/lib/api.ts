@@ -27,6 +27,7 @@ export interface Device {
   job_number?: string;
   condition_rating?: number;
   usage_hours?: number;
+  label_path?: string;
 }
 
 export interface DeviceTreeDevice {
@@ -445,4 +446,6 @@ export const labelsApi = {
   deleteTemplate: (id: number) => api.delete(`/labels/templates/${id}`),
   generateDeviceLabel: (deviceId: string, templateId: number) =>
     api.post(`/labels/device/${deviceId}`, { template_id: templateId }),
+  saveLabel: (deviceId: string, imageData: string) =>
+    api.post<{ label_path: string; message: string }>('/labels/save', { device_id: deviceId, image_data: imageData }),
 };
