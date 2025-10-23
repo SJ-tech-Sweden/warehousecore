@@ -18,6 +18,299 @@ import (
 	"warehousecore/internal/services"
 )
 
+type CaseSummary struct {
+	CaseID      int      `json:"case_id"`
+	Name        string   `json:"name"`
+	Description *string  `json:"description,omitempty"`
+	Status      string   `json:"status"`
+	Width       *float64 `json:"width,omitempty"`
+	Height      *float64 `json:"height,omitempty"`
+	Depth       *float64 `json:"depth,omitempty"`
+	Weight      *float64 `json:"weight,omitempty"`
+	ZoneID      *int     `json:"zone_id,omitempty"`
+	ZoneName    *string  `json:"zone_name,omitempty"`
+	ZoneCode    *string  `json:"zone_code,omitempty"`
+	DeviceCount int      `json:"device_count"`
+}
+
+type CaseDetail struct {
+	CaseSummary
+}
+
+type CaseDevice struct {
+	DeviceID     string  `json:"device_id"`
+	Status       string  `json:"status"`
+	SerialNumber *string `json:"serial_number,omitempty"`
+	Barcode      *string `json:"barcode,omitempty"`
+	ProductName  *string `json:"product_name,omitempty"`
+	ZoneID       *int    `json:"zone_id,omitempty"`
+	ZoneName     *string `json:"zone_name,omitempty"`
+	ZoneCode     *string `json:"zone_code,omitempty"`
+}
+
+func ptrString(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	val := ns.String
+	return &val
+}
+
+func ptrFloat64(n sql.NullFloat64) *float64 {
+	if !n.Valid {
+		return nil
+	}
+	val := n.Float64
+	return &val
+}
+
+func ptrInt(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	val := int(n.Int64)
+	return &val
+}
+
+func nullableStringPtr(value *string) interface{} {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return trimmed
+}
+
+func nullableFloatPtr(value *float64) interface{} {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func nullableIntPtr(value *int) interface{} {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func loadCaseDetail(db *sql.DB, caseID int64) (*CaseDetail, error) {
+	query := `
+		SELECT 
+			c.caseID,
+			c.name,
+			c.description,
+			c.status,
+			c.width,
+			c.height,
+			c.depth,
+			c.weight,
+			c.zone_id,
+			COALESCE(z.name, '') AS zone_name,
+			COALESCE(z.code, '') AS zone_code,
+			COUNT(dc.deviceID) AS device_count
+		FROM cases c
+		LEFT JOIN devicescases dc ON c.caseID = dc.caseID
+		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
+		WHERE c.caseID = ?
+		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, zone_name, zone_code
+	`
+
+	var description sql.NullString
+	var width, height, depth, weight sql.NullFloat64
+	var zoneID sql.NullInt64
+	var zoneName, zoneCode sql.NullString
+	var deviceCount sql.NullInt64
+
+	var detail CaseDetail
+
+	err := db.QueryRow(query, caseID).Scan(
+		&detail.CaseID,
+		&detail.Name,
+		&description,
+		&detail.Status,
+		&width,
+		&height,
+		&depth,
+		&weight,
+		&zoneID,
+		&zoneName,
+		&zoneCode,
+		&deviceCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	detail.Description = ptrString(description)
+	detail.Width = ptrFloat64(width)
+	detail.Height = ptrFloat64(height)
+	detail.Depth = ptrFloat64(depth)
+	detail.Weight = ptrFloat64(weight)
+	detail.ZoneID = ptrInt(zoneID)
+
+	if zoneName.Valid && zoneName.String != "" {
+		detail.ZoneName = ptrString(zoneName)
+	}
+	if zoneCode.Valid && zoneCode.String != "" {
+		detail.ZoneCode = ptrString(zoneCode)
+	}
+	if deviceCount.Valid {
+		detail.DeviceCount = int(deviceCount.Int64)
+	}
+
+	return &detail, nil
+}
+
+func loadCaseDevices(db *sql.DB, caseID int64) ([]CaseDevice, error) {
+	query := `
+		SELECT 
+			d.deviceID,
+			d.status,
+			d.serialnumber,
+			d.barcode,
+			d.zone_id,
+			COALESCE(z.name, '') AS zone_name,
+			COALESCE(z.code, '') AS zone_code,
+			COALESCE(p.name, '') AS product_name
+		FROM devicescases dc
+		INNER JOIN devices d ON dc.deviceID = d.deviceID
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		WHERE dc.caseID = ?
+		ORDER BY d.deviceID ASC
+	`
+
+	rows, err := db.Query(query, caseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	devices := []CaseDevice{}
+
+	for rows.Next() {
+		var device CaseDevice
+		var serialNumber, barcode, productName sql.NullString
+		var zoneID sql.NullInt64
+		var zoneName, zoneCode sql.NullString
+
+		if err := rows.Scan(
+			&device.DeviceID,
+			&device.Status,
+			&serialNumber,
+			&barcode,
+			&zoneID,
+			&zoneName,
+			&zoneCode,
+			&productName,
+		); err != nil {
+			log.Printf("loadCaseDevices scan error: %v", err)
+			continue
+		}
+
+		device.SerialNumber = ptrString(serialNumber)
+		device.Barcode = ptrString(barcode)
+		device.ProductName = ptrString(productName)
+		device.ZoneID = ptrInt(zoneID)
+
+		if zoneName.Valid && zoneName.String != "" {
+			device.ZoneName = ptrString(zoneName)
+		}
+		if zoneCode.Valid && zoneCode.String != "" {
+			device.ZoneCode = ptrString(zoneCode)
+		}
+
+		devices = append(devices, device)
+	}
+
+	return devices, nil
+}
+
+func loadAvailableCaseDevices(db *sql.DB, caseID *int64, search string, limit int) ([]CaseDevice, error) {
+	baseQuery := `
+		SELECT DISTINCT
+			d.deviceID,
+			d.status,
+			d.serialnumber,
+			d.barcode,
+			d.zone_id,
+			COALESCE(z.name, '') AS zone_name,
+			COALESCE(z.code, '') AS zone_code,
+			COALESCE(p.name, '') AS product_name
+		FROM devices d
+		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		WHERE 1=1
+	`
+
+	args := []interface{}{}
+
+	if search != "" {
+		baseQuery += " AND (d.deviceID LIKE ? OR d.serialnumber LIKE ? OR p.name LIKE ?)"
+		term := "%" + search + "%"
+		args = append(args, term, term, term)
+	}
+
+	if caseID != nil {
+		baseQuery += " AND (dc.caseID IS NULL OR dc.caseID = ?)"
+		args = append(args, *caseID)
+	} else {
+		baseQuery += " AND dc.caseID IS NULL"
+	}
+
+	baseQuery += " ORDER BY d.deviceID ASC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := db.Query(baseQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	devices := []CaseDevice{}
+
+	for rows.Next() {
+		var device CaseDevice
+		var serialNumber, barcode, productName sql.NullString
+		var zoneID sql.NullInt64
+		var zoneName, zoneCode sql.NullString
+
+		if err := rows.Scan(
+			&device.DeviceID,
+			&device.Status,
+			&serialNumber,
+			&barcode,
+			&zoneID,
+			&zoneName,
+			&zoneCode,
+			&productName,
+		); err != nil {
+			log.Printf("loadAvailableCaseDevices scan error: %v", err)
+			continue
+		}
+
+		device.SerialNumber = ptrString(serialNumber)
+		device.Barcode = ptrString(barcode)
+		device.ProductName = ptrString(productName)
+		device.ZoneID = ptrInt(zoneID)
+
+		if zoneName.Valid && zoneName.String != "" {
+			device.ZoneName = ptrString(zoneName)
+		}
+		if zoneCode.Valid && zoneCode.String != "" {
+			device.ZoneCode = ptrString(zoneCode)
+		}
+
+		devices = append(devices, device)
+	}
+
+	return devices, nil
+}
 // HealthCheck returns server health status
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
@@ -1000,21 +1293,6 @@ func GetCases(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type CaseSummary struct {
-		CaseID      int      `json:"case_id"`
-		Name        string   `json:"name"`
-		Description *string  `json:"description,omitempty"`
-		Status      string   `json:"status"`
-		Width       *float64 `json:"width,omitempty"`
-		Height      *float64 `json:"height,omitempty"`
-		Depth       *float64 `json:"depth,omitempty"`
-		Weight      *float64 `json:"weight,omitempty"`
-		ZoneID      *int     `json:"zone_id,omitempty"`
-		ZoneName    *string  `json:"zone_name,omitempty"`
-		ZoneCode    *string  `json:"zone_code,omitempty"`
-		DeviceCount int      `json:"device_count"`
-	}
-
 	cases := []CaseSummary{}
 
 	for rows.Next() {
@@ -1044,36 +1322,22 @@ func GetCases(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if description.Valid {
-			item.Description = &description.String
+		descPtr := ptrString(description)
+		if descPtr != nil && strings.TrimSpace(*descPtr) == "" {
+			descPtr = nil
 		}
-		if width.Valid {
-			value := width.Float64
-			item.Width = &value
+		item.Description = descPtr
+		item.Width = ptrFloat64(width)
+		item.Height = ptrFloat64(height)
+		item.Depth = ptrFloat64(depth)
+		item.Weight = ptrFloat64(weight)
+		item.ZoneID = ptrInt(zoneID)
+
+		if zoneName.Valid && strings.TrimSpace(zoneName.String) != "" {
+			item.ZoneName = ptrString(zoneName)
 		}
-		if height.Valid {
-			value := height.Float64
-			item.Height = &value
-		}
-		if depth.Valid {
-			value := depth.Float64
-			item.Depth = &value
-		}
-		if weight.Valid {
-			value := weight.Float64
-			item.Weight = &value
-		}
-		if zoneID.Valid {
-			value := int(zoneID.Int64)
-			item.ZoneID = &value
-		}
-		if zoneName.Valid && zoneName.String != "" {
-			val := zoneName.String
-			item.ZoneName = &val
-		}
-		if zoneCode.Valid && zoneCode.String != "" {
-			val := zoneCode.String
-			item.ZoneCode = &val
+		if zoneCode.Valid && strings.TrimSpace(zoneCode.String) != "" {
+			item.ZoneCode = ptrString(zoneCode)
 		}
 		if deviceCount.Valid {
 			item.DeviceCount = int(deviceCount.Int64)
