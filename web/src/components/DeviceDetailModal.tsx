@@ -1,7 +1,7 @@
-import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb, LightbulbOff } from 'lucide-react';
-import { ledApi } from '../lib/api';
+import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb, LightbulbOff, Tag, Download } from 'lucide-react';
+import { ledApi, labelsApi } from '../lib/api';
 import type { Device } from '../lib/api';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface DeviceDetailModalProps {
   device: Device | null;
@@ -13,6 +13,9 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
   const [locating, setLocating] = useState(false);
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
   const [ledActive, setLedActive] = useState(false);
+  const [labelTemplate, setLabelTemplate] = useState<any | null>(null);
+  const [labelLoading, setLabelLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Cleanup LEDs when modal closes
   useEffect(() => {
@@ -21,6 +24,116 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
       setLedActive(false);
     }
   }, [isOpen, ledActive]);
+
+  // Load label template and render when modal opens
+  useEffect(() => {
+    if (isOpen && device) {
+      loadLabelTemplate();
+    }
+  }, [isOpen, device]);
+
+  const loadLabelTemplate = async () => {
+    setLabelLoading(true);
+    try {
+      const { data } = await labelsApi.getTemplates();
+      const defaultTemplate = data.find((t) => t.is_default);
+      if (defaultTemplate) {
+        setLabelTemplate(defaultTemplate);
+        setTimeout(() => renderLabel(defaultTemplate), 100);
+      }
+    } catch (error) {
+      console.error('Failed to load label template:', error);
+    } finally {
+      setLabelLoading(false);
+    }
+  };
+
+  const renderLabel = async (template: any) => {
+    if (!device || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpi = 300;
+    const mmToPixel = (mm: number) => (mm / 25.4) * dpi;
+
+    canvas.width = mmToPixel(template.width);
+    canvas.height = mmToPixel(template.height);
+
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const elements = JSON.parse(template.template_json);
+
+    for (const elem of elements) {
+      const x = mmToPixel(elem.x);
+      const y = mmToPixel(elem.y);
+      const width = mmToPixel(elem.width);
+      const height = mmToPixel(elem.height);
+
+      ctx.save();
+      ctx.translate(x + width / 2, y + height / 2);
+      ctx.rotate((elem.rotation || 0) * (Math.PI / 180));
+      ctx.translate(-(x + width / 2), -(y + height / 2));
+
+      if (elem.type === 'text') {
+        let content = elem.content;
+        if (content === 'device_id') content = device.device_id;
+        else if (content === 'product_name') content = device.product_name || '';
+        else if (content === 'device_name') content = device.device_id;
+
+        ctx.fillStyle = elem.style?.color || '#000000';
+        ctx.font = `${elem.style?.font_weight || 'normal'} ${mmToPixel(elem.style?.font_size || 10)}px ${elem.style?.font_family || 'Arial'}`;
+        ctx.textAlign = (elem.style?.alignment || 'left') as CanvasTextAlign;
+        ctx.textBaseline = 'top';
+
+        const textX = elem.style?.alignment === 'center' ? x + width / 2 : elem.style?.alignment === 'right' ? x + width : x;
+        ctx.fillText(content, textX, y);
+      } else if (elem.type === 'qrcode') {
+        let content = elem.content;
+        if (content === 'device_id') content = device.device_id;
+        else if (content === 'product_name') content = device.product_name || '';
+
+        try {
+          const { data } = await labelsApi.generateQRCode(content, Math.floor(width));
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, x, y, width, height);
+          img.src = data.image_data;
+        } catch (error) {
+          console.error('Failed to generate QR code:', error);
+        }
+      } else if (elem.type === 'barcode') {
+        let content = elem.content;
+        if (content === 'device_id') content = device.device_id;
+        else if (content === 'product_name') content = device.product_name || '';
+
+        try {
+          const { data } = await labelsApi.generateBarcode(content, Math.floor(width), Math.floor(height));
+          const img = new Image();
+          img.onload = () => ctx.drawImage(img, x, y, width, height);
+          img.src = data.image_data;
+        } catch (error) {
+          console.error('Failed to generate barcode:', error);
+        }
+      } else if (elem.type === 'image' && elem.image_data) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, x, y, width, height);
+        img.src = elem.image_data;
+      }
+
+      ctx.restore();
+    }
+  };
+
+  const handleDownloadLabel = () => {
+    if (!canvasRef.current) return;
+    const link = document.createElement('a');
+    link.download = `label-${device?.device_id || 'device'}.png`;
+    link.href = canvasRef.current.toDataURL();
+    link.click();
+  };
 
   if (!isOpen || !device) return null;
 
@@ -269,6 +382,35 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                   {locateMessage}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Label Preview Section */}
+          {labelTemplate && (
+            <div className="pt-4 border-t border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-accent-red" />
+                  Geräte-Label
+                </h3>
+                <button
+                  onClick={handleDownloadLabel}
+                  className="px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Herunterladen
+                </button>
+              </div>
+              <div className="flex justify-center p-4 bg-black/20 rounded-xl">
+                {labelLoading ? (
+                  <div className="text-gray-400 py-8">Label wird geladen...</div>
+                ) : (
+                  <canvas
+                    ref={canvasRef}
+                    className="max-w-full h-auto border border-white/10 rounded shadow-lg"
+                  />
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -1157,6 +1157,31 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.79 (2025-10-23)
+- **Feature: Device Detail Label Preview** 🏷️
+  - Added label preview directly in device detail modal
+  - Automatically loads default label template when device details are opened
+  - Canvas rendering of device-specific label with QR codes, barcodes, and text
+  - Download button to save individual device label as PNG
+  - Label section appears below LED controls with "Geräte-Label" heading
+  - Uses same rendering logic as Label Designer for consistency
+  - Loading state while template and label are being generated
+  - Integrates seamlessly with existing device detail modal design
+
+- **Bug Fix: Label Designer Preview Dropdown** 🐛
+  - Fixed preview dropdown to show ALL devices instead of just first 20
+  - Removed `.slice(0, 20)` limitation from device list
+  - Users can now select any device for label preview
+
+- **Technical Details:**
+  - Modified DeviceDetailModal.tsx to add label rendering functionality
+  - Added labelsApi integration for template fetching and barcode/QR generation
+  - Canvas API rendering with 300 DPI resolution for print quality
+  - Automatic element rendering: text, QR codes, barcodes, and images
+  - Font family support (Arial, Ubuntu, Aptos, etc.) from template
+  - Device data mapping: device_id, product_name fields
+  - Responsive download functionality with automatic filename generation
+
 ### Version 1.59 (2025-10-23)
 - **Major Redesign: Label Designer UI/UX Overhaul** 🎨
   - Complete visual redesign with Dark Theme and Glassmorphism effects

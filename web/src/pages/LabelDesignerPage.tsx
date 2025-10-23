@@ -498,7 +498,7 @@ export default function LabelDesignerPage() {
               }}
               className="input-select-small"
             >
-              {devices.slice(0, 20).map((d) => (
+              {devices.map((d) => (
                 <option key={d.device_id} value={d.device_id}>
                   {d.device_id} - {d.product_name}
                 </option>
