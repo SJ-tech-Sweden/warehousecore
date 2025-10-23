@@ -274,7 +274,7 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 	}
 
 	// Create labels directory if it doesn't exist
-	labelsDir := "/root/web/dist/labels"
+	labelsDir := "./web/dist/labels"
 	if err := os.MkdirAll(labelsDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create labels directory: %w", err)
 	}

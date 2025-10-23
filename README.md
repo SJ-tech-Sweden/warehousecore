@@ -1157,6 +1157,13 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.82 (2025-10-23)
+- **Bug Fix: Label File Path** 🐛
+  - Fixed label storage path from `/root/web/dist/labels` to `./web/dist/labels`
+  - Labels are now correctly served by the static file server
+  - Device modal now displays generated labels properly
+  - Ensures compatibility with Docker container file system
+
 ### Version 1.81 (2025-10-23)
 - **Major Refactor: Label Generation & Storage System** 🏷️
   - Labels are now pre-generated and stored as PNG files on disk
