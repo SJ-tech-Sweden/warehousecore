@@ -1157,6 +1157,35 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.84 (2025-10-23)
+- **Feature: Multiple Label Templates** 🏷️✨
+  - Added full template management system
+  - Create, edit, delete, and switch between multiple label templates
+  - Set any template as default for label generation
+  - Template selector dropdown with star indicator for default template
+  - "New Template" option to start fresh designs
+  - Save/Update button dynamically changes based on template state
+  - "Set as Default" button for non-default templates
+  - Delete button with confirmation for existing templates
+  - Template name input field for easy identification
+  - Generate All Labels now uses the default template
+  - Original template restored after bulk generation
+
+- **UI Improvements:**
+  - Template management section at top of left panel
+  - Clear visual indicators for current and default templates
+  - Improved workflow: Design → Save → Set as Default → Generate
+  - Updated page description to reflect multi-template capability
+
+- **Technical:**
+  - State management for templates list and current template ID
+  - loadTemplates() fetches all templates on page load
+  - loadTemplate() switches between templates
+  - createNewTemplate() resets to blank canvas
+  - deleteTemplate() with cascade check and confirmation
+  - setAsDefault() marks template for label generation
+  - TypeScript null-safety for template IDs
+
 ### Version 1.83 (2025-10-23)
 - **Bug Fix: Label Path in API Response** 🐛
   - Added label_path field to GetDevices and GetDevice SQL queries

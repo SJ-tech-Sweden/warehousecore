@@ -25,12 +25,14 @@ export default function LabelDesignerPage() {
   const [previewDevice, setPreviewDevice] = useState<Device | null>(null);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [templateName, setTemplateName] = useState('Mein Label Template');
+  const [templateName, setTemplateName] = useState('Neues Template');
+  const [templates, setTemplates] = useState<LabelTemplate[]>([]);
+  const [currentTemplateId, setCurrentTemplateId] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     loadDevices();
-    loadDefaultTemplate();
+    loadTemplates();
   }, []);
 
   const loadDevices = async () => {
@@ -45,19 +47,52 @@ export default function LabelDesignerPage() {
     }
   };
 
-  const loadDefaultTemplate = async () => {
+  const loadTemplates = async () => {
     try {
       const { data } = await labelsApi.getTemplates();
+      setTemplates(data);
+
+      // Load default template if exists
       const defaultTemplate = data.find((t) => t.is_default);
       if (defaultTemplate) {
-        setLabelWidth(defaultTemplate.width);
-        setLabelHeight(defaultTemplate.height);
-        setTemplateName(defaultTemplate.name);
-        const parsed = JSON.parse(defaultTemplate.template_json);
-        setElements(parsed.map((e: LabelElement, i: number) => ({ ...e, id: `elem-${i}` })));
+        loadTemplate(defaultTemplate);
       }
     } catch (error) {
-      console.error('Failed to load template:', error);
+      console.error('Failed to load templates:', error);
+    }
+  };
+
+  const loadTemplate = (template: LabelTemplate) => {
+    setCurrentTemplateId(template.id || null);
+    setLabelWidth(template.width);
+    setLabelHeight(template.height);
+    setTemplateName(template.name);
+    const parsed = JSON.parse(template.template_json);
+    setElements(parsed.map((e: LabelElement, i: number) => ({ ...e, id: `elem-${i}` })));
+  };
+
+  const createNewTemplate = () => {
+    setCurrentTemplateId(null);
+    setTemplateName('Neues Template');
+    setLabelWidth(62);
+    setLabelHeight(29);
+    setElements([]);
+    setSelectedElement(null);
+  };
+
+  const deleteTemplate = async (id: number) => {
+    if (!confirm('Template wirklich löschen?')) return;
+
+    try {
+      await labelsApi.deleteTemplate(id);
+      await loadTemplates();
+      if (currentTemplateId === id) {
+        createNewTemplate();
+      }
+      alert('Template gelöscht!');
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      alert('Fehler beim Löschen');
     }
   };
 
@@ -105,6 +140,11 @@ export default function LabelDesignerPage() {
   };
 
   const saveTemplate = async () => {
+    if (!templateName.trim()) {
+      alert('Bitte Template-Namen eingeben!');
+      return;
+    }
+
     setSaving(true);
     try {
       const templateJSON = JSON.stringify(
@@ -113,20 +153,46 @@ export default function LabelDesignerPage() {
 
       const template: LabelTemplate = {
         name: templateName,
-        description: 'Globales Label Template',
+        description: '',
         width: labelWidth,
         height: labelHeight,
         template_json: templateJSON,
-        is_default: true,
+        is_default: false,
       };
 
-      await labelsApi.createTemplate(template);
-      alert('Template erfolgreich gespeichert!');
+      if (currentTemplateId) {
+        // Update existing template
+        await labelsApi.updateTemplate(currentTemplateId, template);
+        alert('Template aktualisiert!');
+      } else {
+        // Create new template
+        const { data } = await labelsApi.createTemplate(template);
+        setCurrentTemplateId(data.id || null);
+        alert('Template erstellt!');
+      }
+
+      await loadTemplates();
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert('Fehler beim Speichern des Templates');
+      alert('Fehler beim Speichern');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const setAsDefault = async () => {
+    if (!currentTemplateId) {
+      alert('Bitte Template zuerst speichern!');
+      return;
+    }
+
+    try {
+      await labelsApi.updateTemplate(currentTemplateId, { is_default: true });
+      await loadTemplates();
+      alert('Als Standard gesetzt!');
+    } catch (error) {
+      console.error('Failed to set default:', error);
+      alert('Fehler beim Setzen des Standards');
     }
   };
 
@@ -231,9 +297,23 @@ export default function LabelDesignerPage() {
       return;
     }
 
+    // Find default template
+    const defaultTemplate = templates.find((t) => t.is_default);
+    if (!defaultTemplate) {
+      alert('Bitte zuerst ein Template als Standard setzen!');
+      return;
+    }
+
+    // Save current state
+    const originalTemplateId = currentTemplateId;
+
     setExporting(true);
     let successCount = 0;
     try {
+      // Load default template temporarily
+      loadTemplate(defaultTemplate);
+      await new Promise((r) => setTimeout(r, 500)); // Wait for render
+
       for (const device of devices) {
         setPreviewDevice(device);
         await new Promise((r) => setTimeout(r, 300));
@@ -249,7 +329,7 @@ export default function LabelDesignerPage() {
           }
         }
       }
-      alert(`${successCount}/${devices.length} Labels erfolgreich generiert und gespeichert!`);
+      alert(`${successCount}/${devices.length} Labels mit Standard-Template generiert!`);
     } catch (error) {
       console.error('Generation failed:', error);
       alert('Fehler beim Generieren');
@@ -257,6 +337,13 @@ export default function LabelDesignerPage() {
       setExporting(false);
       if (devices.length > 0) {
         setPreviewDevice(devices[0]);
+      }
+      // Restore original template
+      if (originalTemplateId) {
+        const originalTemplate = templates.find((t) => t.id === originalTemplateId);
+        if (originalTemplate) {
+          loadTemplate(originalTemplate);
+        }
       }
     }
   };
@@ -316,12 +403,59 @@ export default function LabelDesignerPage() {
     <div className="label-designer">
       <div className="label-designer-header">
         <h1>🏷️ Label Designer</h1>
-        <p>Globales Label-Template für alle Devices</p>
+        <p>Erstelle und verwalte Label-Templates für deine Devices</p>
       </div>
 
       <div className="designer-grid">
         {/* Left Panel - Toolbar & Properties */}
         <div className="designer-panel glass-dark">
+          {/* Template Management */}
+          <div className="panel-section">
+            <h3>Template</h3>
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className="input-field"
+              placeholder="Template Name"
+            />
+            <select
+              className="input-select"
+              value={currentTemplateId || ''}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id === 'new') {
+                  createNewTemplate();
+                } else if (id) {
+                  const template = templates.find((t) => t.id === parseInt(id));
+                  if (template) loadTemplate(template);
+                }
+              }}
+            >
+              <option value="new">+ Neues Template</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} {t.is_default ? '★' : ''}
+                </option>
+              ))}
+            </select>
+            <div className="button-group">
+              <button onClick={saveTemplate} disabled={saving} className="btn-save">
+                <Save size={18} /> {saving ? 'Speichere...' : currentTemplateId ? 'Aktualisieren' : 'Speichern'}
+              </button>
+              {currentTemplateId && !templates.find((t) => t.id === currentTemplateId)?.is_default && (
+                <button onClick={setAsDefault} className="btn-add">
+                  Als Standard setzen ★
+                </button>
+              )}
+              {currentTemplateId && (
+                <button onClick={() => deleteTemplate(currentTemplateId)} className="btn-delete-small">
+                  <Trash2 size={18} /> Löschen
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="panel-section">
             <h3>Label-Größe</h3>
             <select
