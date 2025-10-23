@@ -55,7 +55,8 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpi = 300;
+    // Use lower DPI for display (still good quality but reasonable size)
+    const dpi = 150;
     const mmToPixel = (mm: number) => (mm / 25.4) * dpi;
 
     canvas.width = mmToPixel(template.width);
@@ -407,7 +408,8 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 ) : (
                   <canvas
                     ref={canvasRef}
-                    className="max-w-full h-auto border border-white/10 rounded shadow-lg"
+                    style={{ maxWidth: '400px', maxHeight: '200px' }}
+                    className="w-auto h-auto border border-white/10 rounded shadow-lg"
                   />
                 )}
               </div>

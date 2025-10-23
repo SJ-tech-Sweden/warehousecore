@@ -1157,6 +1157,14 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.80 (2025-10-23)
+- **Bug Fix: Label Display Scaling in Device Modal** 🐛
+  - Fixed oversized label preview in device detail modal
+  - Reduced DPI from 300 to 150 for more appropriate display size
+  - Added CSS max-width (400px) and max-height (200px) constraints
+  - Label now displays at reasonable size while maintaining good quality
+  - Download still provides full-quality PNG export
+
 ### Version 1.79 (2025-10-23)
 - **Feature: Device Detail Label Preview** 🏷️
   - Added label preview directly in device detail modal
