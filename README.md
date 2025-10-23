@@ -1157,6 +1157,15 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.83 (2025-10-23)
+- **Bug Fix: Label Path in API Response** 🐛
+  - Added label_path field to GetDevices and GetDevice SQL queries
+  - label_path now properly returned in DeviceResponse JSON
+  - Device modal can now display stored label images
+  - Fixed SQL SELECT to include d.label_path column
+  - Updated Scan to include LabelPath field
+  - Added LabelPath validation and mapping to response
+
 ### Version 1.82 (2025-10-23)
 - **Bug Fix: Label File Path** 🐛
   - Fixed label storage path from `/root/web/dist/labels` to `./web/dist/labels`

@@ -398,7 +398,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	query := `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
-		       d.zone_id, d.condition_rating, d.usage_hours,
+		       d.zone_id, d.condition_rating, d.usage_hours, d.label_path,
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(z.name, '') as zone_name,
 		       COALESCE(z.code, '') as zone_code,
@@ -448,6 +448,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 		JobNumber       string  `json:"job_number,omitempty"`
 		ConditionRating float64 `json:"condition_rating"`
 		UsageHours      float64 `json:"usage_hours"`
+		LabelPath       *string `json:"label_path,omitempty"`
 	}
 
 	devices := []DeviceResponse{}
@@ -455,7 +456,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 		var d models.DeviceWithDetails
 		var caseName, jobNumber string
 		if err := rows.Scan(&d.DeviceID, &d.ProductID, &d.SerialNumber, &d.Status, &d.Barcode, &d.QRCode,
-			&d.ZoneID, &d.ConditionRating, &d.UsageHours, &d.ProductName, &d.ZoneName, &d.ZoneCode,
+			&d.ZoneID, &d.ConditionRating, &d.UsageHours, &d.LabelPath, &d.ProductName, &d.ZoneName, &d.ZoneCode,
 			&caseName, &jobNumber); err != nil {
 			log.Printf("Error scanning device row: %v", err)
 			continue
@@ -489,6 +490,9 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 		if d.ZoneID.Valid {
 			resp.ZoneID = &d.ZoneID.Int64
 		}
+		if d.LabelPath.Valid {
+			resp.LabelPath = &d.LabelPath.String
+		}
 
 		devices = append(devices, resp)
 	}
@@ -519,13 +523,14 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 		JobNumber       string  `json:"job_number,omitempty"`
 		ConditionRating float64 `json:"condition_rating"`
 		UsageHours      float64 `json:"usage_hours"`
+		LabelPath       *string `json:"label_path,omitempty"`
 	}
 
 	var device models.DeviceWithDetails
 	var caseName, jobNumber string
 	err := db.QueryRow(`
 		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
-		       d.zone_id, d.condition_rating, d.usage_hours,
+		       d.zone_id, d.condition_rating, d.usage_hours, d.label_path,
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(z.name, '') as zone_name,
 		       COALESCE(z.code, '') as zone_code,
@@ -539,7 +544,7 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
 		WHERE d.deviceID = ?
 	`, deviceID).Scan(&device.DeviceID, &device.ProductID, &device.SerialNumber, &device.Status,
-		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ConditionRating, &device.UsageHours,
+		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ConditionRating, &device.UsageHours, &device.LabelPath,
 		&device.ProductName, &device.ZoneName, &device.ZoneCode, &caseName, &jobNumber)
 
 	if err == sql.ErrNoRows {
@@ -578,6 +583,9 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 	}
 	if device.ZoneID.Valid {
 		resp.ZoneID = &device.ZoneID.Int64
+	}
+	if device.LabelPath.Valid {
+		resp.LabelPath = &device.LabelPath.String
 	}
 
 	respondJSON(w, http.StatusOK, resp)
