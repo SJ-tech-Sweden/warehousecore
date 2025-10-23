@@ -1130,13 +1130,24 @@ For issues or questions:
 
 ---
 
-**Version:** 1.54
-**Last Updated:** 2025-10-19
+**Version:** 1.55
+**Last Updated:** 2025-10-23
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 1.55 (2025-10-23)
+- **Feature: Job-Code Scan Functionality** 🎯
+  - Added job-code scanning capability to /scan page
+  - Recognizes JOB######format codes (e.g., JOB000123)
+  - Smart LED integration with automatic status detection
+  - If LED connected: Auto-highlight job devices and navigate to job
+  - If LED disconnected: Shows modal asking user if they want to enable LED
+  - Modal options: "Ja, LED aktivieren" or "Nein, direkt zum Job"
+  - Seamless navigation to job details page after scan
+  - Fixes GitLab Issue #3: Missing job-code scan function
 
 ### Version 1.54 (2025-10-19)
 - **Feature: LED Control Improvements** 💡

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { ScanLine, CheckCircle, XCircle, MapPin } from 'lucide-react';
-import { scansApi, zonesApi } from '../lib/api';
+import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { scansApi, zonesApi, jobsApi, ledApi } from '../lib/api';
 import type { ScanResponse } from '../lib/api';
 
 type ScanStep = 'device' | 'zone';
 
 export function ScanPage() {
+  const navigate = useNavigate();
   const [scanCode, setScanCode] = useState('');
   const [action, setAction] = useState<'intake' | 'outtake' | 'check'>('check');
   const [result, setResult] = useState<ScanResponse | null>(null);
@@ -15,9 +17,21 @@ export function ScanPage() {
   const [step, setStep] = useState<ScanStep>('device');
   const [deviceScanCode, setDeviceScanCode] = useState('');
 
+  // Job-Code scan states
+  const [showLEDModal, setShowLEDModal] = useState(false);
+  const [scannedJobId, setScannedJobId] = useState<number | null>(null);
+
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!scanCode.trim()) return;
+
+    // Check if scan code is a Job-Code (format: JOB######)
+    const jobCodeMatch = scanCode.match(/^JOB(\d{6})$/i);
+    if (jobCodeMatch) {
+      const jobId = parseInt(jobCodeMatch[1], 10);
+      await handleJobCodeScan(jobId);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -91,6 +105,62 @@ export function ScanPage() {
     setDeviceScanCode('');
     setScanCode('');
     setResult(null);
+  };
+
+  const handleJobCodeScan = async (jobId: number) => {
+    setScanCode('');
+    setLoading(true);
+
+    try {
+      // First, verify job exists
+      await jobsApi.getById(jobId);
+
+      // Check LED status
+      const { data: ledStatus } = await ledApi.getStatus();
+
+      if (ledStatus.mqtt_connected) {
+        // LED is on - navigate directly to job
+        await ledApi.highlightJob(jobId);
+        navigate(`/jobs/${jobId}`);
+      } else {
+        // LED is off - ask user if they want to enable it
+        setScannedJobId(jobId);
+        setShowLEDModal(true);
+      }
+    } catch (error: any) {
+      console.error('Job scan failed:', error);
+      setResult({
+        success: false,
+        message: error.response?.data?.error || `Job ${jobId} nicht gefunden`,
+        action: 'check',
+        duplicate: false,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLEDModalConfirm = async () => {
+    if (!scannedJobId) return;
+
+    try {
+      setLoading(true);
+      await ledApi.highlightJob(scannedJobId);
+      setShowLEDModal(false);
+      navigate(`/jobs/${scannedJobId}`);
+    } catch (error) {
+      console.error('LED activation failed:', error);
+      setShowLEDModal(false);
+      navigate(`/jobs/${scannedJobId}`);
+    }
+  };
+
+  const handleLEDModalCancel = () => {
+    if (scannedJobId) {
+      navigate(`/jobs/${scannedJobId}`);
+    }
+    setShowLEDModal(false);
+    setScannedJobId(null);
   };
 
   return (
@@ -220,6 +290,39 @@ export function ScanPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LED Activation Modal */}
+        {showLEDModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="glass-dark rounded-2xl p-6 sm:p-8 border-2 border-white/10 max-w-md w-full">
+              <div className="text-center mb-6">
+                <div className="inline-block p-4 rounded-xl bg-yellow-500/20 mb-4">
+                  <Lightbulb className="w-12 h-12 text-yellow-300" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">LED-Licht aktivieren?</h2>
+                <p className="text-gray-400 text-sm sm:text-base">
+                  Das LED-Licht ist aktuell ausgeschaltet. Möchtest du es aktivieren, um die Job-Geräte zu markieren?
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleLEDModalCancel}
+                  className="flex-1 px-4 py-3 rounded-lg font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                >
+                  Nein, direkt zum Job
+                </button>
+                <button
+                  onClick={handleLEDModalConfirm}
+                  disabled={loading}
+                  className="flex-1 px-4 py-3 rounded-lg font-semibold bg-gradient-to-r from-accent-red to-red-700 text-white hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 transition-all"
+                >
+                  Ja, LED aktivieren
+                </button>
               </div>
             </div>
           </div>
