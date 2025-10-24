@@ -328,9 +328,9 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 		// Resolve content from field names
 		content := elem.Content
 		switch elem.Content {
-		case "case_id":
+		case "case_id", "device_id": // Support both case_id and device_id (for compatibility with device templates)
 			content = fmt.Sprintf("CASE-%d", caseData.CaseID)
-		case "name":
+		case "name", "product_name": // Support both name and product_name
 			content = caseData.Name
 		case "description":
 			if caseData.Description != nil {

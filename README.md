@@ -1157,6 +1157,15 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.95 (2025-10-24)
+- **Bug Fix: Case Label Field Mapping** 🐛
+  - Fixed case label generation not working with device templates
+  - Added support for device_id and product_name aliases in case label generation
+  - Case labels now work with existing device templates
+  - device_id maps to case_id (formatted as CASE-XXX)
+  - product_name maps to case name
+  - Allows reusing device label templates for cases
+
 ### Version 1.94 (2025-10-24)
 - **Feature: Products & Categories Management** ✨ **[Issue #11]**
   - Added full backend API for 3-tier category structure (Categories > Subcategories > Sub-subcategories)
