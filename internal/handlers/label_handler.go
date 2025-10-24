@@ -207,6 +207,43 @@ func GenerateDeviceLabel(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(labelData)
 }
 
+// GenerateCaseLabel generates a complete label for a case
+// POST /api/v1/labels/case/{case_id}
+// Body: {"template_id": 1}
+func GenerateCaseLabel(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	caseIDStr := vars["case_id"]
+
+	caseID, err := strconv.Atoi(caseIDStr)
+	if err != nil {
+		http.Error(w, "Invalid case ID", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		TemplateID int `json:"template_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.TemplateID == 0 {
+		http.Error(w, "Template ID is required", http.StatusBadRequest)
+		return
+	}
+
+	labelData, err := labelService.GenerateLabelForCase(caseID, req.TemplateID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(labelData)
+}
+
 // SaveDeviceLabel saves a generated label image for a device
 // POST /api/v1/labels/save
 // Body: {"device_id": "DEV001", "image_data": "data:image/png;base64,..."}

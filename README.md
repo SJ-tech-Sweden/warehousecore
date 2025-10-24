@@ -1157,6 +1157,18 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.93 (2025-10-24)
+- **Feature: Case Label Generation** ✨ **[Issue #12]**
+  - Added label printing functionality for cases
+  - New backend endpoint: POST /api/v1/labels/case/{case_id}
+  - Added GenerateLabelForCase service method supporting case-specific fields
+  - Support for case_id, name, barcode, RFID tag, dimensions, weight, and zone
+  - Frontend "Label" button on Cases page with printer icon
+  - Opens label preview in new window with print functionality
+  - Generates QR codes and barcodes from case data
+  - Uses default label template from Label Designer
+  - Supports all case fields in label templates
+
 ### Version 1.92 (2025-10-24)
 - **Bug Fix: LED Clear Functionality** 🐛 **[Issue #6]**
   - Fixed LEDs not clearing when using clear buttons or leaving job page

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Search, MapPin, Box, RefreshCw, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Package, Search, MapPin, Box, RefreshCw, Plus, Edit2, Trash2, X, Printer } from 'lucide-react';
 import {
   casesApi,
   devicesApi,
   ledApi,
   zonesApi,
+  labelsApi,
   type CaseSummary,
   type CaseDetail,
   type CaseDevice,
@@ -266,6 +267,114 @@ export function CasesPage() {
     }
   };
 
+  const handlePrintLabel = async (caseId: number, caseName: string) => {
+    try {
+      // Get default template
+      const { data: templates } = await labelsApi.getTemplates();
+      const defaultTemplate = templates.find(t => t.is_default) || templates[0];
+
+      if (!defaultTemplate) {
+        alert('Kein Label-Template gefunden. Bitte erstellen Sie erst ein Template unter "Labels".');
+        return;
+      }
+
+      // Generate label data
+      const { data: labelData } = await labelsApi.generateCaseLabel(caseId, defaultTemplate.id!);
+
+      // Open label preview in new window
+      const labelWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!labelWindow) {
+        alert('Popup wurde blockiert. Bitte erlauben Sie Popups für diese Seite.');
+        return;
+      }
+
+      // Generate simple HTML for label preview
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Label - ${caseName}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 20px;
+              font-family: Arial, sans-serif;
+              background: #1a1a1a;
+              color: white;
+            }
+            .container {
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 20px;
+              padding-bottom: 20px;
+              border-bottom: 2px solid #444;
+            }
+            .label-preview {
+              background: white;
+              border: 1px solid #ccc;
+              padding: 20px;
+              margin: 20px 0;
+              position: relative;
+            }
+            .element {
+              position: absolute;
+            }
+            .text {
+              color: black;
+              white-space: nowrap;
+            }
+            button {
+              background: #dc2626;
+              color: white;
+              border: none;
+              padding: 10px 20px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 16px;
+            }
+            button:hover {
+              background: #b91c1c;
+            }
+            @media print {
+              .header, button { display: none; }
+              body { background: white; padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Label: ${caseName}</h1>
+              <button onclick="window.print()">Drucken</button>
+            </div>
+            <div class="label-preview" style="width: ${labelData.template.width}mm; height: ${labelData.template.height}mm;">
+              ${labelData.elements.map((elem: any) => {
+                if (elem.type === 'text') {
+                  return `<div class="element text" style="left: ${elem.x}mm; top: ${elem.y}mm; font-size: ${elem.style?.fontSize || 12}px; font-weight: ${elem.style?.fontWeight || 'normal'};">${elem.content || ''}</div>`;
+                } else if (elem.type === 'qrcode' || elem.type === 'barcode') {
+                  return `<img class="element" src="${elem.image_data}" style="left: ${elem.x}mm; top: ${elem.y}mm; width: ${elem.width}mm; height: ${elem.height}mm;" />`;
+                }
+                return '';
+              }).join('')}
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      labelWindow.document.write(html);
+      labelWindow.document.close();
+    } catch (error: any) {
+      console.error('Failed to generate label:', error);
+      alert('Fehler beim Erstellen des Labels: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -413,6 +522,12 @@ export function CasesPage() {
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white disabled:opacity-50"
                   >
                     <MapPin className="w-4 h-4" /> Zone
+                  </button>
+                  <button
+                    onClick={() => handlePrintLabel(caseItem.case_id, caseItem.name)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-green-600/80 hover:bg-green-600 transition-colors text-white"
+                  >
+                    <Printer className="w-4 h-4" /> Label
                   </button>
                   <button
                     onClick={() => handleOpenEditModal(caseItem)}

@@ -449,6 +449,8 @@ export const labelsApi = {
   deleteTemplate: (id: number) => api.delete(`/labels/templates/${id}`),
   generateDeviceLabel: (deviceId: string, templateId: number) =>
     api.post(`/labels/device/${deviceId}`, { template_id: templateId }),
+  generateCaseLabel: (caseId: number, templateId: number) =>
+    api.post(`/labels/case/${caseId}`, { template_id: templateId }),
   saveLabel: (deviceId: string, imageData: string) =>
     api.post<{ label_path: string; message: string }>('/labels/save', { device_id: deviceId, image_data: imageData }),
 };

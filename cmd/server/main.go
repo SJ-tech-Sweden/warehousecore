@@ -189,6 +189,7 @@ func main() {
 	api.HandleFunc("/labels/templates/{id}", handlers.UpdateLabelTemplate).Methods("PUT")
 	api.HandleFunc("/labels/templates/{id}", handlers.DeleteLabelTemplate).Methods("DELETE")
 	api.HandleFunc("/labels/device/{device_id}", handlers.GenerateDeviceLabel).Methods("POST")
+	api.HandleFunc("/labels/case/{case_id}", handlers.GenerateCaseLabel).Methods("POST")
 	api.HandleFunc("/labels/save", handlers.SaveDeviceLabel).Methods("POST")
 
     // Admin routes (RBAC protected)

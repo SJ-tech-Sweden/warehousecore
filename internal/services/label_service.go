@@ -260,6 +260,135 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 	}, nil
 }
 
+// GenerateLabelForCase generates a complete label for a case
+func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[string]interface{}, error) {
+	// Get template
+	template, err := s.GetTemplateByID(templateID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse template elements
+	var elements []models.LabelElement
+	if err := json.Unmarshal([]byte(template.TemplateJSON), &elements); err != nil {
+		return nil, fmt.Errorf("invalid template JSON: %w", err)
+	}
+
+	// Get case data
+	db := repository.GetDB()
+	var caseData struct {
+		CaseID      int     `json:"case_id"`
+		Name        string  `json:"name"`
+		Description *string `json:"description"`
+		Barcode     *string `json:"barcode"`
+		RFIDTag     *string `json:"rfid_tag"`
+		Width       *float64 `json:"width"`
+		Height      *float64 `json:"height"`
+		Depth       *float64 `json:"depth"`
+		Weight      *float64 `json:"weight"`
+		Status      string  `json:"status"`
+		ZoneName    *string `json:"zone_name"`
+	}
+
+	query := `
+		SELECT
+			c.caseID as case_id,
+			c.name,
+			c.description,
+			c.barcode,
+			c.rfid_tag,
+			c.width,
+			c.height,
+			c.depth,
+			c.weight,
+			c.status,
+			z.name as zone_name
+		FROM cases c
+		LEFT JOIN zones z ON c.zone_id = z.id
+		WHERE c.caseID = ?
+	`
+
+	if err := db.Raw(query, caseID).Scan(&caseData).Error; err != nil {
+		return nil, fmt.Errorf("case not found: %w", err)
+	}
+
+	// Process elements and generate barcodes/QR codes
+	processedElements := make([]map[string]interface{}, 0, len(elements))
+	for _, elem := range elements {
+		processed := map[string]interface{}{
+			"type":     elem.Type,
+			"x":        elem.X,
+			"y":        elem.Y,
+			"width":    elem.Width,
+			"height":   elem.Height,
+			"rotation": elem.Rotation,
+			"style":    elem.Style,
+		}
+
+		// Resolve content from field names
+		content := elem.Content
+		switch elem.Content {
+		case "case_id":
+			content = fmt.Sprintf("CASE-%d", caseData.CaseID)
+		case "name":
+			content = caseData.Name
+		case "description":
+			if caseData.Description != nil {
+				content = *caseData.Description
+			}
+		case "barcode":
+			if caseData.Barcode != nil {
+				content = *caseData.Barcode
+			} else {
+				content = fmt.Sprintf("CASE-%d", caseData.CaseID) // fallback
+			}
+		case "rfid_tag":
+			if caseData.RFIDTag != nil {
+				content = *caseData.RFIDTag
+			}
+		case "dimensions":
+			if caseData.Width != nil && caseData.Height != nil && caseData.Depth != nil {
+				content = fmt.Sprintf("%.1fx%.1fx%.1f cm", *caseData.Width, *caseData.Height, *caseData.Depth)
+			}
+		case "weight":
+			if caseData.Weight != nil {
+				content = fmt.Sprintf("%.1f kg", *caseData.Weight)
+			}
+		case "zone_name":
+			if caseData.ZoneName != nil {
+				content = *caseData.ZoneName
+			}
+		case "status":
+			content = caseData.Status
+		}
+
+		processed["content"] = content
+
+		// Generate barcode/QR code if needed
+		if elem.Type == "qrcode" {
+			qrData, err := s.GenerateQRCode(content, int(elem.Width))
+			if err != nil {
+				return nil, err
+			}
+			processed["image_data"] = qrData
+		} else if elem.Type == "barcode" {
+			barcodeData, err := s.GenerateBarcode(content, int(elem.Width), int(elem.Height))
+			if err != nil {
+				return nil, err
+			}
+			processed["image_data"] = barcodeData
+		}
+
+		processedElements = append(processedElements, processed)
+	}
+
+	return map[string]interface{}{
+		"template": template,
+		"elements": processedElements,
+		"case":     caseData,
+	}, nil
+}
+
 // SaveLabelImage saves a base64-encoded label image to disk and updates the device record
 func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (string, error) {
 	// Remove base64 prefix if present
