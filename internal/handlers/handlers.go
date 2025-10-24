@@ -1569,6 +1569,173 @@ func GetCaseContents(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, devices)
 }
 
+// CreateCase creates a new case
+func CreateCase(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name        string   `json:"name"`
+		Description *string  `json:"description"`
+		Width       *float64 `json:"width"`
+		Height      *float64 `json:"height"`
+		Depth       *float64 `json:"depth"`
+		Weight      *float64 `json:"weight"`
+		Status      string   `json:"status"`
+		ZoneID      *int     `json:"zone_id"`
+		Barcode     *string  `json:"barcode"`
+		RFIDTag     *string  `json:"rfid_tag"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	// Validation
+	if strings.TrimSpace(req.Name) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Name is required"})
+		return
+	}
+	if req.Status == "" {
+		req.Status = "free" // Default status
+	}
+	if req.Status != "free" && req.Status != "rented" && req.Status != "maintance" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid status"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+	result, err := db.Exec(`
+		INSERT INTO cases (name, description, width, height, depth, weight, status, zone_id, barcode, rfid_tag)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, req.Name, req.Description, req.Width, req.Height, req.Depth, req.Weight, req.Status, req.ZoneID, req.Barcode, req.RFIDTag)
+
+	if err != nil {
+		log.Printf("CreateCase error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create case"})
+		return
+	}
+
+	caseID, err := result.LastInsertId()
+	if err != nil {
+		log.Printf("CreateCase LastInsertId error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to retrieve case ID"})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"case_id": caseID,
+		"message": "Case created successfully",
+	})
+}
+
+// UpdateCase updates an existing case
+func UpdateCase(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	caseID := vars["id"]
+
+	var req struct {
+		Name        string   `json:"name"`
+		Description *string  `json:"description"`
+		Width       *float64 `json:"width"`
+		Height      *float64 `json:"height"`
+		Depth       *float64 `json:"depth"`
+		Weight      *float64 `json:"weight"`
+		Status      string   `json:"status"`
+		ZoneID      *int     `json:"zone_id"`
+		Barcode     *string  `json:"barcode"`
+		RFIDTag     *string  `json:"rfid_tag"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	// Validation
+	if strings.TrimSpace(req.Name) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Name is required"})
+		return
+	}
+	if req.Status != "free" && req.Status != "rented" && req.Status != "maintance" && req.Status != "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid status"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+	result, err := db.Exec(`
+		UPDATE cases
+		SET name = ?, description = ?, width = ?, height = ?, depth = ?,
+		    weight = ?, status = ?, zone_id = ?, barcode = ?, rfid_tag = ?
+		WHERE caseID = ?
+	`, req.Name, req.Description, req.Width, req.Height, req.Depth, req.Weight, req.Status, req.ZoneID, req.Barcode, req.RFIDTag, caseID)
+
+	if err != nil {
+		log.Printf("UpdateCase error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update case"})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("UpdateCase RowsAffected error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify update"})
+		return
+	}
+
+	if rowsAffected == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Case not found"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Case updated successfully"})
+}
+
+// DeleteCase deletes a case
+func DeleteCase(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	caseID := vars["id"]
+
+	db := repository.GetSQLDB()
+
+	// Check if case has devices
+	var deviceCount int
+	err := db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = ?", caseID).Scan(&deviceCount)
+	if err != nil {
+		log.Printf("DeleteCase check devices error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to check case devices"})
+		return
+	}
+
+	if deviceCount > 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "Cannot delete case with devices",
+			"message": fmt.Sprintf("Case contains %d device(s). Please remove devices first.", deviceCount),
+		})
+		return
+	}
+
+	// Delete the case
+	result, err := db.Exec("DELETE FROM cases WHERE caseID = ?", caseID)
+	if err != nil {
+		log.Printf("DeleteCase error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete case"})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("DeleteCase RowsAffected error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify deletion"})
+		return
+	}
+
+	if rowsAffected == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Case not found"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Case deleted successfully"})
+}
+
 // GetDefects returns defect reports with filters
 func GetDefects(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")

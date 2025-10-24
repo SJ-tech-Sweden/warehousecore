@@ -222,6 +222,9 @@ export const casesApi = {
     api.get<CasesResponse>('/cases', { params }),
   getById: (id: number) => api.get<CaseDetail>(`/cases/${id}`),
   getDevices: (id: number) => api.get<CaseDevice[]>(`/cases/${id}/contents`),
+  create: (data: Partial<CaseDetail>) => api.post<{ case_id: number; message: string }>('/cases', data),
+  update: (id: number, data: Partial<CaseDetail>) => api.put<{ message: string }>(`/cases/${id}`, data),
+  delete: (id: number) => api.delete<{ message: string }>(`/cases/${id}`),
 };
 
 export const zonesApi = {

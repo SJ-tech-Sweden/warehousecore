@@ -154,7 +154,10 @@ func main() {
 
 	// Case endpoints
 	api.HandleFunc("/cases", handlers.GetCases).Methods("GET")
+	api.HandleFunc("/cases", handlers.CreateCase).Methods("POST")
 	api.HandleFunc("/cases/{id}", handlers.GetCase).Methods("GET")
+	api.HandleFunc("/cases/{id}", handlers.UpdateCase).Methods("PUT")
+	api.HandleFunc("/cases/{id}", handlers.DeleteCase).Methods("DELETE")
 	api.HandleFunc("/cases/{id}/contents", handlers.GetCaseContents).Methods("GET")
 
 	// Maintenance endpoints

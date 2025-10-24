@@ -1157,6 +1157,22 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.88 (2025-10-24)
+- **Feature: Cases CRUD Operations** ✨ **[Issue #9]**
+  - Added full Create, Update, Delete operations for cases
+  - New "Neues Case" button to create cases in WarehouseCore
+  - Edit button on each case card for inline editing
+  - Delete button with confirmation and validation (prevents deletion if case contains devices)
+  - Comprehensive form modal with all case fields:
+    - Name, Description, Status (free/rented/maintance)
+    - Dimensions (Width, Height, Depth)
+    - Weight, Zone assignment
+    - Barcode and RFID tag (for new cases)
+  - Zone dropdown populated from warehouse zones
+  - Backend handlers: CreateCase, UpdateCase, DeleteCase
+  - Full error handling and user feedback
+  - Cases page now provides complete management instead of read-only view
+
 ### Version 1.87 (2025-10-24)
 - **Bug Fix: /labels Page Routing Issue** 🐛 **[Issue #13]**
   - Fixed /labels page showing directory content after hard reload
