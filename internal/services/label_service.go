@@ -55,6 +55,14 @@ func (s *LabelService) GenerateBarcode(content string, width, height int) (strin
 		height = 100
 	}
 
+	// Ensure minimum dimensions for barcode library (needs at least 123px width)
+	if width < 123 {
+		width = 123
+	}
+	if height < 1 {
+		height = 1
+	}
+
 	// Generate Code128 barcode
 	bc, err := code128.Encode(content)
 	if err != nil {
@@ -235,19 +243,37 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 
 		processed["content"] = content
 
-		// Generate barcode/QR code if needed
+		// Generate barcode/QR code if needed, or copy static image data
 		if elem.Type == "qrcode" {
-			qrData, err := s.GenerateQRCode(content, int(elem.Width))
+			// Convert mm to pixels at 300 DPI (300 pixels per inch, 25.4mm per inch)
+			// pixels = mm * 300 / 25.4 ≈ mm * 11.8
+			sizePixels := int(elem.Width * 11.8)
+			if sizePixels < 100 {
+				sizePixels = 100
+			}
+			qrData, err := s.GenerateQRCode(content, sizePixels)
 			if err != nil {
 				return nil, err
 			}
 			processed["image_data"] = qrData
 		} else if elem.Type == "barcode" {
-			barcodeData, err := s.GenerateBarcode(content, int(elem.Width), int(elem.Height))
+			// Convert mm to pixels at 300 DPI
+			widthPixels := int(elem.Width * 11.8)
+			heightPixels := int(elem.Height * 11.8)
+			if widthPixels < 123 {
+				widthPixels = 123 // Minimum for Code128
+			}
+			if heightPixels < 50 {
+				heightPixels = 50
+			}
+			barcodeData, err := s.GenerateBarcode(content, widthPixels, heightPixels)
 			if err != nil {
 				return nil, err
 			}
 			processed["image_data"] = barcodeData
+		} else if elem.Type == "image" && elem.ImageData != "" {
+			// Copy static image data from template
+			processed["image_data"] = elem.ImageData
 		}
 
 		processedElements = append(processedElements, processed)
@@ -301,10 +327,8 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 			c.height,
 			c.depth,
 			c.weight,
-			c.status,
-			z.name as zone_name
+			c.status
 		FROM cases c
-		LEFT JOIN zones z ON c.zone_id = z.id
 		WHERE c.caseID = ?
 	`
 
@@ -366,13 +390,28 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 
 		// Generate barcode/QR code if needed, or copy static image data
 		if elem.Type == "qrcode" {
-			qrData, err := s.GenerateQRCode(content, int(elem.Width))
+			// Convert mm to pixels at 300 DPI (300 pixels per inch, 25.4mm per inch)
+			// pixels = mm * 300 / 25.4 ≈ mm * 11.8
+			sizePixels := int(elem.Width * 11.8)
+			if sizePixels < 100 {
+				sizePixels = 100
+			}
+			qrData, err := s.GenerateQRCode(content, sizePixels)
 			if err != nil {
 				return nil, err
 			}
 			processed["image_data"] = qrData
 		} else if elem.Type == "barcode" {
-			barcodeData, err := s.GenerateBarcode(content, int(elem.Width), int(elem.Height))
+			// Convert mm to pixels at 300 DPI
+			widthPixels := int(elem.Width * 11.8)
+			heightPixels := int(elem.Height * 11.8)
+			if widthPixels < 123 {
+				widthPixels = 123 // Minimum for Code128
+			}
+			if heightPixels < 50 {
+				heightPixels = 50
+			}
+			barcodeData, err := s.GenerateBarcode(content, widthPixels, heightPixels)
 			if err != nil {
 				return nil, err
 			}
