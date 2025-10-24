@@ -100,7 +100,7 @@ export function Layout({ children }: LayoutProps) {
     { path: '/devices', icon: Package, label: 'Geräte' },
     { path: '/labels', icon: Tag, label: 'Labels' },
     { path: '/cases', icon: Boxes, label: 'Cases' },
-    { path: '/zones', icon: MapPin, label: 'Zonen' },
+    { path: '/zones', icon: MapPin, label: 'Lager' },
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/maintenance', icon: Wrench, label: 'Wartung' },
   ]), []);

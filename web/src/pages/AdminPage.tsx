@@ -11,7 +11,7 @@ export function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('zonetypes');
 
   const tabs = [
-    { id: 'zonetypes' as TabType, label: 'Zonentypen', icon: Layers },
+    { id: 'zonetypes' as TabType, label: 'Lagertypen', icon: Layers },
     { id: 'led' as TabType, label: 'LED-Verhalten', icon: Lightbulb },
     { id: 'controllers' as TabType, label: 'ESP-Controller', icon: Cpu },
     { id: 'roles' as TabType, label: 'Rollen & Benutzer', icon: Users },

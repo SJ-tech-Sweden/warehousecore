@@ -1157,6 +1157,17 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.89 (2025-10-24)
+- **UI Update: Renamed "Zonen" to "Lager"** 🎨 **[Issue #10]**
+  - Renamed all occurrences of "Zonen" to "Lager" throughout the app
+  - Updated navigation menu: "Zonen" → "Lager"
+  - Updated admin panel: "Zonentypen" → "Lagertypen"
+  - Updated LED settings: "Zonentyp" → "Lagertyp"
+  - Updated controllers: "Zonenarten" → "Lagerarten"
+  - Updated page titles and breadcrumbs
+  - Updated search placeholders and user-facing text
+  - Consistent terminology throughout the entire application
+
 ### Version 1.88 (2025-10-24)
 - **Feature: Cases CRUD Operations** ✨ **[Issue #9]**
   - Added full Create, Update, Delete operations for cases

@@ -146,7 +146,7 @@ export function ZonesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Zonen</h2>
+          <h2 className="text-3xl font-bold text-white mb-2">Lager</h2>
           <p className="text-gray-400">{rootZones.length} Hauptzonen • {zones.length} gesamt</p>
         </div>
         <button
@@ -275,7 +275,7 @@ export function ZonesPage() {
       {rootZones.length === 0 && !showForm && (
         <div className="text-center py-12">
           <MapPin className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">Noch keine Zonen vorhanden</p>
+          <p className="text-gray-400 mb-4">Noch keine Lagerorte vorhanden</p>
           <button
             onClick={() => setShowForm(true)}
             className="text-accent-red hover:text-red-500 font-semibold"

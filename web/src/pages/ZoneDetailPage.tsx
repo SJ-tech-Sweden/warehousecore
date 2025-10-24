@@ -251,7 +251,7 @@ export function ZoneDetailPage() {
           className="flex items-center gap-2 text-sm sm:text-base text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Zurück zu Zonen
+          Zurück zu Lager
         </button>
 
         {/* Breadcrumb */}

@@ -58,7 +58,7 @@ export function ZoneTypesTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Zonentyp wirklich löschen?')) return;
+    if (!confirm('Lagertyp wirklich löschen?')) return;
     try {
       await api.delete(`/admin/zone-types/${id}`);
       loadZoneTypes();
@@ -85,7 +85,7 @@ export function ZoneTypesTab() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-white">Zonentypen verwalten</h2>
+        <h2 className="text-xl font-bold text-white">Lagertypen verwalten</h2>
         <button
           onClick={startNew}
           className="px-4 py-2 bg-accent-red text-white rounded-xl font-semibold hover:shadow-lg flex items-center gap-2"

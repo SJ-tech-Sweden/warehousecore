@@ -218,7 +218,7 @@ export function DevicesPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Geräte, Produkte oder Zonen suchen..."
+            placeholder="Geräte, Produkte oder Lagerorte suchen..."
             className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
         </div>

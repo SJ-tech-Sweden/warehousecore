@@ -461,7 +461,7 @@ export function LEDSettingsTab() {
         default_led_color: zoneType.default_led_color,
         default_intensity: zoneType.default_intensity,
       });
-      setZoneTypeFeedback(zoneType.id, '✓ Zonentyp gespeichert');
+      setZoneTypeFeedback(zoneType.id, '✓ Lagertyp gespeichert');
       loadZoneTypes();
     } catch (error: any) {
       setZoneTypeFeedback(
@@ -1212,9 +1212,9 @@ export function LEDSettingsTab() {
 
       {/* Zone type specific defaults */}
       <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-white">LED-Standardwerte pro Zonentyp</h3>
+        <h3 className="text-lg font-semibold text-white">LED-Standardwerte pro Lagertyp</h3>
         <p className="text-sm text-gray-400">
-          Passe hier das LED-Verhalten für einzelne Zonentypen an. Diese Einstellungen überschreiben den globalen Standard.
+          Passe hier das LED-Verhalten für einzelne Lagertypen an. Diese Einstellungen überschreiben den globalen Standard.
         </p>
 
         <div className="space-y-4">
@@ -1305,7 +1305,7 @@ export function LEDSettingsTab() {
                     }`}
                   >
                     <Save className="w-4 h-4" />
-                    <span>{zoneTypeSaving === zoneType.id ? 'Speichert...' : 'Zonentyp speichern'}</span>
+                    <span>{zoneTypeSaving === zoneType.id ? 'Speichert...' : 'Lagertyp speichern'}</span>
                   </button>
                   <button
                     onClick={() =>

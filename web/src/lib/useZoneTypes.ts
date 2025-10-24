@@ -15,7 +15,7 @@ export function useZoneTypes() {
       setZoneTypes(data);
     } catch (err) {
       console.error('Failed to load zone types:', err);
-      setError('Zonentypen konnten nicht geladen werden.');
+      setError('Lagertypen konnten nicht geladen werden.');
     } finally {
       setLoading(false);
     }
