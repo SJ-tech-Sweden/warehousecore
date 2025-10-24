@@ -1157,6 +1157,16 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.92 (2025-10-24)
+- **Bug Fix: LED Clear Functionality** 🐛 **[Issue #6]**
+  - Fixed LEDs not clearing when using clear buttons or leaving job page
+  - Updated ClearAllLEDs function to support multi-controller architecture
+  - Now sends clear command to all active LED controllers in database
+  - Added fallback to default topic for backwards compatibility
+  - LEDs now properly clear when toggling off, leaving job page, or on cleanup
+  - Improved error handling with detailed logging per controller
+  - Solves issue where LEDs stayed on across multiple ESP32 controllers
+
 ### Version 1.91 (2025-10-24)
 - **Bug Fix: Job Redirect After Scanning** 🐛 **[Issue #7]**
   - Fixed job page staying empty after scanning job ID barcode

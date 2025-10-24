@@ -353,9 +353,61 @@ func (s *Service) HighlightJobBins(jobID string) error {
 	return nil
 }
 
-// ClearAllLEDs turns off all LEDs
+// ClearAllLEDs turns off all LEDs (multi-controller aware)
 func (s *Service) ClearAllLEDs() error {
-	return s.publisher.PublishClear()
+	s.mu.RLock()
+	mapping := s.mapping
+	s.mu.RUnlock()
+
+	// Get all active LED controllers from database
+	db := repository.GetDB()
+	if db == nil {
+		// Fallback: send clear to default topic only
+		log.Println("[LED] Database not available, clearing default controller only")
+		return s.publisher.PublishClear()
+	}
+
+	var controllers []models.LEDController
+	if err := db.Where("is_active = ?", true).Find(&controllers).Error; err != nil {
+		log.Printf("[LED] Failed to query controllers: %v, clearing default only", err)
+		return s.publisher.PublishClear()
+	}
+
+	// If no controllers configured, clear default
+	if len(controllers) == 0 {
+		log.Println("[LED] No active controllers found, clearing default controller")
+		return s.publisher.PublishClear()
+	}
+
+	// Send clear command to all active controllers
+	warehouseID := ""
+	if mapping != nil {
+		warehouseID = mapping.WarehouseID
+	}
+
+	clearCmd := LEDCommand{Op: "clear", WarehouseID: warehouseID}
+	errCount := 0
+
+	for _, controller := range controllers {
+		if err := s.publisher.PublishCommandToController(&controller, clearCmd); err != nil {
+			log.Printf("[LED] Failed to clear LEDs for controller %s: %v", controller.ControllerID, err)
+			errCount++
+		} else {
+			log.Printf("[LED] Cleared LEDs for controller %s (%s)", controller.ControllerID, controller.DisplayName)
+		}
+	}
+
+	// Also clear default topic for backwards compatibility
+	if err := s.publisher.PublishClear(); err != nil {
+		log.Printf("[LED] Failed to clear default topic: %v", err)
+		errCount++
+	}
+
+	if errCount > 0 {
+		return fmt.Errorf("failed to clear LEDs for %d controller(s)", errCount)
+	}
+
+	return nil
 }
 
 // IdentifyController sends identify command to test LEDs
