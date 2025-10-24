@@ -1157,6 +1157,19 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.94 (2025-10-24)
+- **Feature: Products & Categories Management** ✨ **[Issue #11]**
+  - Added full backend API for 3-tier category structure (Categories > Subcategories > Sub-subcategories)
+  - Created CRUD endpoints for all category levels
+  - Implemented Products API with full filtering and search capabilities
+  - Added bulk device creation endpoint for products
+  - New admin UI tabs for Categories and Products management
+  - Category management with create, edit, delete operations
+  - Products list view with category hierarchy display
+  - Foundation for expanded product and device management
+  - Routes: GET/POST/PUT/DELETE /admin/categories, /admin/subcategories, /admin/subbiercategories, /admin/products
+  - Bulk device creation: POST /admin/products/{id}/devices
+
 ### Version 1.93 (2025-10-24)
 - **Feature: Case Label Generation** ✨ **[Issue #12]**
   - Added label printing functionality for cases
