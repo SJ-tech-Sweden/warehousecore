@@ -356,7 +356,7 @@ export function CasesPage() {
               ${labelData.elements.map((elem: any) => {
                 if (elem.type === 'text') {
                   return `<div class="element text" style="left: ${elem.x}mm; top: ${elem.y}mm; font-size: ${elem.style?.fontSize || 12}px; font-weight: ${elem.style?.fontWeight || 'normal'};">${elem.content || ''}</div>`;
-                } else if (elem.type === 'qrcode' || elem.type === 'barcode') {
+                } else if (elem.type === 'qrcode' || elem.type === 'barcode' || elem.type === 'image') {
                   return `<img class="element" src="${elem.image_data}" style="left: ${elem.x}mm; top: ${elem.y}mm; width: ${elem.width}mm; height: ${elem.height}mm;" />`;
                 }
                 return '';

@@ -23,14 +23,15 @@ func (LabelTemplate) TableName() string {
 
 // LabelElement represents an element in a label design (stored in TemplateJSON)
 type LabelElement struct {
-	Type     string             `json:"type"` // "barcode", "qrcode", "text", "image"
-	X        float64            `json:"x"`
-	Y        float64            `json:"y"`
-	Width    float64            `json:"width"`
-	Height   float64            `json:"height"`
-	Rotation float64            `json:"rotation"`
-	Content  string             `json:"content"` // field name or static text
-	Style    LabelElementStyle  `json:"style"`
+	Type      string             `json:"type"` // "barcode", "qrcode", "text", "image"
+	X         float64            `json:"x"`
+	Y         float64            `json:"y"`
+	Width     float64            `json:"width"`
+	Height    float64            `json:"height"`
+	Rotation  float64            `json:"rotation"`
+	Content   string             `json:"content"` // field name or static text
+	Style     LabelElementStyle  `json:"style"`
+	ImageData string             `json:"image_data,omitempty"` // For static images
 }
 
 // LabelElementStyle defines styling for label elements

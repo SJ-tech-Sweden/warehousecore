@@ -364,7 +364,7 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 
 		processed["content"] = content
 
-		// Generate barcode/QR code if needed
+		// Generate barcode/QR code if needed, or copy static image data
 		if elem.Type == "qrcode" {
 			qrData, err := s.GenerateQRCode(content, int(elem.Width))
 			if err != nil {
@@ -377,6 +377,9 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 				return nil, err
 			}
 			processed["image_data"] = barcodeData
+		} else if elem.Type == "image" && elem.ImageData != "" {
+			// Copy static image data from template
+			processed["image_data"] = elem.ImageData
 		}
 
 		processedElements = append(processedElements, processed)
