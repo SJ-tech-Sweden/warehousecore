@@ -8,7 +8,6 @@ interface Category {
   abbreviation: string;
 }
 
-/* Commented out for future implementation
 interface Subcategory {
   subcategory_id: string;
   name: string;
@@ -22,22 +21,21 @@ interface Subbiercategory {
   abbreviation: string;
   subcategory_id: string;
 }
-*/
 
 type Level = 'category' | 'subcategory' | 'subbiercategory';
 
 export function CategoriesTab() {
   const [categories, setCategories] = useState<Category[]>([]);
-  // const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
-  // const [subbiercategories, setSubbiercategories] = useState<Subbiercategory[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [subbiercategories, setSubbiercategories] = useState<Subbiercategory[]>([]);
   const [activeLevel, setActiveLevel] = useState<Level>('category');
   const [editing, setEditing] = useState<number | string | 'new' | null>(null);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
     loadCategories();
-    // loadSubcategories();
-    // loadSubbiercategories();
+    loadSubcategories();
+    loadSubbiercategories();
   }, []);
 
   const loadCategories = async () => {
@@ -49,7 +47,6 @@ export function CategoriesTab() {
     }
   };
 
-  /* Commented out for future implementation
   const loadSubcategories = async () => {
     try {
       const { data } = await api.get('/admin/subcategories');
@@ -67,7 +64,6 @@ export function CategoriesTab() {
       console.error('Failed to load subbiercategories:', error);
     }
   };
-  */
 
   const handleSaveCategory = async () => {
     try {
@@ -84,7 +80,6 @@ export function CategoriesTab() {
     }
   };
 
-  /* Commented out for future implementation
   const handleSaveSubcategory = async () => {
     try {
       if (editing === 'new') {
@@ -114,7 +109,6 @@ export function CategoriesTab() {
       alert('Fehler: ' + (error.response?.data?.error || error.message));
     }
   };
-  */
 
   const handleDelete = async (level: Level, id: number | string) => {
     if (!confirm('Wirklich löschen?')) return;
@@ -122,8 +116,8 @@ export function CategoriesTab() {
     try {
       await api.delete(`/admin/${level === 'category' ? 'categories' : level === 'subcategory' ? 'subcategories' : 'subbiercategories'}/${id}`);
       if (level === 'category') loadCategories();
-      // else if (level === 'subcategory') loadSubcategories();
-      // else loadSubbiercategories();
+      else if (level === 'subcategory') loadSubcategories();
+      else loadSubbiercategories();
     } catch (error: any) {
       alert('Fehler: ' + (error.response?.data?.error || error.message));
     }
@@ -215,18 +209,151 @@ export function CategoriesTab() {
         </div>
       )}
 
-      {/* Similar sections for subcategories and subbiercategories can be added */}
+      {/* Subcategories */}
       {activeLevel === 'subcategory' && (
-        <div className="text-white">
-          <p>Unterkategorie-Verwaltung (ähnlich wie Kategorien)</p>
-          <p className="text-sm text-gray-400 mt-2">Hinweis: Unterkategorien benötigen eine Kategorie als Elternelement</p>
+        <div className="space-y-2">
+          <button
+            onClick={() => { setEditing('new'); setFormData({}); }}
+            className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Neue Unterkategorie
+          </button>
+
+          {editing && (
+            <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
+              <input
+                type="text"
+                placeholder="Name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              />
+              <input
+                type="text"
+                placeholder="Abkürzung (max. 3 Zeichen)"
+                maxLength={3}
+                value={formData.abbreviation || ''}
+                onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              />
+              <select
+                value={formData.category_id || ''}
+                onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              >
+                <option value="">-- Kategorie wählen --</option>
+                {categories.map(cat => (
+                  <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={handleSaveSubcategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
+                  <Save className="w-4 h-4" />
+                  Speichern
+                </button>
+                <button onClick={() => { setEditing(null); setFormData({}); }} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
+                  <X className="w-4 h-4" />
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {subcategories.map(subcat => {
+            const parentCategory = categories.find(c => c.category_id === subcat.category_id);
+            return (
+              <div key={subcat.subcategory_id} className="glass rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-white font-semibold">{subcat.name}</h3>
+                  <p className="text-gray-400 text-sm">{subcat.abbreviation}</p>
+                  {parentCategory && <p className="text-gray-500 text-xs mt-1">Kategorie: {parentCategory.name}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditing(subcat.subcategory_id); setFormData(subcat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete('subcategory', subcat.subcategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
+      {/* Subbiercategories */}
       {activeLevel === 'subbiercategory' && (
-        <div className="text-white">
-          <p>Sub-Unterkategorie-Verwaltung (ähnlich wie Kategorien)</p>
-          <p className="text-sm text-gray-400 mt-2">Hinweis: Sub-Unterkategorien benötigen eine Unterkategorie als Elternelement</p>
+        <div className="space-y-2">
+          <button
+            onClick={() => { setEditing('new'); setFormData({}); }}
+            className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Neue Sub-Unterkategorie
+          </button>
+
+          {editing && (
+            <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
+              <input
+                type="text"
+                placeholder="Name"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              />
+              <input
+                type="text"
+                placeholder="Abkürzung (max. 3 Zeichen)"
+                maxLength={3}
+                value={formData.abbreviation || ''}
+                onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              />
+              <select
+                value={formData.subcategory_id || ''}
+                onChange={(e) => setFormData({ ...formData, subcategory_id: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg glass text-white"
+              >
+                <option value="">-- Unterkategorie wählen --</option>
+                {subcategories.map(subcat => (
+                  <option key={subcat.subcategory_id} value={subcat.subcategory_id}>{subcat.name}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={handleSaveSubbiercategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
+                  <Save className="w-4 h-4" />
+                  Speichern
+                </button>
+                <button onClick={() => { setEditing(null); setFormData({}); }} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
+                  <X className="w-4 h-4" />
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {subbiercategories.map(subbiercat => {
+            const parentSubcategory = subcategories.find(s => s.subcategory_id === subbiercat.subcategory_id);
+            return (
+              <div key={subbiercat.subbiercategory_id} className="glass rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-white font-semibold">{subbiercat.name}</h3>
+                  <p className="text-gray-400 text-sm">{subbiercat.abbreviation}</p>
+                  {parentSubcategory && <p className="text-gray-500 text-xs mt-1">Unterkategorie: {parentSubcategory.name}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditing(subbiercat.subbiercategory_id); setFormData(subbiercat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete('subbiercategory', subbiercat.subbiercategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

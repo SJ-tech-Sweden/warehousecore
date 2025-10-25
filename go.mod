@@ -18,6 +18,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/net v0.45.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
