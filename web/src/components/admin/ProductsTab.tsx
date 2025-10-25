@@ -155,6 +155,14 @@ export function ProductsTab() {
     ? subbiercategories.filter(s => s.subcategory_id === formData.subcategory_id)
     : [];
 
+  // Debug logging
+  console.log('FormData:', formData);
+  console.log('Categories:', categories.length);
+  console.log('Subcategories:', subcategories.length);
+  console.log('Subbiercategories:', subbiercategories.length);
+  console.log('Filtered Subcategories:', filteredSubcategories.length);
+  console.log('Filtered Subbiercategories:', filteredSubbiercategories.length);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -279,26 +287,36 @@ export function ProductsTab() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Unterkategorie</label>
+                  <label className="block text-sm font-semibold text-white mb-2">
+                    Unterkategorie {filteredSubcategories.length > 0 && `(${filteredSubcategories.length} verfügbar)`}
+                  </label>
                   <select
                     value={formData.subcategory_id || ''}
                     onChange={(e) => {
                       const value = e.target.value;
-                      console.log('Subcategory selected:', value);
+                      console.log('Subcategory onChange fired! Value:', value);
+                      console.log('Current formData before update:', formData);
                       setFormData({
                         ...formData,
                         subcategory_id: value ? Number(value) : undefined,
                         subbiercategory_id: undefined,
                       });
                     }}
+                    onClick={() => console.log('Subcategory select clicked!')}
+                    onFocus={() => console.log('Subcategory select focused!')}
                     disabled={!formData.category_id}
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50"
+                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">Keine</option>
                     {filteredSubcategories.map(sub => (
-                      <option key={sub.subcategory_id} value={sub.subcategory_id.toString()}>{sub.name}</option>
+                      <option key={sub.subcategory_id} value={sub.subcategory_id.toString()}>
+                        {sub.name} (ID: {sub.subcategory_id})
+                      </option>
                     ))}
                   </select>
+                  {filteredSubcategories.length === 0 && formData.category_id && (
+                    <p className="text-xs text-yellow-400 mt-1">Keine Unterkategorien für diese Kategorie gefunden</p>
+                  )}
                 </div>
 
                 <div>
