@@ -215,9 +215,8 @@ export function ProductsTab() {
 
       {/* Product Form Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm overflow-y-auto">
-          <div className="min-h-full flex items-center justify-center p-4">
-            <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl my-8">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-white/10">
               <h2 className="text-2xl font-bold text-white">
                 {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt'}
@@ -395,7 +394,6 @@ export function ProductsTab() {
                 </button>
               </div>
             </form>
-            </div>
           </div>
         </div>
       )}

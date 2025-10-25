@@ -100,9 +100,8 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-4">
-        <div className="glass-dark rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl my-8 max-h-[90vh]">
+    <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="glass-dark rounded-2xl w-full max-w-4xl flex flex-col shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -166,7 +165,6 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
           >
             {selectedDevices.size} Gerät{selectedDevices.size !== 1 ? 'e' : ''} hinzufügen
           </button>
-        </div>
         </div>
       </div>
     </div>
