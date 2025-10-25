@@ -258,12 +258,13 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Kategorie</label>
                   <select
-                    value={formData.category_id ?? ''}
+                    value={formData.category_id || ''}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const value = e.target.value;
+                      console.log('Category selected:', value);
                       setFormData({
                         ...formData,
-                        category_id: val ? parseInt(val, 10) : undefined,
+                        category_id: value ? Number(value) : undefined,
                         subcategory_id: undefined,
                         subbiercategory_id: undefined,
                       });
@@ -272,7 +273,7 @@ export function ProductsTab() {
                   >
                     <option value="">Keine</option>
                     {categories.map(cat => (
-                      <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
+                      <option key={cat.category_id} value={cat.category_id.toString()}>{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -280,21 +281,22 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Unterkategorie</label>
                   <select
-                    value={formData.subcategory_id ?? ''}
+                    value={formData.subcategory_id || ''}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const value = e.target.value;
+                      console.log('Subcategory selected:', value);
                       setFormData({
                         ...formData,
-                        subcategory_id: val ? parseInt(val, 10) : undefined,
+                        subcategory_id: value ? Number(value) : undefined,
                         subbiercategory_id: undefined,
                       });
                     }}
-                    disabled={!formData.category_id || filteredSubcategories.length === 0}
+                    disabled={!formData.category_id}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50"
                   >
                     <option value="">Keine</option>
                     {filteredSubcategories.map(sub => (
-                      <option key={sub.subcategory_id} value={sub.subcategory_id}>{sub.name}</option>
+                      <option key={sub.subcategory_id} value={sub.subcategory_id.toString()}>{sub.name}</option>
                     ))}
                   </select>
                 </div>
@@ -302,20 +304,21 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Sub-Unterkategorie</label>
                   <select
-                    value={formData.subbiercategory_id ?? ''}
+                    value={formData.subbiercategory_id || ''}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const value = e.target.value;
+                      console.log('Subbiercategory selected:', value);
                       setFormData({
                         ...formData,
-                        subbiercategory_id: val ? parseInt(val, 10) : undefined,
+                        subbiercategory_id: value ? Number(value) : undefined,
                       });
                     }}
-                    disabled={!formData.subcategory_id || filteredSubbiercategories.length === 0}
+                    disabled={!formData.subcategory_id}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50"
                   >
                     <option value="">Keine</option>
                     {filteredSubbiercategories.map(subbier => (
-                      <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
+                      <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id.toString()}>
                         {subbier.name}
                       </option>
                     ))}
