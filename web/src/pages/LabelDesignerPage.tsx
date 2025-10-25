@@ -394,51 +394,59 @@ export default function LabelDesignerPage() {
   };
 
   const exportAllLabels = async () => {
-    const totalItems = devices.length + cases.length;
-    if (totalItems === 0) {
-      alert('Keine Devices oder Cases gefunden!');
-      return;
-    }
-
     setExporting(true);
     try {
       const zip = new JSZip();
+      let exportedCount = 0;
+      let skippedCount = 0;
 
-      // Export device labels
+      // Export device labels (only those that already have labels)
       for (const device of devices) {
-        setPreviewDevice(device);
-        await new Promise((r) => setTimeout(r, 300));
-
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const imageData = canvas.toDataURL('image/png');
-          // Remove the data:image/png;base64, prefix
-          const base64Data = imageData.split(',')[1];
-          zip.file(`devices/${device.device_id}_label.png`, base64Data, { base64: true });
+        if (device.label_path) {
+          try {
+            const response = await fetch(device.label_path);
+            if (response.ok) {
+              const blob = await response.blob();
+              zip.file(`devices/${device.device_id}_label.png`, blob);
+              exportedCount++;
+            } else {
+              console.warn(`Failed to fetch label for ${device.device_id}`);
+              skippedCount++;
+            }
+          } catch (error) {
+            console.error(`Error fetching label for ${device.device_id}:`, error);
+            skippedCount++;
+          }
+        } else {
+          skippedCount++;
         }
       }
 
-      // Export case labels
+      // Export case labels (only those that already have labels)
       for (const caseItem of cases) {
-        // Convert case to device-like object for rendering
-        const caseAsDevice: Device = {
-          device_id: `CASE-${caseItem.case_id}`,
-          product_name: caseItem.name,
-          status: caseItem.status,
-          zone_code: caseItem.zone_code,
-          zone_name: caseItem.zone_name,
-          zone_id: caseItem.zone_id,
-        };
-
-        setPreviewDevice(caseAsDevice);
-        await new Promise((r) => setTimeout(r, 300));
-
-        const canvas = canvasRef.current;
-        if (canvas) {
-          const imageData = canvas.toDataURL('image/png');
-          const base64Data = imageData.split(',')[1];
-          zip.file(`cases/CASE-${caseItem.case_id}_label.png`, base64Data, { base64: true });
+        if (caseItem.label_path) {
+          try {
+            const response = await fetch(caseItem.label_path);
+            if (response.ok) {
+              const blob = await response.blob();
+              zip.file(`cases/CASE-${caseItem.case_id}_label.png`, blob);
+              exportedCount++;
+            } else {
+              console.warn(`Failed to fetch label for CASE-${caseItem.case_id}`);
+              skippedCount++;
+            }
+          } catch (error) {
+            console.error(`Error fetching label for CASE-${caseItem.case_id}:`, error);
+            skippedCount++;
+          }
+        } else {
+          skippedCount++;
         }
+      }
+
+      if (exportedCount === 0) {
+        alert('Keine generierten Labels gefunden! Bitte zuerst Labels generieren.');
+        return;
       }
 
       // Generate ZIP file and trigger download
@@ -449,15 +457,12 @@ export default function LabelDesignerPage() {
       link.click();
       URL.revokeObjectURL(link.href);
 
-      alert(`${totalItems} Labels erfolgreich in ZIP exportiert!\n(${devices.length} Devices + ${cases.length} Cases)`);
+      alert(`${exportedCount} Labels erfolgreich in ZIP exportiert!${skippedCount > 0 ? `\n${skippedCount} Labels übersprungen (nicht generiert)` : ''}`);
     } catch (error) {
       console.error('Export failed:', error);
       alert('Fehler beim Export');
     } finally {
       setExporting(false);
-      if (devices.length > 0) {
-        setPreviewDevice(devices[0]);
-      }
     }
   };
 
@@ -831,7 +836,7 @@ export default function LabelDesignerPage() {
                 <Save size={18} /> {exporting ? `Generiere ${devices.length + cases.length}...` : `Alle Labels Generieren (${devices.length} Devices + ${cases.length} Cases)`}
               </button>
               <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action">
-                <Download size={18} /> {exporting ? `Exportiere ${devices.length + cases.length}...` : `Alle Labels Exportieren (ZIP)`}
+                <Download size={18} /> {exporting ? 'Exportiere Labels...' : 'Alle Labels Exportieren (ZIP)'}
               </button>
             </div>
           </div>
