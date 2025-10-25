@@ -80,6 +80,7 @@ export interface CaseSummary {
   zone_name?: string;
   zone_code?: string;
   device_count: number;
+  label_path?: string;
 }
 
 export interface CaseDetail extends CaseSummary {}

@@ -1,4 +1,4 @@
-import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers } from 'lucide-react';
+import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers, Tag, Download } from 'lucide-react';
 import type { CaseDetail, CaseDevice } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 
@@ -183,6 +183,33 @@ export function CaseDetailModal({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Label Preview Section */}
+          {caseInfo?.label_path && (
+            <div className="pt-6 mt-6 border-t border-white/10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-accent-red" />
+                  Case-Label
+                </h3>
+                <a
+                  href={caseInfo.label_path}
+                  download={`CASE-${caseInfo.case_id}_label.png`}
+                  className="px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Herunterladen
+                </a>
+              </div>
+              <div className="flex justify-center p-4 bg-black/20 rounded-xl">
+                <img
+                  src={caseInfo.label_path}
+                  alt={`Label für Case ${caseInfo.case_id}`}
+                  className="max-w-sm h-auto border border-white/10 rounded shadow-lg"
+                />
+              </div>
             </div>
           )}
         </div>

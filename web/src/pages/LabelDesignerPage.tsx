@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Trash2, Download, Printer, QrCode, Barcode, Type, Save, Image as ImageIcon } from 'lucide-react';
 import { labelsApi, devicesApi, casesApi } from '../lib/api';
 import type { LabelTemplate, LabelElement, Device, CaseSummary } from '../lib/api';
+import JSZip from 'jszip';
 import './LabelDesignerPage.css';
 
 interface DesignElement extends LabelElement {
@@ -393,26 +394,62 @@ export default function LabelDesignerPage() {
   };
 
   const exportAllLabels = async () => {
-    if (devices.length === 0) {
-      alert('Keine Devices gefunden!');
+    const totalItems = devices.length + cases.length;
+    if (totalItems === 0) {
+      alert('Keine Devices oder Cases gefunden!');
       return;
     }
 
     setExporting(true);
     try {
+      const zip = new JSZip();
+
+      // Export device labels
       for (const device of devices) {
         setPreviewDevice(device);
         await new Promise((r) => setTimeout(r, 300));
 
         const canvas = canvasRef.current;
         if (canvas) {
-          const link = document.createElement('a');
-          link.download = `${device.device_id}_label.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
+          const imageData = canvas.toDataURL('image/png');
+          // Remove the data:image/png;base64, prefix
+          const base64Data = imageData.split(',')[1];
+          zip.file(`devices/${device.device_id}_label.png`, base64Data, { base64: true });
         }
       }
-      alert(`${devices.length} Labels erfolgreich exportiert!`);
+
+      // Export case labels
+      for (const caseItem of cases) {
+        // Convert case to device-like object for rendering
+        const caseAsDevice: Device = {
+          device_id: `CASE-${caseItem.case_id}`,
+          product_name: caseItem.name,
+          status: caseItem.status,
+          zone_code: caseItem.zone_code,
+          zone_name: caseItem.zone_name,
+          zone_id: caseItem.zone_id,
+        };
+
+        setPreviewDevice(caseAsDevice);
+        await new Promise((r) => setTimeout(r, 300));
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          const base64Data = imageData.split(',')[1];
+          zip.file(`cases/CASE-${caseItem.case_id}_label.png`, base64Data, { base64: true });
+        }
+      }
+
+      // Generate ZIP file and trigger download
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `labels_export_${new Date().toISOString().split('T')[0]}.zip`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      alert(`${totalItems} Labels erfolgreich in ZIP exportiert!\n(${devices.length} Devices + ${cases.length} Cases)`);
     } catch (error) {
       console.error('Export failed:', error);
       alert('Fehler beim Export');
@@ -707,16 +744,44 @@ export default function LabelDesignerPage() {
             <select
               value={previewDevice?.device_id || ''}
               onChange={(e) => {
-                const device = devices.find((d) => d.device_id === e.target.value);
-                if (device) setPreviewDevice(device);
+                const value = e.target.value;
+                if (value.startsWith('CASE-')) {
+                  // It's a case
+                  const caseId = parseInt(value.replace('CASE-', ''));
+                  const caseItem = cases.find((c) => c.case_id === caseId);
+                  if (caseItem) {
+                    const caseAsDevice: Device = {
+                      device_id: `CASE-${caseItem.case_id}`,
+                      product_name: caseItem.name,
+                      status: caseItem.status,
+                      zone_code: caseItem.zone_code,
+                      zone_name: caseItem.zone_name,
+                      zone_id: caseItem.zone_id,
+                    };
+                    setPreviewDevice(caseAsDevice);
+                  }
+                } else {
+                  // It's a device
+                  const device = devices.find((d) => d.device_id === value);
+                  if (device) setPreviewDevice(device);
+                }
               }}
               className="input-select-small"
             >
-              {devices.map((d) => (
-                <option key={d.device_id} value={d.device_id}>
-                  {d.device_id} - {d.product_name}
-                </option>
-              ))}
+              <optgroup label="Devices">
+                {devices.map((d) => (
+                  <option key={d.device_id} value={d.device_id}>
+                    {d.device_id} - {d.product_name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Cases">
+                {cases.map((c) => (
+                  <option key={`CASE-${c.case_id}`} value={`CASE-${c.case_id}`}>
+                    CASE-{c.case_id} - {c.name}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <div className="canvas-wrapper">
@@ -765,8 +830,8 @@ export default function LabelDesignerPage() {
               <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary">
                 <Save size={18} /> {exporting ? `Generiere ${devices.length + cases.length}...` : `Alle Labels Generieren (${devices.length} Devices + ${cases.length} Cases)`}
               </button>
-              <button onClick={exportAllLabels} disabled={exporting || devices.length === 0} className="btn-action">
-                <Download size={18} /> {exporting ? `Exportiere ${devices.length}...` : `Alle Labels Exportieren`}
+              <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action">
+                <Download size={18} /> {exporting ? `Exportiere ${devices.length + cases.length}...` : `Alle Labels Exportieren (ZIP)`}
               </button>
             </div>
           </div>
