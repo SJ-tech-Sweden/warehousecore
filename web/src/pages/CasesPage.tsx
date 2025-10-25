@@ -52,10 +52,12 @@ export function CasesPage() {
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
   const [deviceTreeModalOpen, setDeviceTreeModalOpen] = useState(false);
+  const [deviceTreeModalContext, setDeviceTreeModalContext] = useState<'detail' | 'edit'>('detail');
 
   // Form modal state
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingCaseId, setEditingCaseId] = useState<number | null>(null);
+  const [editingCaseDevices, setEditingCaseDevices] = useState<CaseDevice[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
   const [formData, setFormData] = useState<CaseFormData>({
     name: '',
@@ -183,14 +185,21 @@ export function CasesPage() {
   };
 
   const handleAddDevicesToCase = () => {
+    setDeviceTreeModalContext('detail');
+    setDeviceTreeModalOpen(true);
+  };
+
+  const handleAddDevicesToEditCase = () => {
+    setDeviceTreeModalContext('edit');
     setDeviceTreeModalOpen(true);
   };
 
   const handleConfirmAddDevices = async (deviceIds: string[]) => {
-    if (!selectedCase) return;
+    const caseId = deviceTreeModalContext === 'detail' ? selectedCase?.case_id : editingCaseId;
+    if (!caseId) return;
 
     try {
-      const { data } = await casesApi.addDevices(selectedCase.case_id, deviceIds);
+      const { data } = await casesApi.addDevices(caseId, deviceIds);
 
       if (data.success_count > 0) {
         setActionMessage({
@@ -199,8 +208,14 @@ export function CasesPage() {
         });
 
         // Reload case devices
-        const devicesRes = await casesApi.getDevices(selectedCase.case_id);
-        setCaseDevices(devicesRes.data);
+        const devicesRes = await casesApi.getDevices(caseId);
+
+        if (deviceTreeModalContext === 'detail') {
+          setCaseDevices(devicesRes.data);
+        } else {
+          setEditingCaseDevices(devicesRes.data);
+        }
+
         void loadCases(); // Refresh case list
       }
 
@@ -242,6 +257,31 @@ export function CasesPage() {
     }
   };
 
+  const handleRemoveDeviceFromEditCase = async (deviceId: string) => {
+    if (!editingCaseId) return;
+
+    try {
+      await casesApi.removeDevice(editingCaseId, deviceId);
+
+      setActionMessage({
+        type: 'success',
+        text: `Gerät ${deviceId} erfolgreich entfernt`,
+      });
+
+      // Reload case devices
+      const devicesRes = await casesApi.getDevices(editingCaseId);
+      setEditingCaseDevices(devicesRes.data);
+      void loadCases(); // Refresh case list
+    } catch (error: any) {
+      setActionMessage({
+        type: 'error',
+        text: 'Fehler beim Entfernen: ' + (error.response?.data?.error || error.message),
+      });
+    } finally {
+      clearActionMessage();
+    }
+  };
+
   const handleRefreshCaseDevices = async () => {
     if (!selectedCase) return;
 
@@ -265,6 +305,7 @@ export function CasesPage() {
 
   const handleOpenCreateModal = () => {
     setEditingCaseId(null);
+    setEditingCaseDevices([]);
     setFormData({
       name: '',
       description: '',
@@ -288,6 +329,16 @@ export function CasesPage() {
       barcode: undefined,
       rfid_tag: undefined,
     });
+
+    // Load devices for this case
+    try {
+      const devicesRes = await casesApi.getDevices(caseItem.case_id);
+      setEditingCaseDevices(devicesRes.data);
+    } catch (error) {
+      console.error('Failed to load case devices:', error);
+      setEditingCaseDevices([]);
+    }
+
     setFormModalOpen(true);
     void loadZones();
   };
@@ -787,6 +838,60 @@ export function CasesPage() {
                   </>
                 )}
               </div>
+
+              {/* Device Management (only in edit mode) */}
+              {editingCaseId && (
+                <div className="border-t border-white/10 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-white">
+                      Geräte ({editingCaseDevices.length})
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleAddDevicesToEditCase}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Geräte hinzufügen
+                    </button>
+                  </div>
+
+                  {editingCaseDevices.length === 0 ? (
+                    <div className="text-center text-gray-400 text-sm py-8 bg-white/5 rounded-lg">
+                      Keine Geräte in diesem Case.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {editingCaseDevices.map((device) => (
+                        <div
+                          key={device.device_id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-white text-sm font-mono">
+                              {device.device_id}
+                            </div>
+                            {device.product_name && (
+                              <div className="text-xs text-gray-400 mt-1">{device.product_name}</div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Gerät ${device.device_id} aus diesem Case entfernen?`)) {
+                                void handleRemoveDeviceFromEditCase(device.device_id);
+                              }
+                            }}
+                            className="ml-3 p-2 rounded-lg text-red-400 hover:bg-red-600/20 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button
