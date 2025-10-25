@@ -18,23 +18,23 @@ interface Category {
 }
 
 interface Subcategory {
-  subcategory_id: number;
+  subcategory_id: number | string;
   name: string;
   category_id: number;
 }
 
 interface Subbiercategory {
-  subbiercategory_id: number;
+  subbiercategory_id: number | string;
   name: string;
-  subcategory_id: number;
+  subcategory_id: number | string;
 }
 
 interface ProductFormData {
   name: string;
   description?: string;
   category_id?: number;
-  subcategory_id?: number;
-  subbiercategory_id?: number;
+  subcategory_id?: number | string;
+  subbiercategory_id?: number | string;
   item_cost_per_day?: number;
   device_quantity?: number;
   device_prefix?: string;
@@ -296,9 +296,10 @@ export function ProductsTab() {
                       const value = e.target.value;
                       console.log('Subcategory onChange fired! Value:', value);
                       console.log('Current formData before update:', formData);
+                      // Don't convert to Number - subcategory IDs are strings like "EFF1002"
                       setFormData({
                         ...formData,
-                        subcategory_id: value ? Number(value) : undefined,
+                        subcategory_id: value || undefined,
                         subbiercategory_id: undefined,
                       });
                     }}
@@ -309,7 +310,7 @@ export function ProductsTab() {
                   >
                     <option value="">Keine</option>
                     {filteredSubcategories.map(sub => (
-                      <option key={sub.subcategory_id} value={sub.subcategory_id.toString()}>
+                      <option key={sub.subcategory_id} value={sub.subcategory_id}>
                         {sub.name} (ID: {sub.subcategory_id})
                       </option>
                     ))}
@@ -326,9 +327,10 @@ export function ProductsTab() {
                     onChange={(e) => {
                       const value = e.target.value;
                       console.log('Subbiercategory selected:', value);
+                      // Don't convert to Number - subbiercategory IDs might be strings too
                       setFormData({
                         ...formData,
-                        subbiercategory_id: value ? Number(value) : undefined,
+                        subbiercategory_id: value || undefined,
                       });
                     }}
                     disabled={!formData.subcategory_id}
@@ -336,7 +338,7 @@ export function ProductsTab() {
                   >
                     <option value="">Keine</option>
                     {filteredSubbiercategories.map(subbier => (
-                      <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id.toString()}>
+                      <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
                         {subbier.name}
                       </option>
                     ))}
