@@ -226,6 +226,10 @@ export const casesApi = {
   create: (data: Partial<CaseDetail>) => api.post<{ case_id: number; message: string }>('/cases', data),
   update: (id: number, data: Partial<CaseDetail>) => api.put<{ message: string }>(`/cases/${id}`, data),
   delete: (id: number) => api.delete<{ message: string }>(`/cases/${id}`),
+  addDevices: (caseId: number, deviceIds: string[]) =>
+    api.post<{ success_count: number; skipped_count: number; total: number; errors?: string[]; message?: string }>(`/cases/${caseId}/devices`, { device_ids: deviceIds }),
+  removeDevice: (caseId: number, deviceId: string) =>
+    api.delete<{ message: string }>(`/cases/${caseId}/devices/${deviceId}`),
 };
 
 export const zonesApi = {

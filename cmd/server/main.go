@@ -159,6 +159,8 @@ func main() {
 	api.HandleFunc("/cases/{id}", handlers.UpdateCase).Methods("PUT")
 	api.HandleFunc("/cases/{id}", handlers.DeleteCase).Methods("DELETE")
 	api.HandleFunc("/cases/{id}/contents", handlers.GetCaseContents).Methods("GET")
+	api.HandleFunc("/cases/{id}/devices", handlers.AddDevicesToCase).Methods("POST")
+	api.HandleFunc("/cases/{id}/devices/{device_id}", handlers.RemoveDeviceFromCase).Methods("DELETE")
 
 	// Maintenance endpoints
 	api.HandleFunc("/defects", handlers.GetDefects).Methods("GET")

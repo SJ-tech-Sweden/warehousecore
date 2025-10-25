@@ -1737,6 +1737,149 @@ func DeleteCase(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Case deleted successfully"})
 }
 
+// AddDevicesToCase adds multiple devices to a case
+// POST /api/v1/cases/{id}/devices
+// Body: {"device_ids": ["DEV001", "DEV002"]}
+func AddDevicesToCase(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	caseIDStr := vars["id"]
+
+	caseID, err := strconv.Atoi(caseIDStr)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid case ID"})
+		return
+	}
+
+	var req struct {
+		DeviceIDs []string `json:"device_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.DeviceIDs) == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "No device IDs provided"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	// Check if case exists
+	var exists int
+	err = db.QueryRow("SELECT COUNT(*) FROM cases WHERE caseID = ?", caseID).Scan(&exists)
+	if err != nil {
+		log.Printf("AddDevicesToCase check case error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify case"})
+		return
+	}
+
+	if exists == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Case not found"})
+		return
+	}
+
+	// Add devices to case
+	successCount := 0
+	skippedCount := 0
+	errors := []string{}
+
+	for _, deviceID := range req.DeviceIDs {
+		// Check if device exists
+		var deviceExists int
+		err = db.QueryRow("SELECT COUNT(*) FROM devices WHERE deviceID = ?", deviceID).Scan(&deviceExists)
+		if err != nil || deviceExists == 0 {
+			errors = append(errors, fmt.Sprintf("Device %s not found", deviceID))
+			skippedCount++
+			continue
+		}
+
+		// Check if device is already in a case
+		var existingCaseID sql.NullInt64
+		err = db.QueryRow("SELECT caseID FROM devicescases WHERE deviceID = ?", deviceID).Scan(&existingCaseID)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("AddDevicesToCase check existing case error: %v", err)
+			errors = append(errors, fmt.Sprintf("Failed to check device %s", deviceID))
+			skippedCount++
+			continue
+		}
+
+		if existingCaseID.Valid {
+			errors = append(errors, fmt.Sprintf("Device %s is already in case %d", deviceID, existingCaseID.Int64))
+			skippedCount++
+			continue
+		}
+
+		// Add device to case
+		_, err = db.Exec("INSERT INTO devicescases (deviceID, caseID) VALUES (?, ?)", deviceID, caseID)
+		if err != nil {
+			log.Printf("AddDevicesToCase insert error for %s: %v", deviceID, err)
+			errors = append(errors, fmt.Sprintf("Failed to add device %s", deviceID))
+			skippedCount++
+			continue
+		}
+
+		successCount++
+	}
+
+	response := map[string]interface{}{
+		"success_count": successCount,
+		"skipped_count": skippedCount,
+		"total":         len(req.DeviceIDs),
+	}
+
+	if len(errors) > 0 {
+		response["errors"] = errors
+	}
+
+	if successCount > 0 {
+		response["message"] = fmt.Sprintf("Successfully added %d device(s) to case", successCount)
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
+// RemoveDeviceFromCase removes a device from a case
+// DELETE /api/v1/cases/{id}/devices/{device_id}
+func RemoveDeviceFromCase(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	caseIDStr := vars["id"]
+	deviceID := vars["device_id"]
+
+	caseID, err := strconv.Atoi(caseIDStr)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid case ID"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	// Check if device is in this case
+	var exists int
+	err = db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = ? AND deviceID = ?", caseID, deviceID).Scan(&exists)
+	if err != nil {
+		log.Printf("RemoveDeviceFromCase check error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify device in case"})
+		return
+	}
+
+	if exists == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Device not found in this case"})
+		return
+	}
+
+	// Remove device from case
+	_, err = db.Exec("DELETE FROM devicescases WHERE caseID = ? AND deviceID = ?", caseID, deviceID)
+	if err != nil {
+		log.Printf("RemoveDeviceFromCase delete error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to remove device from case"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Device removed from case successfully"})
+}
+
 // GetDefects returns defect reports with filters
 func GetDefects(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")

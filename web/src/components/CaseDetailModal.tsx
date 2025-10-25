@@ -1,4 +1,4 @@
-import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers, Tag, Download } from 'lucide-react';
+import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers, Tag, Download, Plus, Trash2 } from 'lucide-react';
 import type { CaseDetail, CaseDevice } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 
@@ -11,6 +11,9 @@ interface CaseDetailModalProps {
   onOpenZone: (device: { zone_id?: number; zone_code?: string }) => void;
   onOpenDevice: (deviceId: string) => void;
   onLocateDevice: (device: CaseDevice) => void;
+  onAddDevices: () => void;
+  onRemoveDevice: (deviceId: string) => void;
+  onRefresh: () => void;
 }
 
 export function CaseDetailModal({
@@ -22,6 +25,8 @@ export function CaseDetailModal({
   onOpenZone,
   onOpenDevice,
   onLocateDevice,
+  onAddDevices,
+  onRemoveDevice,
 }: CaseDetailModalProps) {
   if (!isOpen) return null;
 
@@ -111,6 +116,17 @@ export function CaseDetailModal({
         )}
 
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Add Devices Button */}
+          <div className="mb-4">
+            <button
+              onClick={onAddDevices}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-accent-red to-red-700 hover:shadow-lg hover:shadow-accent-red/50 hover:scale-105 active:scale-95 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Geräte hinzufügen
+            </button>
+          </div>
+
           {loading ? (
             <div className="flex flex-col items-center justify-center h-60 gap-3 text-gray-400">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent-red" />
@@ -159,7 +175,7 @@ export function CaseDetailModal({
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => onOpenDevice(device.device_id)}
                       className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white"
@@ -179,6 +195,17 @@ export function CaseDetailModal({
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white disabled:opacity-50"
                     >
                       <MapPin className="w-4 h-4" /> Zone
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Gerät ${device.device_id} aus diesem Case entfernen?`)) {
+                          onRemoveDevice(device.device_id);
+                        }
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-red-600/80 hover:bg-red-600 transition-colors text-white"
+                      title="Aus Case entfernen"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

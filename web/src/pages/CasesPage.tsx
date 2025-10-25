@@ -16,6 +16,7 @@ import {
 import { formatStatus, getStatusColor } from '../lib/utils';
 import { CaseDetailModal } from '../components/CaseDetailModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
+import { DeviceTreeModal } from '../components/DeviceTreeModal';
 
 type StatusFilter = 'all' | 'free' | 'rented' | 'maintance';
 
@@ -50,6 +51,7 @@ export function CasesPage() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [deviceModalOpen, setDeviceModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
+  const [deviceTreeModalOpen, setDeviceTreeModalOpen] = useState(false);
 
   // Form modal state
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -178,6 +180,78 @@ export function CasesPage() {
 
   const clearActionMessage = () => {
     setTimeout(() => setActionMessage(null), 4000);
+  };
+
+  const handleAddDevicesToCase = () => {
+    setDeviceTreeModalOpen(true);
+  };
+
+  const handleConfirmAddDevices = async (deviceIds: string[]) => {
+    if (!selectedCase) return;
+
+    try {
+      const { data } = await casesApi.addDevices(selectedCase.case_id, deviceIds);
+
+      if (data.success_count > 0) {
+        setActionMessage({
+          type: 'success',
+          text: `${data.success_count} Gerät(e) erfolgreich hinzugefügt`,
+        });
+
+        // Reload case devices
+        const devicesRes = await casesApi.getDevices(selectedCase.case_id);
+        setCaseDevices(devicesRes.data);
+        void loadCases(); // Refresh case list
+      }
+
+      if (data.errors && data.errors.length > 0) {
+        console.warn('Add devices errors:', data.errors);
+      }
+    } catch (error: any) {
+      setActionMessage({
+        type: 'error',
+        text: 'Fehler beim Hinzufügen der Geräte: ' + (error.response?.data?.error || error.message),
+      });
+    } finally {
+      clearActionMessage();
+    }
+  };
+
+  const handleRemoveDeviceFromCase = async (deviceId: string) => {
+    if (!selectedCase) return;
+
+    try {
+      await casesApi.removeDevice(selectedCase.case_id, deviceId);
+
+      setActionMessage({
+        type: 'success',
+        text: `Gerät ${deviceId} erfolgreich entfernt`,
+      });
+
+      // Reload case devices
+      const devicesRes = await casesApi.getDevices(selectedCase.case_id);
+      setCaseDevices(devicesRes.data);
+      void loadCases(); // Refresh case list
+    } catch (error: any) {
+      setActionMessage({
+        type: 'error',
+        text: 'Fehler beim Entfernen: ' + (error.response?.data?.error || error.message),
+      });
+    } finally {
+      clearActionMessage();
+    }
+  };
+
+  const handleRefreshCaseDevices = async () => {
+    if (!selectedCase) return;
+
+    try {
+      const devicesRes = await casesApi.getDevices(selectedCase.case_id);
+      setCaseDevices(devicesRes.data);
+      void loadCases();
+    } catch (error) {
+      console.error('Failed to refresh case devices:', error);
+    }
   };
 
   const loadZones = async () => {
@@ -557,6 +631,16 @@ export function CasesPage() {
         onLocateDevice={handleLocateDevice}
         onOpenDevice={handleOpenDevice}
         onOpenZone={handleOpenZone}
+        onAddDevices={handleAddDevicesToCase}
+        onRemoveDevice={handleRemoveDeviceFromCase}
+        onRefresh={handleRefreshCaseDevices}
+      />
+
+      <DeviceTreeModal
+        isOpen={deviceTreeModalOpen}
+        onClose={() => setDeviceTreeModalOpen(false)}
+        onConfirm={handleConfirmAddDevices}
+        zoneId={-1}
       />
 
       <DeviceDetailModal
