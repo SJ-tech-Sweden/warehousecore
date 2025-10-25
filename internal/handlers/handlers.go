@@ -1378,7 +1378,7 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 	caseID := vars["id"]
 
 	query := `
-		SELECT 
+		SELECT
 			c.caseID,
 			c.name,
 			c.description,
@@ -1388,6 +1388,7 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 			c.depth,
 			c.weight,
 			c.zone_id,
+			c.label_path,
 			COALESCE(z.name, '') AS zone_name,
 			COALESCE(z.code, '') AS zone_code,
 			COUNT(dc.deviceID) AS device_count
@@ -1395,12 +1396,13 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN devicescases dc ON c.caseID = dc.caseID
 		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
 		WHERE c.caseID = ?
-		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, zone_name, zone_code
+		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, c.label_path, zone_name, zone_code
 	`
 
 	var description sql.NullString
 	var width, height, depth, weight sql.NullFloat64
 	var zoneID sql.NullInt64
+	var labelPath sql.NullString
 	var zoneName, zoneCode sql.NullString
 	var deviceCount sql.NullInt64
 
@@ -1417,6 +1419,7 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 		ZoneName    *string  `json:"zone_name,omitempty"`
 		ZoneCode    *string  `json:"zone_code,omitempty"`
 		DeviceCount int      `json:"device_count"`
+		LabelPath   *string  `json:"label_path,omitempty"`
 	}
 
 	var item CaseDetail
@@ -1431,6 +1434,7 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 		&depth,
 		&weight,
 		&zoneID,
+		&labelPath,
 		&zoneName,
 		&zoneCode,
 		&deviceCount,
@@ -1475,6 +1479,10 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 	if zoneCode.Valid && zoneCode.String != "" {
 		val := zoneCode.String
 		item.ZoneCode = &val
+	}
+	if labelPath.Valid && labelPath.String != "" {
+		val := labelPath.String
+		item.LabelPath = &val
 	}
 	if deviceCount.Valid {
 		item.DeviceCount = int(deviceCount.Int64)
