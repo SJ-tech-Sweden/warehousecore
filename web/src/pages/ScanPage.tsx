@@ -297,8 +297,9 @@ export function ScanPage() {
 
         {/* LED Activation Modal */}
         {showLEDModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="glass-dark rounded-2xl p-6 sm:p-8 border-2 border-white/10 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">
+            <div className="min-h-full flex items-center justify-center p-4">
+              <div className="glass-dark rounded-2xl p-6 sm:p-8 border-2 border-white/10 max-w-md w-full my-8">
               <div className="text-center mb-6">
                 <div className="inline-block p-4 rounded-xl bg-yellow-500/20 mb-4">
                   <Lightbulb className="w-12 h-12 text-yellow-300" />
@@ -323,6 +324,7 @@ export function ScanPage() {
                 >
                   Ja, LED aktivieren
                 </button>
+              </div>
               </div>
             </div>
           </div>

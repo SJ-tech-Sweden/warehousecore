@@ -215,8 +215,9 @@ export function ProductsTab() {
 
       {/* Product Form Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center p-4">
+            <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl my-8">
             <div className="flex items-center justify-between p-6 border-b border-white/10">
               <h2 className="text-2xl font-bold text-white">
                 {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt'}
@@ -257,13 +258,16 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Kategorie</label>
                   <select
-                    value={formData.category_id?.toString() || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      category_id: e.target.value ? parseInt(e.target.value) : undefined,
-                      subcategory_id: undefined,
-                      subbiercategory_id: undefined,
-                    })}
+                    value={formData.category_id ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData({
+                        ...formData,
+                        category_id: val ? parseInt(val, 10) : undefined,
+                        subcategory_id: undefined,
+                        subbiercategory_id: undefined,
+                      });
+                    }}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors"
                   >
                     <option value="">Keine</option>
@@ -276,13 +280,16 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Unterkategorie</label>
                   <select
-                    value={formData.subcategory_id?.toString() || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      subcategory_id: e.target.value ? parseInt(e.target.value) : undefined,
-                      subbiercategory_id: undefined,
-                    })}
-                    disabled={!formData.category_id}
+                    value={formData.subcategory_id ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData({
+                        ...formData,
+                        subcategory_id: val ? parseInt(val, 10) : undefined,
+                        subbiercategory_id: undefined,
+                      });
+                    }}
+                    disabled={!formData.category_id || filteredSubcategories.length === 0}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50"
                   >
                     <option value="">Keine</option>
@@ -295,12 +302,15 @@ export function ProductsTab() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">Sub-Unterkategorie</label>
                   <select
-                    value={formData.subbiercategory_id?.toString() || ''}
-                    onChange={(e) => setFormData({
-                      ...formData,
-                      subbiercategory_id: e.target.value ? parseInt(e.target.value) : undefined,
-                    })}
-                    disabled={!formData.subcategory_id}
+                    value={formData.subbiercategory_id ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData({
+                        ...formData,
+                        subbiercategory_id: val ? parseInt(val, 10) : undefined,
+                      });
+                    }}
+                    disabled={!formData.subcategory_id || filteredSubbiercategories.length === 0}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors disabled:opacity-50"
                   >
                     <option value="">Keine</option>
@@ -385,6 +395,7 @@ export function ProductsTab() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
