@@ -12,7 +12,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"warehousecore/internal/models"
-	"warehousecore/internal/services"
 )
 
 // ControllerListener subscribes to controller heartbeat topics and auto-registers devices.
@@ -22,6 +21,14 @@ type ControllerListener struct {
 	topicFilter string
 	dryRun      bool
 	startOnce   sync.Once
+}
+
+// controllerHeartbeatHandler is assigned from main so we avoid package import cycles.
+var controllerHeartbeatHandler func(identifier string, payload *models.LEDControllerHeartbeat) error
+
+// RegisterControllerHeartbeatHandler installs the callback used when a controller heartbeat is received.
+func RegisterControllerHeartbeatHandler(handler func(identifier string, payload *models.LEDControllerHeartbeat) error) {
+	controllerHeartbeatHandler = handler
 }
 
 // NewControllerListener creates the listener but does not start it yet.
@@ -159,8 +166,12 @@ func (l *ControllerListener) handleStatusMessage(_ mqtt.Client, msg mqtt.Message
 		payload.TopicSuffix = l.extractTopicSuffix(msg.Topic())
 	}
 
-	service := services.NewLEDControllerService()
-	if _, err := service.RecordHeartbeat(identifier, &payload); err != nil {
+	if controllerHeartbeatHandler == nil {
+		log.Printf("[LED] Controller listener received heartbeat for %s but no handler is registered", identifier)
+		return
+	}
+
+	if err := controllerHeartbeatHandler(identifier, &payload); err != nil {
 		log.Printf("[LED] Controller listener failed to store heartbeat for %s: %v", identifier, err)
 		return
 	}

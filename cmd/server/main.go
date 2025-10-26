@@ -18,6 +18,7 @@ import (
 	"warehousecore/internal/handlers"
 	"warehousecore/internal/led"
 	"warehousecore/internal/middleware"
+	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
 	"warehousecore/internal/services"
 )
@@ -95,6 +96,12 @@ func main() {
 	log.Println("[LED] Initializing LED service...")
 	_ = led.GetService() // Initialize singleton at startup
 	log.Println("[LED] LED service initialization complete")
+
+	led.RegisterControllerHeartbeatHandler(func(identifier string, payload *models.LEDControllerHeartbeat) error {
+		service := services.NewLEDControllerService()
+		_, err := service.RecordHeartbeat(identifier, payload)
+		return err
+	})
 
 	controllerListener := led.NewControllerListener()
 	if controllerListener != nil {
