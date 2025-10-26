@@ -53,3 +53,7 @@ mosquitto/log/
 mosquitto/config/passwords
 mosquitto/certs/
 # Note: passwords file is auto-generated from .env on container startup
+
+# Claude Code files
+CLAUDE.md
+AGENTS.md
