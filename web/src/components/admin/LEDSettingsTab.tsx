@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Save, Lightbulb, RefreshCcw, SlidersHorizontal, FileText, Square } from 'lucide-react';
 import { api, ledApi, zonesApi, type LEDAppearance, type LEDJobHighlightSettings, type LEDMapping, type Zone } from '../../lib/api';
 
-const ZONE_KEYWORDS = ['bin', 'fach', 'slot', 'compartment', 'shelf'];
+const ZONE_KEYWORDS = ['bin', 'fach', 'slot', 'compartment', 'shelf', 'gitterbox'];
 
 const zoneLabelForOption = (zone: Zone): string => {
   const zoneName = zone.name || zone.code || 'Unbenanntes Fach';
@@ -232,7 +232,7 @@ export function LEDSettingsTab() {
     try {
       const { data } = await ledApi.validateMapping(mapping);
       if (data.valid) {
-        setMappingMessage(`✓ Mapping gültig (${data.total_bins ?? 0} Bins, ${data.total_shelves ?? 0} Regale)`);
+        setMappingMessage(`✓ Mapping gültig (${data.total_bins ?? 0} Bereiche, ${data.total_shelves ?? 0} Gruppen)`);
       } else {
         const errors = Array.isArray(data.errors) ? data.errors.join(', ') : 'Unbekannter Fehler';
         setMappingMessage('⚠️ ' + errors);
@@ -693,7 +693,7 @@ export function LEDSettingsTab() {
           <h3 className="text-lg font-semibold text-white">Job-Highlight Einstellungen</h3>
         </div>
         <p className="text-sm text-gray-400">
-          Steuere, wie die Regalfächer leuchten, wenn ein Job ausgewählt ist. Du kannst zwischen
+          Steuere, wie Fächer oder Gitterboxen leuchten, wenn ein Job ausgewählt ist. Du kannst zwischen
           einer kompletten Visualisierung aller Fächer und einem Fokus auf die zu packenden Fächer wählen.
         </p>
 
@@ -888,7 +888,7 @@ export function LEDSettingsTab() {
           <h3 className="text-lg font-semibold text-white">LED-Mapping konfigurieren</h3>
         </div>
         <p className="text-sm text-gray-400">
-          Weise Regalfächern ihre LED-Pixel zu. Die Konfiguration wird im Container persistiert und survive Deployments.
+          Weise einzelnen Bereichen (z. B. Fächer, Gitterboxen) ihre LED-Pixel zu. Die Konfiguration wird im Container persistiert und survive Deployments.
         </p>
 
         {mappingLoading ? (
@@ -1038,13 +1038,13 @@ export function LEDSettingsTab() {
                 onClick={addShelf}
                 className="flex items-center gap-2 px-3 py-2 bg-accent-red/80 hover:bg-accent-red text-white rounded-lg transition-colors"
               >
-                Regal hinzufügen
+                Gruppe hinzufügen
               </button>
             </div>
 
             {mapping.shelves.length === 0 ? (
               <div className="glass rounded-xl p-5 text-sm text-gray-400">
-                Noch keine Regale angelegt. Füge über "Regal hinzufügen" ein neues Regal hinzu.
+                Noch keine Gruppen angelegt. Füge über „Gruppe hinzufügen“ einen Eintrag hinzu.
               </div>
             ) : (
               <div className="space-y-4">
@@ -1052,7 +1052,7 @@ export function LEDSettingsTab() {
                   <div key={`${shelf.shelf_id}-${shelfIndex}`} className="glass-dark rounded-xl p-5 space-y-4 border border-white/10">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex-1">
-                        <label className="block text-xs font-semibold text-gray-400 mb-1">Regal-ID</label>
+                        <label className="block text-xs font-semibold text-gray-400 mb-1">Gruppenkennung (z. B. Regal A, Gitterbox 1)</label>
                         <input
                           type="text"
                           value={shelf.shelf_id}
@@ -1064,7 +1064,7 @@ export function LEDSettingsTab() {
                         onClick={() => removeShelf(shelfIndex)}
                         className="px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 text-red-300"
                       >
-                        Regal entfernen
+                        Gruppe entfernen
                       </button>
                     </div>
 
@@ -1077,13 +1077,13 @@ export function LEDSettingsTab() {
                           <div key={`${bin.bin_id}-${binIndex}`} className="glass rounded-lg p-4 space-y-3 border border-white/10">
                             <div className="grid gap-3 md:grid-cols-3">
                               <div>
-                                <label className="block text-xs font-semibold text-gray-400 mb-1">Fach auswählen</label>
+                                <label className="block text-xs font-semibold text-gray-400 mb-1">Bereich auswählen</label>
                                 <select
                                   value={selectedZone ? selectedZone.code : ''}
                                   onChange={(e) => updateBinId(shelfIndex, binIndex, e.target.value || bin.bin_id)}
                                   className="w-full px-3 py-2 rounded-lg glass text-white"
                                 >
-                                  <option value="">-- Fach wählen --</option>
+                                  <option value="">-- Bereich wählen --</option>
                                   {zoneOptions.map((zone) => (
                                     <option key={zone.zone_id} value={zone.code ?? ''} className="bg-dark">
                                       {zoneLabelForOption(zone)}
