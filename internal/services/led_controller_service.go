@@ -180,6 +180,12 @@ func (s *LEDControllerService) RecordHeartbeat(identifier string, payload *model
 		if payload.LedCount != nil {
 			status["led_count"] = *payload.LedCount
 		}
+		if payload.ActiveLEDs != nil {
+			status["active_leds"] = *payload.ActiveLEDs
+		}
+		if payload.WarehouseID != "" {
+			status["warehouse_id"] = payload.WarehouseID
+		}
 		if payload.Status != nil {
 			for k, v := range payload.Status {
 				status[k] = v
