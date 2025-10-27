@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -17,35 +18,35 @@ import (
 
 // Product represents a product (item type)
 type Product struct {
-	ProductID             int      `json:"product_id"`
-	Name                  string   `json:"name"`
-	CategoryID            *int     `json:"category_id"`
-	SubcategoryID         *string  `json:"subcategory_id"`
-	SubbiercategoryID     *string  `json:"subbiercategory_id"`
-	ManufacturerID        *int     `json:"manufacturer_id"`
-	BrandID               *int     `json:"brand_id"`
-	Description           *string  `json:"description"`
-	MaintenanceInterval   *int     `json:"maintenance_interval"`
-	ItemCostPerDay        *float64 `json:"item_cost_per_day"`
-	Weight                *float64 `json:"weight"`
-	Height                *float64 `json:"height"`
-	Width                 *float64 `json:"width"`
-	Depth                 *float64 `json:"depth"`
-	PowerConsumption      *float64 `json:"power_consumption"`
-	PosInCategory         *int     `json:"pos_in_category"`
+	ProductID           int      `json:"product_id"`
+	Name                string   `json:"name"`
+	CategoryID          *int     `json:"category_id"`
+	SubcategoryID       *string  `json:"subcategory_id"`
+	SubbiercategoryID   *string  `json:"subbiercategory_id"`
+	ManufacturerID      *int     `json:"manufacturer_id"`
+	BrandID             *int     `json:"brand_id"`
+	Description         *string  `json:"description"`
+	MaintenanceInterval *int     `json:"maintenance_interval"`
+	ItemCostPerDay      *float64 `json:"item_cost_per_day"`
+	Weight              *float64 `json:"weight"`
+	Height              *float64 `json:"height"`
+	Width               *float64 `json:"width"`
+	Depth               *float64 `json:"depth"`
+	PowerConsumption    *float64 `json:"power_consumption"`
+	PosInCategory       *int     `json:"pos_in_category"`
 
 	// Joined fields for display
-	CategoryName          *string  `json:"category_name,omitempty"`
-	SubcategoryName       *string  `json:"subcategory_name,omitempty"`
-	SubbiercategoryName   *string  `json:"subbiercategory_name,omitempty"`
+	CategoryName        *string `json:"category_name,omitempty"`
+	SubcategoryName     *string `json:"subcategory_name,omitempty"`
+	SubbiercategoryName *string `json:"subbiercategory_name,omitempty"`
 }
 
 // DeviceCreateRequest represents a request to create devices
 type DeviceCreateRequest struct {
-	ProductID       int      `json:"product_id"`
-	Quantity        int      `json:"quantity"`
-	StartingNumber  *int     `json:"starting_number"` // Optional, if not provided, auto-generate
-	Prefix          *string  `json:"prefix"`          // Optional device ID prefix
+	ProductID      int     `json:"product_id"`
+	Quantity       int     `json:"quantity"`
+	StartingNumber *int    `json:"starting_number"` // Optional, if not provided, auto-generate
+	Prefix         *string `json:"prefix"`          // Optional device ID prefix
 }
 
 // DeviceCreateResponse represents the response after creating devices
@@ -372,7 +373,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 
-	// Get product info for generating device IDs
+	// Ensure product exists
 	var productName string
 	err := db.QueryRow("SELECT name FROM products WHERE productID = ?", req.ProductID).Scan(&productName)
 	if err == sql.ErrNoRows {
@@ -384,53 +385,58 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate device IDs
-	prefix := "DEV"
+	// Optional prefix: if triggers respect a session variable we pass it through
 	if req.Prefix != nil && *req.Prefix != "" {
-		prefix = strings.ToUpper(*req.Prefix)
-	}
-
-	startNum := 1
-	if req.StartingNumber != nil {
-		startNum = *req.StartingNumber
-	} else {
-		// Find highest existing number for this prefix
-		var maxNum sql.NullInt64
-		db.QueryRow(`
-			SELECT MAX(CAST(SUBSTRING(deviceID, ?) AS UNSIGNED))
-			FROM devices
-			WHERE deviceID LIKE ?
-		`, len(prefix)+1, prefix+"%").Scan(&maxNum)
-
-		if maxNum.Valid {
-			startNum = int(maxNum.Int64) + 1
+		upperPrefix := strings.ToUpper(*req.Prefix)
+		if _, err := db.Exec("SET @device_prefix = ?", upperPrefix); err != nil {
+			log.Printf("Failed to set device prefix session variable: %v", err)
+		} else {
+			defer db.Exec("SET @device_prefix = NULL")
 		}
 	}
 
-	// Create devices
-	createdDeviceIDs := make([]string, 0, req.Quantity)
-	labelService := services.NewLabelService()
+	existingIDs := make(map[string]struct{})
+	rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = ?", req.ProductID)
+	if err == nil {
+		defer rows.Close()
+		var id string
+		for rows.Next() {
+			if err := rows.Scan(&id); err == nil {
+				existingIDs[id] = struct{}{}
+			}
+		}
+	}
 
 	for i := 0; i < req.Quantity; i++ {
-		deviceID := fmt.Sprintf("%s%04d", prefix, startNum+i)
-
-		_, err := db.Exec(`
-			INSERT INTO devices (deviceID, productID, status)
-			VALUES (?, ?, 'free')
-		`, deviceID, req.ProductID)
-
-		if err != nil {
-			log.Printf("Failed to create device %s: %v", deviceID, err)
-			// Continue creating other devices
-			continue
+		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES (?, 'free')", req.ProductID); err != nil {
+			log.Printf("Failed to create device via trigger: %v", err)
 		}
+	}
 
-		createdDeviceIDs = append(createdDeviceIDs, deviceID)
+	createdDeviceIDs := make([]string, 0, req.Quantity)
+	rowsNew, err := db.Query("SELECT deviceID FROM devices WHERE productID = ?", req.ProductID)
+	if err != nil {
+		log.Printf("Failed to fetch generated device IDs: %v", err)
+	} else {
+		defer rowsNew.Close()
+		var id string
+		for rowsNew.Next() {
+			if err := rowsNew.Scan(&id); err != nil {
+				log.Printf("Failed to scan device id: %v", err)
+				continue
+			}
+			if _, existed := existingIDs[id]; !existed {
+				createdDeviceIDs = append(createdDeviceIDs, id)
+			}
+		}
+	}
 
-		// Automatically generate a basic label for the new device
+	sort.Strings(createdDeviceIDs)
+
+	labelService := services.NewLabelService()
+	for _, deviceID := range createdDeviceIDs {
 		if err := labelService.AutoGenerateDeviceLabel(deviceID); err != nil {
 			log.Printf("Failed to auto-generate label for device %s: %v", deviceID, err)
-			// Don't fail device creation if label generation fails
 		}
 	}
 
