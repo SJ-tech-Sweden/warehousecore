@@ -436,6 +436,25 @@ uint32_t parseColor(const char* hexColor) {
   return color;
 }
 
+String extractHostFromURL(const String& url) {
+  if (url.length() == 0) {
+    return "";
+  }
+
+  int start = 0;
+  if (url.startsWith("https://")) {
+    start = 8;
+  } else if (url.startsWith("http://")) {
+    start = 7;
+  }
+
+  int slash = url.indexOf('/', start);
+  if (slash == -1) {
+    return url.substring(start);
+  }
+  return url.substring(start, slash);
+}
+
 void sendHTTPHeartbeat(const String& payload) {
   if (apiBaseUrl.length() == 0) {
     return;
@@ -450,6 +469,18 @@ void sendHTTPHeartbeat(const String& payload) {
     url += "/";
   }
   url += "led/controllers/" + controllerId + "/heartbeat";
+
+  String host = extractHostFromURL(apiBaseUrl);
+  if (host.length() > 0) {
+    IPAddress resolved;
+    if (WiFi.hostByName(host.c_str(), resolved)) {
+      Serial.printf("[HTTP] Resolved host: %s -> %s\n", host.c_str(), resolved.toString().c_str());
+    } else {
+      Serial.printf("[HTTP] Failed to resolve host: %s\n", host.c_str());
+    }
+  }
+
+  Serial.printf("[HTTP] Heartbeat URL: %s\n", url.c_str());
 
   bool began = false;
   if (url.startsWith("https://")) {
@@ -472,6 +503,7 @@ void sendHTTPHeartbeat(const String& payload) {
   int code = http.POST(payload);
   if (code <= 0 || code >= 400) {
     Serial.printf("[HTTP] Heartbeat POST failed (%d): %s\n", code, http.errorToString(code).c_str());
+    Serial.printf("[HTTP] Response body: %s\n", http.getString().c_str());
   }
   http.end();
 }

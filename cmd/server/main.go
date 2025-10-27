@@ -122,6 +122,7 @@ func main() {
 
 	// API v1 routes
 	api := router.PathPrefix("/api/v1").Subrouter()
+	router.HandleFunc("/led/controllers/{controller_id}/heartbeat", handlers.LEDControllerHeartbeat).Methods("POST")
 
 	// Auth endpoints (public - no auth required)
 	api.HandleFunc("/auth/login", handlers.Login).Methods("POST")
