@@ -300,165 +300,196 @@ export function LEDControllersTab() {
       )}
 
       {editor && (
-        <div className="glass rounded-xl p-4 border border-accent-red space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {editor === 'new' && (
-              <input
-                type="text"
-                className="px-3 py-2 rounded-lg glass text-white"
-                placeholder="Controller ID (z.B. esp-regal-1)"
-                value={form.controller_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, controller_id: e.target.value }))}
-              />
-            )}
-            <input
-              type="text"
-              className="px-3 py-2 rounded-lg glass text-white"
-              placeholder="Anzeigename"
-              value={form.display_name}
-              onChange={(e) => setForm((prev) => ({ ...prev, display_name: e.target.value }))}
-            />
-            <input
-              type="text"
-              className="px-3 py-2 rounded-lg glass text-white"
-              placeholder="Topic-Suffix (optional)"
-              value={form.topic_suffix}
-              onChange={(e) => setForm((prev) => ({ ...prev, topic_suffix: e.target.value }))}
-            />
-            <label className="flex items-center gap-2 text-sm text-gray-300">
-              <input
-                type="checkbox"
-                className="w-4 h-4"
-                checked={form.is_active}
-                onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-              />
-              Aktiv
-            </label>
-          </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="glass rounded-2xl border border-accent-red shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-dark-900/95 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-accent-red" />
+                {editor === 'new' ? 'Neuer Controller' : 'Controller bearbeiten'}
+              </h3>
+              <button
+                onClick={resetEditor}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title="Schließen"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
 
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-300">Zuständige Lagerzonen</label>
-            {selectedZones.length > 0 ? (
-              <div className="flex flex-wrap gap-2 text-xs">
-                {selectedZones.map((zone) => (
-                  <span key={zone.id} className="bg-accent-red/20 text-accent-red px-2 py-1 rounded-full">
-                    {zone.label}
-                  </span>
-                ))}
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {editor === 'new' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">Controller ID</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 rounded-lg glass text-white"
+                      placeholder="z.B. esp-regal-1"
+                      value={form.controller_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, controller_id: e.target.value }))}
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">Anzeigename</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 rounded-lg glass text-white"
+                    placeholder="Anzeigename"
+                    value={form.display_name}
+                    onChange={(e) => setForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">Topic-Suffix (optional)</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 rounded-lg glass text-white"
+                    placeholder="optional"
+                    value={form.topic_suffix}
+                    onChange={(e) => setForm((prev) => ({ ...prev, topic_suffix: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">Status</label>
+                  <label className="flex items-center gap-2 text-sm text-gray-300 px-3 py-2 glass rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4"
+                      checked={form.is_active}
+                      onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                    />
+                    Aktiv
+                  </label>
+                </div>
               </div>
-            ) : (
-              <p className="text-xs text-gray-500">Noch keine Zonen zugewiesen.</p>
-            )}
-            <select
-              multiple
-              value={form.zoneTypeIds.map(String)}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions).map((opt) => Number(opt.value));
-                handleZoneSelectChange(selected);
-              }}
-              className="w-full rounded-lg glass text-white px-3 py-2 bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-red"
-            >
-              {sortedZoneTypes.map((zone) => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500">
-              Tipp: Halte <span className="font-semibold">Strg / Cmd</span>, um mehrere Zonen auszuwählen.
-            </p>
-          </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-300 mb-2">Metadata (JSON)</label>
-            <textarea
-              className="w-full h-32 rounded-lg glass text-white font-mono text-sm px-3 py-2"
-              value={form.metadata}
-              onChange={(e) => setForm((prev) => ({ ...prev, metadata: e.target.value }))}
-            />
-          </div>
-
-          {editor !== 'new' && (
-            <div className="glass rounded-lg p-4 space-y-4 border border-blue-500/30">
-              <div>
-                <h4 className="text-white font-semibold mb-2">Hardware-Konfiguration</h4>
-                <p className="text-xs text-gray-400 mb-3">
-                  Diese Einstellungen werden per MQTT an den ESP32 gesendet.
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-300">Zuständige Lagerzonen</label>
+                {selectedZones.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {selectedZones.map((zone) => (
+                      <span key={zone.id} className="bg-accent-red/20 text-accent-red px-3 py-1 rounded-full">
+                        {zone.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">Noch keine Zonen zugewiesen.</p>
+                )}
+                <select
+                  multiple
+                  value={form.zoneTypeIds.map(String)}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions).map((opt) => Number(opt.value));
+                    handleZoneSelectChange(selected);
+                  }}
+                  className="w-full rounded-lg glass text-white px-3 py-2 bg-white/5 focus:outline-none focus:ring-2 focus:ring-accent-red"
+                >
+                  {sortedZoneTypes.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500">
+                  Tipp: Halte <span className="font-semibold">Strg / Cmd</span>, um mehrere Zonen auszuwählen.
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1200"
-                    className="w-full px-3 py-2 rounded-lg glass text-white"
-                    value={configureLedCount}
-                    onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">1-1200 LEDs</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Data Pin (GPIO)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    className="w-full px-3 py-2 rounded-lg glass text-white"
-                    value={configureDataPin}
-                    onChange={(e) => setConfigureDataPin(parseInt(e.target.value) || 0)}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">GPIO 0-50</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Chipset</label>
-                  <select
-                    className="w-full px-3 py-2 rounded-lg glass text-white"
-                    value={configureChipset}
-                    onChange={(e) => setConfigureChipset(e.target.value)}
-                  >
-                    <option value="SK6812_GRBW">SK6812 GRBW</option>
-                    <option value="SK6812_GRB">SK6812 GRB</option>
-                    <option value="WS2812B">WS2812B</option>
-                    <option value="WS2811">WS2811</option>
-                    <option value="APA102">APA102</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">LED-Typ</p>
-                </div>
-              </div>
-              <div className="flex justify-between gap-2">
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 flex-1">
-                  <p className="text-yellow-300 text-xs">
-                    <strong>Hinweis:</strong> Pin/Chipset-Änderungen erfordern ESP32-Neustart
-                  </p>
-                </div>
-                <button
-                  onClick={handleHardwareConfig}
-                  disabled={configuring}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50"
-                  title="Hardware-Konfiguration senden"
-                >
-                  <Save className="w-4 h-4" /> {configuring ? 'Sende...' : 'Hardware speichern'}
-                </button>
-              </div>
-            </div>
-          )}
 
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={resetEditor}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-600 text-white flex items-center gap-2"
-            >
-              <X className="w-4 h-4" /> Abbrechen
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white flex items-center gap-2 disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" /> {saving ? 'Speichert...' : 'Speichern'}
-            </button>
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">Metadata (JSON)</label>
+                <textarea
+                  className="w-full h-32 rounded-lg glass text-white font-mono text-sm px-3 py-2"
+                  value={form.metadata}
+                  onChange={(e) => setForm((prev) => ({ ...prev, metadata: e.target.value }))}
+                />
+              </div>
+
+              {editor !== 'new' && (
+                <div className="glass rounded-lg p-5 space-y-4 border border-blue-500/30 bg-blue-500/5">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-5 h-5 text-blue-400" />
+                    <h4 className="text-white font-semibold">Hardware-Konfiguration</h4>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Diese Einstellungen werden per MQTT an den ESP32 gesendet und dauerhaft gespeichert.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="1200"
+                        className="w-full px-3 py-2 rounded-lg glass text-white"
+                        value={configureLedCount}
+                        onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">1-1200 LEDs</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">Data Pin (GPIO)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="50"
+                        className="w-full px-3 py-2 rounded-lg glass text-white"
+                        value={configureDataPin}
+                        onChange={(e) => setConfigureDataPin(parseInt(e.target.value) || 0)}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">GPIO 0-50</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Chipset</label>
+                      <select
+                        className="w-full px-3 py-2 rounded-lg glass text-white"
+                        value={configureChipset}
+                        onChange={(e) => setConfigureChipset(e.target.value)}
+                      >
+                        <option value="SK6812_GRBW">SK6812 GRBW</option>
+                        <option value="SK6812_GRB">SK6812 GRB</option>
+                        <option value="WS2812B">WS2812B</option>
+                        <option value="WS2811">WS2811</option>
+                        <option value="APA102">APA102</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">LED-Typ</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex-1">
+                      <p className="text-yellow-300 text-xs">
+                        <strong>Hinweis:</strong> Pin/Chipset-Änderungen erfordern ESP32-Neustart
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleHardwareConfig}
+                      disabled={configuring}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-blue-700 transition-colors whitespace-nowrap"
+                      title="Hardware-Konfiguration senden"
+                    >
+                      <Save className="w-4 h-4" /> {configuring ? 'Sende...' : 'Hardware speichern'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="sticky bottom-0 bg-dark-900/95 backdrop-blur-sm border-t border-white/10 px-6 py-4 flex gap-3 justify-end rounded-b-2xl">
+              <button
+                onClick={resetEditor}
+                className="px-5 py-2 rounded-lg text-sm font-semibold bg-gray-600 text-white flex items-center gap-2 hover:bg-gray-700 transition-colors"
+              >
+                <X className="w-4 h-4" /> Abbrechen
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-5 py-2 rounded-lg text-sm font-semibold bg-green-600 text-white flex items-center gap-2 disabled:opacity-50 hover:bg-green-700 transition-colors"
+              >
+                <Save className="w-4 h-4" /> {saving ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
           </div>
         </div>
       )}
