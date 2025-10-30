@@ -1,8 +1,11 @@
 /*
- * ESP32 SK6812 LED Controller for StorageCore
+ * ESP32 SK6812 LED Controller for WarehouseCore
  *
- * Subscribes to MQTT commands from StorageCore server and controls
+ * Subscribes to MQTT commands from WarehouseCore server and controls
  * SK6812 GRBW LED strips to highlight storage bins.
+ *
+ * Supports: ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6, ESP32-H2
+ * Optimized for: XIAO ESP32-C6
  */
 
 #include <Arduino.h>
@@ -20,12 +23,28 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.1.0"
+#define FIRMWARE_VERSION "1.2.0"
 #endif
 
-// Pin configuration
-#ifndef LED_PIN
-#define LED_PIN 5
+// Auto-detect XIAO ESP32-C6 and set appropriate default pins
+#if defined(CONFIG_IDF_TARGET_ESP32C6) && !defined(LED_PIN)
+  // XIAO ESP32-C6 recommended pins for NeoPixel: D0-D5 (GPIO 0-5)
+  #define LED_PIN 0  // D0 on XIAO ESP32-C6
+  #define BOARD_DETECTED "XIAO-ESP32-C6"
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) && !defined(LED_PIN)
+  #define LED_PIN 2
+  #define BOARD_DETECTED "ESP32-C3"
+#elif defined(CONFIG_IDF_TARGET_ESP32S3) && !defined(LED_PIN)
+  #define LED_PIN 5
+  #define BOARD_DETECTED "ESP32-S3"
+#elif defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(LED_PIN)
+  #define LED_PIN 5
+  #define BOARD_DETECTED "ESP32-S2"
+#elif !defined(LED_PIN)
+  #define LED_PIN 5
+  #define BOARD_DETECTED "ESP32"
+#else
+  #define BOARD_DETECTED "Custom"
 #endif
 
 #ifndef LED_LENGTH
@@ -128,8 +147,19 @@ void setup() {
 
   Serial.println("\n\n=================================");
   Serial.println("ESP32 SK6812 LED Controller");
-  Serial.println("StorageCore Warehouse Highlighting");
+  Serial.println("WarehouseCore Warehouse Highlighting");
+  Serial.printf("Firmware: v%s\n", FIRMWARE_VERSION);
+  Serial.printf("Board: %s\n", BOARD_DETECTED);
   Serial.println("=================================\n");
+
+  // Board info
+  Serial.printf("[BOARD] Chip: %s\n", ESP.getChipModel());
+  Serial.printf("[BOARD] Cores: %d\n", ESP.getChipCores());
+  Serial.printf("[BOARD] CPU Freq: %d MHz\n", ESP.getCpuFreqMHz());
+  Serial.printf("[BOARD] Flash: %d KB\n", ESP.getFlashChipSize() / 1024);
+  Serial.printf("[BOARD] Free Heap: %d KB\n", ESP.getFreeHeap() / 1024);
+  Serial.printf("[BOARD] SDK: %s\n", ESP.getSdkVersion());
+  Serial.println();
 
   // ID vor jeglicher WiFi-Initialisierung bestimmen
   controllerId = determineControllerId();
@@ -139,12 +169,20 @@ void setup() {
   statusTopic = String(TOPIC_PREFIX) + "/" + controllerTopic + "/status";
 
   Serial.printf("[ID] Controller ID: %s\n", controllerId.c_str());
-  Serial.printf("[MQTT] Topic suffix: %s\n", controllerTopic.c_str());
+  Serial.printf("[ID] Topic suffix: %s\n", controllerTopic.c_str());
+  Serial.printf("[ID] Warehouse ID: %s\n", WAREHOUSE_ID);
+  Serial.println();
+
+  Serial.printf("[MQTT] Broker: %s:%d\n", MQTT_HOST, MQTT_PORT);
+  Serial.printf("[MQTT] User: %s\n", MQTT_USER);
+  Serial.printf("[MQTT] Topic prefix: %s\n", TOPIC_PREFIX);
   Serial.printf("[MQTT] Command topic: %s\n", cmdTopic.c_str());
   Serial.printf("[MQTT] Status topic: %s\n", statusTopic.c_str());
-  Serial.printf("[MQTT] Warehouse ID: %s\n", WAREHOUSE_ID);
+  Serial.println();
 
   // Initialize LED strip
+  Serial.printf("[LED] Pin: GPIO %d\n", LED_PIN);
+  Serial.printf("[LED] Count: %d pixels\n", LED_LENGTH);
   strip.begin();
   strip.clear();
   strip.show();
@@ -239,35 +277,71 @@ void connectWiFi() {
   }
 }
 
-void connectMQTT() {
-  if (WiFi.status() != WL_CONNECTED) return;
+const char* getMQTTErrorString(int errorCode) {
+  switch (errorCode) {
+    case -4: return "MQTT_CONNECTION_TIMEOUT - Server didn't respond in time";
+    case -3: return "MQTT_CONNECTION_LOST - Network connection lost";
+    case -2: return "MQTT_CONNECT_FAILED - Network connection failed";
+    case -1: return "MQTT_DISCONNECTED - Client disconnected cleanly";
+    case  0: return "MQTT_CONNECTED - Connected";
+    case  1: return "MQTT_CONNECT_BAD_PROTOCOL - Protocol version not supported";
+    case  2: return "MQTT_CONNECT_BAD_CLIENT_ID - Client ID rejected";
+    case  3: return "MQTT_CONNECT_UNAVAILABLE - Server unavailable";
+    case  4: return "MQTT_CONNECT_BAD_CREDENTIALS - Bad username/password";
+    case  5: return "MQTT_CONNECT_UNAUTHORIZED - Not authorized";
+    default: return "UNKNOWN_ERROR";
+  }
+}
 
-  Serial.printf("[MQTT] Connecting to %s:%d\n", MQTT_HOST, MQTT_PORT);
+void connectMQTT() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[MQTT] Skipping MQTT connect - WiFi not connected");
+    return;
+  }
+
+  Serial.printf("[MQTT] Connecting to %s:%d as '%s'...\n", MQTT_HOST, MQTT_PORT, MQTT_USER);
 
 #ifdef USE_TLS
   espClient.setInsecure(); // Nur für Tests – in Produktion Zertifikate nutzen
-  Serial.println("[MQTT] TLS enabled");
+  Serial.println("[MQTT] TLS enabled (insecure mode)");
 #endif
 
   // Last Will
   String lwt = "{\"status\":\"offline\",\"controller_id\":\"" + controllerId + "\",\"warehouse_id\":\"" + String(WAREHOUSE_ID) + "\"}";
-
   String clientId = "ESP32-" + controllerId + "-" + String(random(0xffff), HEX);
+
+  Serial.printf("[MQTT] Client ID: %s\n", clientId.c_str());
+  Serial.printf("[MQTT] Will topic: %s\n", statusTopic.c_str());
 
   if (mqttClient.connect(clientId.c_str(), MQTT_USER, MQTT_PASS,
                          statusTopic.c_str(), 1, true, lwt.c_str())) {
-    Serial.println("[MQTT] Connected!");
+    Serial.println("[MQTT] ✓ Connected successfully!");
 
     if (mqttClient.subscribe(cmdTopic.c_str(), 1)) {
-      Serial.printf("[MQTT] Subscribed to: %s\n", cmdTopic.c_str());
+      Serial.printf("[MQTT] ✓ Subscribed to: %s\n", cmdTopic.c_str());
     } else {
-      Serial.println("[MQTT] Subscription failed!");
+      Serial.println("[MQTT] ✗ Subscription failed!");
     }
 
     // Online-Status
+    Serial.println("[MQTT] Sending initial heartbeat...");
     sendHeartbeat();
   } else {
-    Serial.printf("[MQTT] Connection failed, rc=%d\n", mqttClient.state());
+    int errorCode = mqttClient.state();
+    Serial.printf("[MQTT] ✗ Connection failed!\n");
+    Serial.printf("[MQTT] Error code: %d\n", errorCode);
+    Serial.printf("[MQTT] Error description: %s\n", getMQTTErrorString(errorCode));
+
+    if (errorCode == 4) {
+      Serial.println("[MQTT] → Check MQTT_USER and MQTT_PASS in secrets.h");
+    } else if (errorCode == -2 || errorCode == -4) {
+      Serial.println("[MQTT] → Check MQTT_HOST and MQTT_PORT in secrets.h");
+      Serial.println("[MQTT] → Ensure MQTT broker is reachable from this network");
+      Serial.println("[MQTT] → Try pinging the MQTT host from another device");
+    } else if (errorCode == 5) {
+      Serial.println("[MQTT] → Check MQTT broker ACL/permissions");
+    }
+    Serial.println();
   }
 }
 
@@ -438,6 +512,11 @@ uint32_t parseColor(const char* hexColor) {
 }
 
 void sendHeartbeat() {
+  if (!mqttClient.connected()) {
+    Serial.println("[HEARTBEAT] Skipped - MQTT not connected");
+    return;
+  }
+
   StaticJsonDocument<512> doc;
   doc["status"] = "online";
   doc["controller_id"] = controllerId;
@@ -454,17 +533,22 @@ void sendHeartbeat() {
   }
 
   doc["firmware_version"] = FIRMWARE_VERSION;
-  doc["mac_address"] = getMacFullHexLower(); // identisch zur ID-Quelle
+  doc["mac_address"] = getMacFullHexLower();
   doc["led_count"] = LED_LENGTH;
 
   String payload;
   serializeJson(doc, payload);
 
-  if (mqttClient.connected()) {
-    if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), true)) {
-      Serial.printf("[HEARTBEAT] MQTT sent (uptime: %lu s)\n", millis() / 1000);
-    } else {
-      Serial.println("[HEARTBEAT] MQTT publish failed");
-    }
+  Serial.printf("[HEARTBEAT] Publishing to: %s\n", statusTopic.c_str());
+  Serial.printf("[HEARTBEAT] Payload size: %d bytes\n", payload.length());
+
+  if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), true)) {
+    Serial.printf("[HEARTBEAT] ✓ Sent successfully (uptime: %lu s, RSSI: %d dBm)\n",
+                  millis() / 1000, WiFi.RSSI());
+  } else {
+    Serial.println("[HEARTBEAT] ✗ Publish failed!");
+    Serial.printf("[HEARTBEAT] MQTT state: %d (%s)\n",
+                  mqttClient.state(), getMQTTErrorString(mqttClient.state()));
+    Serial.println("[HEARTBEAT] → Will retry on next heartbeat interval");
   }
 }
