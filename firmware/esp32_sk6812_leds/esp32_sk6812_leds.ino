@@ -24,7 +24,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.5.0"
+#define FIRMWARE_VERSION "1.5.1"
 #endif
 
 // Auto-detect XIAO ESP32-C6 and set appropriate default pins
@@ -660,7 +660,9 @@ void sendHeartbeat() {
   Serial.printf("[HEARTBEAT] Publishing to: %s\n", statusTopic.c_str());
   Serial.printf("[HEARTBEAT] Payload size: %d bytes\n", payload.length());
 
-  if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), true)) {
+  // IMPORTANT: Use retained=false to prevent old heartbeats from persisting in MQTT broker
+  // If retained=true, the broker will store and re-deliver old messages even after ESP32 is offline
+  if (mqttClient.publish(statusTopic.c_str(), payload.c_str(), false)) {
     Serial.printf("[HEARTBEAT] ✓ Sent successfully (uptime: %lu s, RSSI: %d dBm)\n",
                   millis() / 1000, WiFi.RSSI());
   } else {
