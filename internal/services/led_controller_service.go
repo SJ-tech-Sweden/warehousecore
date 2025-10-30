@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"warehousecore/internal/led"
 	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
 )
@@ -343,4 +344,37 @@ func normalizeMACAddress(mac string) string {
 		sb.WriteString(clean[i : i+2])
 	}
 	return sb.String()
+}
+
+// ConfigureController sends configuration to an LED controller via MQTT
+func (s *LEDControllerService) ConfigureController(id int, ledCount int) error {
+	if s.db == nil {
+		return errors.New("database not initialised")
+	}
+
+	// Get controller details
+	var controller models.LEDController
+	if err := s.db.First(&controller, id).Error; err != nil {
+		return err
+	}
+
+	// Import LED package for MQTT publishing
+	publisher := led.GetPublisher()
+	if publisher == nil {
+		return errors.New("MQTT publisher not available")
+	}
+
+	// Create config command
+	cmd := led.LEDCommand{
+		Op:          "config",
+		WarehouseID: controller.TopicSuffix,
+		LedCount:    &ledCount,
+	}
+
+	// Publish to controller's topic
+	if err := publisher.PublishCommandToController(&controller, cmd); err != nil {
+		return err
+	}
+
+	return nil
 }

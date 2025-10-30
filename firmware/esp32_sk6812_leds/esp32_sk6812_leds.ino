@@ -23,7 +23,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.3.0"
 #endif
 
 // Auto-detect XIAO ESP32-C6 and set appropriate default pins
@@ -53,6 +53,9 @@
 
 // LED strip setup (SK6812 GRBW)
 Adafruit_NeoPixel strip(LED_LENGTH, LED_PIN, NEO_GRBW + NEO_KHZ800);
+
+// Runtime LED configuration (can be changed via MQTT)
+int currentLedCount = LED_LENGTH;
 
 // WiFi and MQTT clients
 #ifdef USE_TLS
@@ -136,6 +139,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length);
 void handleHighlightCommand(JsonDocument& doc);
 void handleClearCommand();
 void handleIdentifyCommand();
+void handleConfigCommand(JsonDocument& doc);
 void updateLEDPatterns();
 uint32_t parseColor(const char* hexColor);
 void connectWiFi();
@@ -377,6 +381,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     handleClearCommand();
   } else if (strcmp(op, "identify") == 0) {
     handleIdentifyCommand();
+  } else if (strcmp(op, "config") == 0) {
+    handleConfigCommand(doc);
   } else {
     Serial.printf("[CMD] Unknown operation: %s\n", op);
   }
@@ -449,7 +455,7 @@ void handleIdentifyCommand() {
 
   // Blink all LEDs white 3 times
   for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < LED_LENGTH; j++) {
+    for (int j = 0; j < currentLedCount; j++) {
       strip.setPixelColor(j, strip.Color(0, 0, 0, 255));
     }
     strip.show();
@@ -460,6 +466,40 @@ void handleIdentifyCommand() {
   }
 
   Serial.println("[CMD] Identify complete");
+}
+
+void handleConfigCommand(JsonDocument& doc) {
+  Serial.println("[CMD] Processing CONFIG command");
+
+  bool configChanged = false;
+
+  // Update LED count if provided
+  if (doc.containsKey("led_count")) {
+    int newLedCount = doc["led_count"];
+    if (newLedCount > 0 && newLedCount <= 1200) {  // Safety limit
+      currentLedCount = newLedCount;
+      strip.updateLength(currentLedCount);
+      Serial.printf("[CONFIG] LED count updated to: %d\n", currentLedCount);
+      configChanged = true;
+    } else {
+      Serial.printf("[CONFIG] Invalid LED count: %d (must be 1-1200)\n", newLedCount);
+    }
+  }
+
+  // Clear LEDs when config changes
+  if (configChanged) {
+    activeLEDs.clear();
+    strip.clear();
+    strip.show();
+    ledsActive = false;
+
+    // Send updated heartbeat with new config
+    sendHeartbeat();
+
+    Serial.println("[CONFIG] Configuration applied successfully");
+  } else {
+    Serial.println("[CONFIG] No valid configuration changes received");
+  }
 }
 
 void updateLEDPatterns() {
@@ -534,7 +574,7 @@ void sendHeartbeat() {
 
   doc["firmware_version"] = FIRMWARE_VERSION;
   doc["mac_address"] = getMacFullHexLower();
-  doc["led_count"] = LED_LENGTH;
+  doc["led_count"] = currentLedCount;
 
   String payload;
   serializeJson(doc, payload);

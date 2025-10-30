@@ -2,9 +2,10 @@ package led
 
 // LEDCommand represents a command to be sent to ESP32 LED controllers via MQTT
 type LEDCommand struct {
-	Op          string   `json:"op"`           // "highlight", "clear", "identify"
+	Op          string   `json:"op"`           // "highlight", "clear", "identify", "config"
 	WarehouseID string   `json:"warehouse_id"` // e.g., "weidelbach"
 	Shelves     []Shelf  `json:"shelves,omitempty"`
+	LedCount    *int     `json:"led_count,omitempty"` // For "config" op - number of LEDs
 }
 
 // Shelf represents a shelf with bins to highlight
