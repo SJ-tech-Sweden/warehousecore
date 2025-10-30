@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ledApi, api, type LEDController, type LEDControllerPayload, type ZoneTypeDefinition } from '../../lib/api';
-import { Plus, Save, X, RefreshCcw, Trash2, Cpu } from 'lucide-react';
+import { Plus, Save, X, RefreshCcw, Trash2, Cpu, Settings } from 'lucide-react';
 
 type EditorTarget = number | 'new' | null;
+type ConfigureTarget = number | null;
 
 interface ControllerForm {
   controller_id: string;
@@ -49,6 +50,9 @@ export function LEDControllersTab() {
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [form, setForm] = useState<ControllerForm>(defaultForm);
   const [message, setMessage] = useState<string>('');
+  const [configureTarget, setConfigureTarget] = useState<ConfigureTarget>(null);
+  const [configureLedCount, setConfigureLedCount] = useState<number>(600);
+  const [configuring, setConfiguring] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -167,6 +171,58 @@ export function LEDControllersTab() {
     }
   };
 
+  const startConfigure = (controller: LEDController) => {
+    const statusData = controller.status_data as Record<string, unknown> | undefined;
+    const currentLedCount = typeof statusData?.['led_count'] === 'number' ? statusData['led_count'] as number : 600;
+    setConfigureTarget(controller.id);
+    setConfigureLedCount(currentLedCount);
+  };
+
+  const handleConfigure = async () => {
+    if (configureTarget === null) return;
+    if (configureLedCount < 1 || configureLedCount > 1200) {
+      alert('LED-Anzahl muss zwischen 1 und 1200 liegen.');
+      return;
+    }
+    try {
+      setConfiguring(true);
+      await ledApi.configureController(configureTarget, configureLedCount);
+      setMessage(`✓ Konfiguration gesendet: ${configureLedCount} LEDs`);
+      setConfigureTarget(null);
+      // Reload after 2 seconds to show updated values
+      setTimeout(() => loadData(), 2000);
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
+      alert('Fehler: ' + msg);
+    } finally {
+      setConfiguring(false);
+    }
+  };
+
+  const handleDeleteOffline = async () => {
+    const offlineControllers = controllers.filter(c => {
+      if (!c.last_seen) return true;
+      const diff = Date.now() - new Date(c.last_seen).getTime();
+      return diff >= ONLINE_THRESHOLD_MS;
+    });
+
+    if (offlineControllers.length === 0) {
+      alert('Keine offline Controller gefunden.');
+      return;
+    }
+
+    if (!confirm(`${offlineControllers.length} offline Controller löschen?`)) return;
+
+    try {
+      await Promise.all(offlineControllers.map(c => ledApi.deleteController(c.id)));
+      setMessage(`✓ ${offlineControllers.length} offline Controller gelöscht`);
+      loadData();
+    } catch (error: any) {
+      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
+      alert('Fehler: ' + msg);
+    }
+  };
+
   const controllerStatus = (controller: LEDController) => {
     if (!controller.last_seen) return { label: 'Offline', className: 'text-gray-400' };
     const last = new Date(controller.last_seen).getTime();
@@ -188,6 +244,13 @@ export function LEDControllersTab() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={handleDeleteOffline}
+            className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg flex items-center gap-2 text-sm hover:bg-red-600/30"
+            title="Alle offline Controller löschen"
+          >
+            <Trash2 className="w-4 h-4" /> Offline löschen
+          </button>
+          <button
             onClick={loadData}
             className="px-3 py-2 bg-white/10 text-white rounded-lg flex items-center gap-2 text-sm hover:bg-white/20"
           >
@@ -204,6 +267,51 @@ export function LEDControllersTab() {
 
       {message && (
         <div className="glass rounded-xl px-4 py-2 text-sm text-green-400">{message}</div>
+      )}
+
+      {configureTarget !== null && (
+        <div className="glass rounded-xl p-4 border border-blue-500 space-y-4">
+          <div>
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-blue-400" />
+              LED-Anzahl konfigurieren
+            </h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Ändere die Anzahl der LEDs für diesen Controller. Die Konfiguration wird sofort per MQTT gesendet.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl (1-1200)</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="1200"
+                  className="w-full px-3 py-2 rounded-lg glass text-white"
+                  value={configureLedCount}
+                  onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Aktuelle Anzahl aus Heartbeat: {configureLedCount} LEDs
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setConfigureTarget(null)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-600 text-white flex items-center gap-2"
+            >
+              <X className="w-4 h-4" /> Abbrechen
+            </button>
+            <button
+              onClick={handleConfigure}
+              disabled={configuring}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> {configuring ? 'Wird gesendet...' : 'Konfiguration senden'}
+            </button>
+          </div>
+        </div>
       )}
 
       {editor && (
@@ -360,6 +468,15 @@ export function LEDControllersTab() {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  {status.label === 'Online' && (
+                    <button
+                      onClick={() => startConfigure(controller)}
+                      className="px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 flex items-center gap-2"
+                      title="LED-Anzahl konfigurieren"
+                    >
+                      <Settings className="w-4 h-4" /> Konfigurieren
+                    </button>
+                  )}
                   <button
                     onClick={() => startEdit(controller)}
                     className="px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20"

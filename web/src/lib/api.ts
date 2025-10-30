@@ -409,6 +409,7 @@ export const ledApi = {
   createController: (payload: LEDControllerPayload) => api.post('/admin/led/controllers', payload),
   updateController: (id: number, payload: LEDControllerPayload) => api.put(`/admin/led/controllers/${id}`, payload),
   deleteController: (id: number) => api.delete(`/admin/led/controllers/${id}`),
+  configureController: (id: number, ledCount: number) => api.post(`/admin/led/controllers/${id}/configure`, { led_count: ledCount }),
 };
 
 // Label API
