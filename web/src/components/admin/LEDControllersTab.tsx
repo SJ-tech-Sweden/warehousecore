@@ -3,7 +3,6 @@ import { ledApi, api, type LEDController, type LEDControllerPayload, type ZoneTy
 import { Plus, Save, X, RefreshCcw, Trash2, Cpu, Settings, RotateCw } from 'lucide-react';
 
 type EditorTarget = number | 'new' | null;
-type ConfigureTarget = number | null;
 
 interface ControllerForm {
   controller_id: string;
@@ -50,7 +49,6 @@ export function LEDControllersTab() {
   const [editor, setEditor] = useState<EditorTarget>(null);
   const [form, setForm] = useState<ControllerForm>(defaultForm);
   const [message, setMessage] = useState<string>('');
-  const [configureTarget, setConfigureTarget] = useState<ConfigureTarget>(null);
   const [configureLedCount, setConfigureLedCount] = useState<number>(600);
   const [configureDataPin, setConfigureDataPin] = useState<number>(0);
   const [configureChipset, setConfigureChipset] = useState<string>('SK6812_GRBW');
@@ -93,6 +91,15 @@ export function LEDControllersTab() {
       metadata: controller.metadata ? JSON.stringify(controller.metadata, null, 2) : '{\n\n}',
       zoneTypeIds: controller.zone_types?.map((zt) => zt.id) ?? [],
     });
+
+    // Load hardware config from controller status
+    const statusData = controller.status_data as Record<string, unknown> | undefined;
+    const currentLedCount = typeof statusData?.['led_count'] === 'number' ? statusData['led_count'] as number : 600;
+    const currentDataPin = typeof statusData?.['data_pin'] === 'number' ? statusData['data_pin'] as number : 0;
+    const currentChipset = typeof statusData?.['chipset'] === 'string' ? statusData['chipset'] as string : 'SK6812_GRBW';
+    setConfigureLedCount(currentLedCount);
+    setConfigureDataPin(currentDataPin);
+    setConfigureChipset(currentChipset);
   };
 
   const resetEditor = () => {
@@ -160,10 +167,11 @@ export function LEDControllersTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Controller wirklich löschen?')) return;
+    if (!confirm('Controller deaktivieren? Er wird aus der Liste entfernt und taucht nur wieder auf, wenn er einen neuen Heartbeat sendet.')) return;
     try {
-      await ledApi.deleteController(id);
-      setMessage('✓ Controller gelöscht');
+      // Set is_active to false instead of deleting
+      await ledApi.updateController(id, { is_active: false });
+      setMessage('✓ Controller deaktiviert');
       if (editor === id) {
         resetEditor();
       }
@@ -174,19 +182,8 @@ export function LEDControllersTab() {
     }
   };
 
-  const startConfigure = (controller: LEDController) => {
-    const statusData = controller.status_data as Record<string, unknown> | undefined;
-    const currentLedCount = typeof statusData?.['led_count'] === 'number' ? statusData['led_count'] as number : 600;
-    const currentDataPin = typeof statusData?.['data_pin'] === 'number' ? statusData['data_pin'] as number : 0;
-    const currentChipset = typeof statusData?.['chipset'] === 'string' ? statusData['chipset'] as string : 'SK6812_GRBW';
-    setConfigureTarget(controller.id);
-    setConfigureLedCount(currentLedCount);
-    setConfigureDataPin(currentDataPin);
-    setConfigureChipset(currentChipset);
-  };
-
-  const handleConfigure = async () => {
-    if (configureTarget === null) return;
+  const handleHardwareConfig = async () => {
+    if (editor === null || editor === 'new') return;
     if (configureLedCount < 1 || configureLedCount > 1200) {
       alert('LED-Anzahl muss zwischen 1 und 1200 liegen.');
       return;
@@ -197,18 +194,17 @@ export function LEDControllersTab() {
     }
     try {
       setConfiguring(true);
-      await ledApi.configureController(configureTarget, {
+      await ledApi.configureController(editor, {
         led_count: configureLedCount,
         data_pin: configureDataPin,
         chipset: configureChipset,
       });
-      setMessage(`✓ Konfiguration gesendet. Neustart erforderlich für Pin/Chipset-Änderungen.`);
-      setConfigureTarget(null);
+      setMessage(`✓ Hardware-Konfiguration gesendet.`);
       // Reload after 2 seconds to show updated values
       setTimeout(() => loadData(), 2000);
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler: ' + msg);
+      alert('Fehler beim Senden der Hardware-Konfiguration: ' + msg);
     } finally {
       setConfiguring(false);
     }
@@ -303,93 +299,6 @@ export function LEDControllersTab() {
         <div className="glass rounded-xl px-4 py-2 text-sm text-green-400">{message}</div>
       )}
 
-      {configureTarget !== null && (
-        <div className="glass rounded-xl p-6 border border-blue-500 space-y-6">
-          <div>
-            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
-              <Settings className="w-5 h-5 text-blue-400" />
-              ESP32 Hardware konfigurieren
-            </h3>
-            <p className="text-sm text-gray-400 mb-4">
-              Konfiguriere die Hardware-Einstellungen für diesen Controller.
-              LED-Anzahl wird sofort übernommen, Pin und Chipset erfordern einen Neustart des ESP32.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="1200"
-                  className="w-full px-3 py-2 rounded-lg glass text-white"
-                  value={configureLedCount}
-                  onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
-                />
-                <p className="text-xs text-gray-500 mt-1">1-1200 LEDs (sofort aktiv)</p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">Data Pin (GPIO)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="50"
-                  className="w-full px-3 py-2 rounded-lg glass text-white"
-                  value={configureDataPin}
-                  onChange={(e) => setConfigureDataPin(parseInt(e.target.value) || 0)}
-                />
-                <p className="text-xs text-gray-500 mt-1">GPIO 0-50 (Neustart nötig)</p>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Chipset</label>
-                <select
-                  className="w-full px-3 py-2 rounded-lg glass text-white"
-                  value={configureChipset}
-                  onChange={(e) => setConfigureChipset(e.target.value)}
-                >
-                  <option value="SK6812_GRBW">SK6812 GRBW</option>
-                  <option value="SK6812_GRB">SK6812 GRB</option>
-                  <option value="WS2812B">WS2812B</option>
-                  <option value="WS2811">WS2811</option>
-                  <option value="APA102">APA102</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">LED-Typ (Neustart nötig)</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-            <p className="text-yellow-300 text-xs">
-              <strong>Hinweis:</strong> Änderungen an Data Pin und Chipset werden gespeichert,
-              erfordern aber einen Neustart des ESP32. Nach dem Speichern kannst du den ESP direkt über den Button neu starten.
-            </p>
-          </div>
-          <div className="flex gap-2 justify-between">
-            <button
-              onClick={() => configureTarget && handleRestart(configureTarget)}
-              disabled={restarting !== null || configuring}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-orange-600 text-white flex items-center gap-2 disabled:opacity-50"
-              title="ESP32 neu starten (für Pin/Chipset-Änderungen)"
-            >
-              <RotateCw className="w-4 h-4" /> {restarting === configureTarget ? 'Startet neu...' : 'ESP neu starten'}
-            </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setConfigureTarget(null)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-600 text-white flex items-center gap-2"
-              >
-                <X className="w-4 h-4" /> Abbrechen
-              </button>
-              <button
-                onClick={handleConfigure}
-                disabled={configuring}
-                className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" /> {configuring ? 'Wird gesendet...' : 'Konfiguration senden'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {editor && (
         <div className="glass rounded-xl p-4 border border-accent-red space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -469,6 +378,73 @@ export function LEDControllersTab() {
             />
           </div>
 
+          {editor !== 'new' && (
+            <div className="glass rounded-lg p-4 space-y-4 border border-blue-500/30">
+              <div>
+                <h4 className="text-white font-semibold mb-2">Hardware-Konfiguration</h4>
+                <p className="text-xs text-gray-400 mb-3">
+                  Diese Einstellungen werden per MQTT an den ESP32 gesendet.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="1200"
+                    className="w-full px-3 py-2 rounded-lg glass text-white"
+                    value={configureLedCount}
+                    onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">1-1200 LEDs</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">Data Pin (GPIO)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    className="w-full px-3 py-2 rounded-lg glass text-white"
+                    value={configureDataPin}
+                    onChange={(e) => setConfigureDataPin(parseInt(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">GPIO 0-50</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Chipset</label>
+                  <select
+                    className="w-full px-3 py-2 rounded-lg glass text-white"
+                    value={configureChipset}
+                    onChange={(e) => setConfigureChipset(e.target.value)}
+                  >
+                    <option value="SK6812_GRBW">SK6812 GRBW</option>
+                    <option value="SK6812_GRB">SK6812 GRB</option>
+                    <option value="WS2812B">WS2812B</option>
+                    <option value="WS2811">WS2811</option>
+                    <option value="APA102">APA102</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">LED-Typ</p>
+                </div>
+              </div>
+              <div className="flex justify-between gap-2">
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 flex-1">
+                  <p className="text-yellow-300 text-xs">
+                    <strong>Hinweis:</strong> Pin/Chipset-Änderungen erfordern ESP32-Neustart
+                  </p>
+                </div>
+                <button
+                  onClick={handleHardwareConfig}
+                  disabled={configuring}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50"
+                  title="Hardware-Konfiguration senden"
+                >
+                  <Save className="w-4 h-4" /> {configuring ? 'Sende...' : 'Hardware speichern'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-end">
             <button
               onClick={resetEditor}
@@ -493,7 +469,9 @@ export function LEDControllersTab() {
         ) : controllers.length === 0 ? (
           <div className="glass rounded-xl p-5 text-center text-gray-400">Noch keine Controller registriert.</div>
         ) : (
-          controllers.map((controller) => {
+          controllers
+            .filter((c) => c.is_active && c.last_seen !== null)
+            .map((controller) => {
             const status = controllerStatus(controller);
             const statusData = controller.status_data as Record<string, unknown> | undefined;
             const wifiRSSI =
@@ -545,29 +523,21 @@ export function LEDControllersTab() {
                 </div>
                 <div className="flex gap-2">
                   {status.label === 'Online' && (
-                    <>
-                      <button
-                        onClick={() => startConfigure(controller)}
-                        className="px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 flex items-center gap-2"
-                        title="Hardware konfigurieren"
-                      >
-                        <Settings className="w-4 h-4" /> Konfigurieren
-                      </button>
-                      <button
-                        onClick={() => handleRestart(controller.id)}
-                        disabled={restarting === controller.id}
-                        className="px-3 py-2 rounded-lg text-sm font-semibold bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 flex items-center gap-2 disabled:opacity-50"
-                        title="ESP32 neu starten"
-                      >
-                        <RotateCw className="w-4 h-4" /> {restarting === controller.id ? 'Startet...' : 'Neustart'}
-                      </button>
-                    </>
+                    <button
+                      onClick={() => handleRestart(controller.id)}
+                      disabled={restarting === controller.id}
+                      className="px-3 py-2 rounded-lg text-sm font-semibold bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 flex items-center gap-2 disabled:opacity-50"
+                      title="ESP32 neu starten"
+                    >
+                      <RotateCw className="w-4 h-4" /> {restarting === controller.id ? 'Startet...' : 'Neustart'}
+                    </button>
                   )}
                   <button
                     onClick={() => startEdit(controller)}
-                    className="px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20"
+                    className="px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 flex items-center gap-2"
+                    title="Controller bearbeiten & konfigurieren"
                   >
-                    Bearbeiten
+                    <Settings className="w-4 h-4" /> Bearbeiten
                   </button>
                   <button
                     onClick={() => handleDelete(controller.id)}

@@ -24,7 +24,7 @@
 #endif
 
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "1.5.1"
+#define FIRMWARE_VERSION "1.6.0"
 #endif
 
 // Auto-detect XIAO ESP32-C6 and set appropriate default pins
@@ -194,24 +194,25 @@ void setup() {
   // Load configuration from preferences
   preferences.begin("led-config", false);
   currentDataPin = preferences.getInt("data_pin", LED_PIN);
+  currentLedCount = preferences.getInt("led_count", LED_LENGTH);
   currentChipset = preferences.getString("chipset", "SK6812_GRBW");
   preferences.end();
 
-  Serial.printf("[CONFIG] Loaded data_pin: %d\n", currentDataPin);
+  Serial.printf("[CONFIG] Loaded data_pin: %d (compiled: %d)\n", currentDataPin, LED_PIN);
+  Serial.printf("[CONFIG] Loaded led_count: %d (compiled: %d)\n", currentLedCount, LED_LENGTH);
   Serial.printf("[CONFIG] Loaded chipset: %s\n", currentChipset.c_str());
-  if (currentDataPin != LED_PIN) {
-    Serial.printf("[CONFIG] WARNING: Configured pin (%d) differs from compiled pin (%d). Restart required to apply.\n", currentDataPin, LED_PIN);
-  }
   Serial.println();
 
-  // Initialize LED strip
-  Serial.printf("[LED] Pin: GPIO %d\n", LED_PIN);
-  Serial.printf("[LED] Count: %d pixels\n", LED_LENGTH);
+  // Initialize LED strip with loaded configuration
+  // Note: Pin configuration requires recompilation/reflash, but we can change LED count at runtime
+  Serial.printf("[LED] Initializing with pin: GPIO %d, count: %d pixels\n", currentDataPin, currentLedCount);
+  strip.updateLength(currentLedCount);  // Apply saved LED count
+  strip.setPin(currentDataPin);         // Try to apply saved pin (may not work on all platforms)
   strip.begin();
   strip.clear();
   strip.show();
   strip.setBrightness(255);
-  Serial.println("[LED] Strip initialized");
+  Serial.println("[LED] Strip initialized with saved configuration");
 
   // Connect to WiFi
   connectWiFi();
@@ -502,7 +503,13 @@ void handleConfigCommand(JsonDocument& doc) {
     if (newLedCount > 0 && newLedCount <= 1200) {  // Safety limit
       currentLedCount = newLedCount;
       strip.updateLength(currentLedCount);
-      Serial.printf("[CONFIG] LED count updated to: %d\n", currentLedCount);
+
+      // Save to preferences for persistence across reboots
+      preferences.begin("led-config", false);
+      preferences.putInt("led_count", currentLedCount);
+      preferences.end();
+
+      Serial.printf("[CONFIG] LED count updated and saved to: %d\n", currentLedCount);
       configChanged = true;
     } else {
       Serial.printf("[CONFIG] Invalid LED count: %d (must be 1-1200)\n", newLedCount);
