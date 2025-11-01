@@ -41,6 +41,9 @@ interface ProductFormData {
 }
 
 export function ProductsTab() {
+  console.log('===== PRODUCTSTAB COMPONENT MOUNTED =====');
+  console.log('Version: 1.56 - Frontend rebuild test');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,6 +58,7 @@ export function ProductsTab() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    console.log('===== ProductsTab useEffect RUNNING =====');
     loadProducts();
     loadCategories();
   }, []);
@@ -97,12 +101,21 @@ export function ProductsTab() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return;
+    console.log('');
+    console.log('##################################################');
+    console.log('##### FORM SUBMIT TRIGGERED #####');
+    console.log('##################################################');
+    console.log('Full formData object:', JSON.stringify(formData, null, 2));
+    console.log('formData.device_quantity:', formData.device_quantity);
+    console.log('formData.device_prefix:', formData.device_prefix);
+    console.log('Type of device_quantity:', typeof formData.device_quantity);
+    console.log('Is device_quantity defined?', formData.device_quantity !== undefined);
+    console.log('Is device_quantity > 0?', formData.device_quantity ? formData.device_quantity > 0 : false);
+    console.log('Is editing product?', editingProduct);
+    console.log('##################################################');
+    console.log('');
 
-    console.log('[PRODUCT CREATE] Starting product creation with formData:', formData);
-    console.log('[PRODUCT CREATE] Device quantity:', formData.device_quantity);
-    console.log('[PRODUCT CREATE] Device prefix:', formData.device_prefix);
-    console.log('[PRODUCT CREATE] Is editing?', editingProduct);
+    if (!formData.name.trim()) return;
 
     setSubmitting(true);
     try {
@@ -375,10 +388,20 @@ export function ProductsTab() {
                           type="number"
                           min="0"
                           value={formData.device_quantity || ''}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            device_quantity: e.target.value ? parseInt(e.target.value) : undefined,
-                          })}
+                          onChange={(e) => {
+                            const newValue = e.target.value ? parseInt(e.target.value) : undefined;
+                            console.log('========================================');
+                            console.log('DEVICE QUANTITY FIELD CHANGED!');
+                            console.log('Raw input value:', e.target.value);
+                            console.log('Parsed value:', newValue);
+                            console.log('Current formData BEFORE update:', formData);
+                            setFormData({
+                              ...formData,
+                              device_quantity: newValue,
+                            });
+                            console.log('Updated formData (will apply next render)');
+                            console.log('========================================');
+                          }}
                           className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
                           placeholder="z.B. 10"
                         />
@@ -388,10 +411,16 @@ export function ProductsTab() {
                         <input
                           type="text"
                           value={formData.device_prefix || ''}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            device_prefix: e.target.value,
-                          })}
+                          onChange={(e) => {
+                            console.log('========================================');
+                            console.log('DEVICE PREFIX FIELD CHANGED!');
+                            console.log('New prefix value:', e.target.value);
+                            console.log('========================================');
+                            setFormData({
+                              ...formData,
+                              device_prefix: e.target.value,
+                            });
+                          }}
                           className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
                           placeholder="z.B. LED"
                         />
@@ -400,6 +429,15 @@ export function ProductsTab() {
                     <p className="text-xs text-gray-400 mt-2">
                       Geräte werden automatisch mit IDs wie {formData.device_prefix || 'XXX'}0001, {formData.device_prefix || 'XXX'}0002, etc. erstellt
                     </p>
+                    {/* VISUAL DEBUG DISPLAY */}
+                    <div className="mt-3 p-3 bg-yellow-600/20 border border-yellow-500 rounded-lg">
+                      <p className="text-yellow-300 font-mono text-xs">
+                        <strong>DEBUG INFO:</strong><br/>
+                        Quantity: {formData.device_quantity || 'NONE'}<br/>
+                        Prefix: {formData.device_prefix || 'NONE'}<br/>
+                        Will create devices: {formData.device_quantity && formData.device_quantity > 0 ? 'YES' : 'NO'}
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

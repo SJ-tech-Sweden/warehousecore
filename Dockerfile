@@ -1,5 +1,22 @@
 # Multi-stage build for WarehouseCore
-FROM golang:1.24-alpine AS builder
+
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/web
+
+# Copy frontend package files
+COPY web/package*.json ./
+RUN npm ci
+
+# Copy frontend source
+COPY web/ ./
+
+# Build frontend
+RUN npm run build
+
+# Stage 2: Build Backend
+FROM golang:1.24-alpine AS backend-builder
 
 # Install build dependencies
 RUN apk add --no-cache git gcc musl-dev
@@ -16,25 +33,25 @@ COPY . .
 # Build the application
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o warehousecore ./cmd/server
 
-# Final stage
+# Stage 3: Final Image
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /root/
 
-# Copy binary from builder
-COPY --from=builder /app/warehousecore .
+# Copy binary from backend builder
+COPY --from=backend-builder /app/warehousecore .
 
 # Copy migrations
-COPY --from=builder /app/migrations ./migrations
+COPY --from=backend-builder /app/migrations ./migrations
 
 # Copy LED configuration files
-COPY --from=builder /app/internal/led/config ./internal/led/config
-COPY --from=builder /app/internal/led/schema ./internal/led/schema
+COPY --from=backend-builder /app/internal/led/config ./internal/led/config
+COPY --from=backend-builder /app/internal/led/schema ./internal/led/schema
 
-# Copy frontend build
-COPY ./web/dist ./web/dist
+# Copy frontend build from frontend builder
+COPY --from=frontend-builder /app/web/dist ./web/dist
 
 # Create .env placeholder
 RUN touch .env
