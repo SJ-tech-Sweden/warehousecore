@@ -207,14 +207,15 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 
 	query := `
 		SELECT
-			d.device_id,
-			d.name as device_name,
+			d.deviceID as device_id,
+			p.name as device_name,
 			sb.name as product,
 			c.name as category
 		FROM devices d
-		LEFT JOIN subbiercategories sb ON d.subbiercategory_id = sb.id
-		LEFT JOIN categories c ON d.category_id = c.id
-		WHERE d.device_id = ?
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN subbiercategories sb ON p.subbiercategoryID = sb.subbiercategoryID
+		LEFT JOIN categories c ON p.categoryID = c.categoryID
+		WHERE d.deviceID = ?
 	`
 
 	if err := db.Raw(query, deviceID).Scan(&device).Error; err != nil {
