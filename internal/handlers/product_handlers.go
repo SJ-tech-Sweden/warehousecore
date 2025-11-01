@@ -355,14 +355,28 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 // CreateDevicesForProduct creates multiple devices for a product
 func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
+	// Extract product ID from URL path
+	vars := mux.Vars(r)
+	productID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid product ID"})
+		return
+	}
+
 	var req DeviceCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
-	if req.ProductID == 0 || req.Quantity <= 0 {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "product_id and valid quantity are required"})
+	// Override ProductID with the one from URL path
+	req.ProductID = productID
+
+	log.Printf("[DEVICE CREATE] Starting device creation for product %d, quantity: %d, prefix: %v",
+		req.ProductID, req.Quantity, req.Prefix)
+
+	if req.Quantity <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Valid quantity is required"})
 		return
 	}
 
@@ -377,7 +391,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 	var productName string
 	var abbreviation sql.NullString
 	var posInCategory sql.NullInt64
-	err := db.QueryRow(`
+	err = db.QueryRow(`
 		SELECT p.name, s.abbreviation, p.pos_in_category
 		FROM products p
 		LEFT JOIN subcategories s ON p.subcategoryID = s.subcategoryID
