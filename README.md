@@ -1155,13 +1155,25 @@ For issues or questions:
 
 ---
 
-**Version:** 1.59
-**Last Updated:** 2025-10-23
+**Version:** 2.42
+**Last Updated:** 2025-11-01
 **Maintainer:** Tsunami Events UG Development Team
 
 ---
 
 ## Changelog
+
+### Version 2.42 (2025-11-01)
+- **Bug Fix: Product Creation Device Generation** 🔧
+  - Fixed device creation endpoint from `/products/create-devices` to `/admin/products/{id}/devices`
+  - Devices are now properly created when specifying quantity during product creation
+  - Database triggers correctly generate device IDs with proper naming convention
+
+- **Bug Fix: Product Tree Display** 🌳
+  - Modified GetDeviceTree query to include products even without devices
+  - Added `WHERE p.productID IS NOT NULL` filter to prevent empty category rows
+  - Products now appear in /devices page tree structure regardless of device count
+  - Improved query structure to prioritize products over devices in tree building
 
 ### Version 2.2 (2025-10-24)
 - **Bug Fix: Case Label Size Rendering** 🔧
