@@ -1200,6 +1200,25 @@ For issues or questions:
 
 ## Changelog
 
+### Version 2.45 (2025-11-01)
+- **Critical Bug Fix: Device Creation Route Handler** 🔧
+  - Fixed device creation failing when creating products with quantity specified in ProductsTab
+  - **Root Cause:** Handler was reading product_id from request body instead of URL path parameter
+  - **The Issue:**
+    - Frontend correctly called: `POST /admin/products/{productId}/devices` with productId in URL
+    - Backend handler incorrectly expected product_id in request body
+    - This mismatch caused the handler to receive product_id as 0, failing validation
+  - **The Fix:**
+    - Modified `CreateDevicesForProduct` handler to extract product ID from URL path using `mux.Vars(r)["id"]`
+    - Product ID now correctly parsed from `/admin/products/{id}/devices` route parameter
+    - Request body now only contains `quantity` and `prefix` fields
+    - Added comprehensive logging at handler entry point
+  - **Technical Details:**
+    - Changed from: `req.ProductID` (from body) to `productID := mux.Vars(r)["id"]` (from URL)
+    - Fixed Go compilation error (variable redeclaration)
+    - Improved error messages and validation flow
+  - **Impact:** Device creation from ProductsTab now works as intended. Creating a product with device_quantity > 0 will automatically create the specified number of devices with proper IDs.
+
 ### Version 2.44 (2025-11-01)
 - **Bug Fix: pos_in_category Validation Blocking Device Creation** 🔧
   - Removed overly strict validation that incorrectly blocked device creation for legacy products
