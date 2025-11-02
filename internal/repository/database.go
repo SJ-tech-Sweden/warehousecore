@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -10,6 +11,11 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"warehousecore/config"
+)
+
+// Common errors
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 // DB holds the database connection pool
