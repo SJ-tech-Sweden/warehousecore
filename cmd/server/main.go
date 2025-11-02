@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -22,6 +23,8 @@ import (
 	"warehousecore/internal/repository"
 	"warehousecore/internal/services"
 )
+
+var brandingService *services.CompanyBrandingService
 
 // spaHandler serves the SPA and falls back to index.html for client-side routes
 func spaHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,8 +71,19 @@ func serveIndexWithConfig(w http.ResponseWriter, r *http.Request) {
 	rentalCoreDomain := os.Getenv("RENTALCORE_DOMAIN")
 	warehouseCoreDomain := os.Getenv("WAREHOUSECORE_DOMAIN")
 
+	// Resolve company branding
+	companyName := "RentalCore"
+	if brandingService != nil {
+		companyName = brandingService.CompanyName()
+	}
+
 	// Create config injection script
-	configScript := fmt.Sprintf(`<script>window.__APP_CONFIG__={rentalCoreDomain:"%s",warehouseCoreDomain:"%s"};</script>`, rentalCoreDomain, warehouseCoreDomain)
+	configScript := fmt.Sprintf(
+		`<script>window.__APP_CONFIG__={rentalCoreDomain:"%s",warehouseCoreDomain:"%s",companyName:"%s"};</script>`,
+		template.JSEscapeString(rentalCoreDomain),
+		template.JSEscapeString(warehouseCoreDomain),
+		template.JSEscapeString(companyName),
+	)
 
 	// Inject the script before </head>
 	modifiedContent := bytes.Replace(content, []byte("</head>"), []byte(configScript+"</head>"), 1)
@@ -91,6 +105,8 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer repository.CloseDatabase()
+
+	brandingService = services.NewCompanyBrandingService(repository.GetDB())
 
 	// Initialize LED service
 	log.Println("[LED] Initializing LED service...")

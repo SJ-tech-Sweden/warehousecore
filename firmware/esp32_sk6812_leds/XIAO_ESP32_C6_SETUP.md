@@ -83,7 +83,7 @@ cp secrets.h.template secrets.h
 #define WIFI_PASS "YourWiFiPassword"
 
 // MQTT - Use external server address!
-#define MQTT_HOST "tsunami-events.de"   // ← Your server domain/IP
+#define MQTT_HOST "mqtt.example.com"   // ← Your server domain/IP
 #define MQTT_PORT 1883
 #define MQTT_USER "leduser"             // Default from docker-compose
 #define MQTT_PASS "ledpassword123"      // Default from docker-compose
@@ -102,7 +102,7 @@ Ensure your MQTT broker is accessible externally:
 
 ```bash
 # Test from another machine on your network
-mosquitto_sub -h tsunami-events.de -p 1883 -u leduser -P ledpassword123 -t '#' -v
+mosquitto_sub -h mqtt.example.com -p 1883 -u leduser -P ledpassword123 -t '#' -v
 ```
 
 If this fails, check firewall rules:
@@ -163,7 +163,7 @@ Board: XIAO-ESP32-C6
 [ID] Topic suffix: esp-a1b2c3
 [ID] Warehouse ID: WDL
 
-[MQTT] Broker: tsunami-events.de:1883
+[MQTT] Broker: mqtt.example.com:1883
 [MQTT] User: leduser
 [MQTT] Topic prefix: weidelbach
 [MQTT] Command topic: weidelbach/esp-a1b2c3/cmd
@@ -179,7 +179,7 @@ Board: XIAO-ESP32-C6
 [WiFi] RSSI: -45 dBm
 [WiFi] MAC (eFuse): a1b2c3d4e5f6
 
-[MQTT] Connecting to tsunami-events.de:1883 as 'leduser'...
+[MQTT] Connecting to mqtt.example.com:1883 as 'leduser'...
 [MQTT] ✓ Connected successfully!
 [MQTT] ✓ Subscribed to: weidelbach/esp-a1b2c3/cmd
 [MQTT] Sending initial heartbeat...
@@ -199,7 +199,7 @@ Board: XIAO-ESP32-C6
 **Solutions:**
 1. Verify MQTT_HOST is the **external** IP/domain (not "mosquitto")
 2. Check server firewall: `sudo ufw status`
-3. Test connectivity: `ping tsunami-events.de`
+3. Test connectivity: `ping mqtt.example.com`
 4. Ensure port 1883 is open on your router (port forwarding if needed)
 
 ### ❌ MQTT Error 4: Bad Credentials
@@ -231,7 +231,7 @@ Board: XIAO-ESP32-C6
 3. Check WarehouseCore logs: `docker-compose logs -f warehousecore`
 4. Manually subscribe to MQTT topic to verify messages:
    ```bash
-   mosquitto_sub -h tsunami-events.de -p 1883 -u leduser -P ledpassword123 \
+   mosquitto_sub -h mqtt.example.com -p 1883 -u leduser -P ledpassword123 \
      -t 'weidelbach/+/status' -v
    ```
 
@@ -263,7 +263,7 @@ Board: XIAO-ESP32-C6
 
 Subscribe to status messages:
 ```bash
-mosquitto_sub -h tsunami-events.de -p 1883 \
+mosquitto_sub -h mqtt.example.com -p 1883 \
   -u leduser -P ledpassword123 \
   -t 'weidelbach/+/status' -v
 ```

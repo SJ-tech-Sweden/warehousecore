@@ -12,7 +12,7 @@
 - Username: tsweb
 - Password: <configured_in_env>
 - Database: RentalCore
-- Host:     tsunami-events.de
+- Host:     app.example.com
 ## Project Resources
 
 ### Database Templates
@@ -37,7 +37,7 @@
 - REMEMBER: NO SENSITIVE DATA IS ALLOWED TO BE PUSHED TO GITHUB!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHECK ALL FILES WHICH ARE GONNA BE PUSHED AND REMOVE THERE SENSITIVE DATA AND REPLACE IT WITH DEMO DATA!!!!!!!!!!
 - DO NOT DO NEVER WRITE IN COMMIT MESSAGES, THAT THE COMMIT WAS MADE BY CLAUDE OR SMTH. IT SHOULD LOOK LIKE THAT IT ISNT BY AI. ALSO ONLY USE THE NORMAL GIT COMMANDS, SO I DONT HAVE TO CONNECT YOU TO MY REPO
 - please keep the navigation menu in the readme uptodate
-- my mysql user: tsweb, my mysql pw: <configured_in_env>, my mysql host: tsunami-events, my Database: Rentalcore
+- my mysql user: warehouse_user, my mysql pw: <configured_in_env>, my mysql host: db.example.com, my Database: rentalcore
 - Always push when you are finished editing or so your changes to dockerhub and github. For dockerhub check which version was the latest version pushed to dockerhub and push the following version. Also ALWAYS PUSH THE :latest version
 - dont let old versions of files there. and dont name updated or fixed versions like [filename]_updated_fixed_complete_CORRECT use normal file names and remove the old files.
 - you can make edits on the Database Tables !!!NOT THE DATA!!! on your own

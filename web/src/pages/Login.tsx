@@ -11,6 +11,7 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const companyName = (window as any).__APP_CONFIG__?.companyName || 'RentalCore';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ export function Login() {
             <span className="text-accent-red">Warehouse</span>
             <span className="text-white">Core</span>
           </h1>
-          <p className="text-gray-400">Tsunami Events UG</p>
+          <p className="text-gray-400">{companyName}</p>
         </div>
 
         {/* Login Card */}
@@ -116,7 +117,7 @@ export function Login() {
         {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
-            WarehouseCore © 2025 Tsunami Events UG
+            WarehouseCore © 2025 {companyName}
           </p>
         </div>
       </div>

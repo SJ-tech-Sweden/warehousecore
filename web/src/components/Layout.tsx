@@ -17,6 +17,7 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const { t } = useTranslation();
+  const companyName = (window as any).__APP_CONFIG__?.companyName || 'RentalCore';
 
   useEffect(() => {
     const checkMobile = () => {
@@ -154,7 +155,7 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <div className="text-xs sm:text-sm text-gray-400 hidden sm:block">
-              Tsunami Events UG
+              {companyName}
             </div>
           </div>
         </div>

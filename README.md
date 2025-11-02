@@ -1,6 +1,6 @@
 # WarehouseCore
 
-**Physical Warehouse Management System for Tsunami Events UG**
+**Physical Warehouse Management System for RentalCore Deployments**
 
 WarehouseCore is the digital twin of the Weidelbach warehouse, providing real-time tracking of devices, cases, zones, and movements with barcode/QR scan-driven workflows.
 
@@ -24,7 +24,7 @@ WarehouseCore is the digital twin of the Weidelbach warehouse, providing real-ti
 
 ## Overview
 
-WarehouseCore manages the physical warehouse operations for Tsunami Events, synchronizing in real-time with RentalCore (job management system). It provides:
+WarehouseCore manages the physical warehouse operations alongside RentalCore (the job management system). It provides:
 
 - **Digital warehouse mapping** - Zones, shelves, racks, vehicles, cases
 - **Real-time device status** - in_storage | on_job | defective | repair
@@ -743,7 +743,7 @@ warehousecore/
 
 **Frontend:**
 - React 18+ with TypeScript
-- TailwindCSS with Tsunami Events brand theme
+- TailwindCSS with the shared RentalCore brand theme
 - shadcn/ui components
 - Dark mode first-class support
 
@@ -780,10 +780,10 @@ cp .env.example .env
 3. **Run database migrations**
 ```bash
 # Execute SQL files in migrations/ directory against RentalCore database
-mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/001_storage_zones.sql
-mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/002_device_movements.sql
-mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/003_scan_events.sql
-mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/004_defect_reports.sql
+mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/001_storage_zones.sql
+mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/002_device_movements.sql
+mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/003_scan_events.sql
+mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/004_defect_reports.sql
 ```
 
 4. **Install dependencies**
@@ -1056,7 +1056,7 @@ docker compose pull && docker compose up -d
 ### Running Migrations
 Apply new migrations to the shared RentalCore database:
 ```bash
-mysql -h tsunami-events.de -u tsweb -p RentalCore < migrations/XXX_new_feature.sql
+mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/XXX_new_feature.sql
 ```
 
 ### Development Workflow
@@ -1153,7 +1153,7 @@ PORT=8081
 HOST=0.0.0.0
 
 # Database (Shared with RentalCore)
-DB_HOST=tsunami-events.de
+DB_HOST=db.example.com
 DB_USER=tsweb
 DB_PASS=<password>
 DB_NAME=RentalCore
@@ -1180,7 +1180,7 @@ WAREHOUSE_ID=weidelbach                # Warehouse identifier
 
 ## License
 
-Proprietary - Tsunami Events UG
+Proprietary - WarehouseCore Project
 
 ---
 
@@ -1194,7 +1194,7 @@ For issues or questions:
 
 **Version:** 2.49
 **Last Updated:** 2025-11-01
-**Maintainer:** Tsunami Events UG Development Team
+**Maintainer:** WarehouseCore Development Team
 
 ---
 

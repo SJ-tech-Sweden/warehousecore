@@ -211,7 +211,7 @@ Trage deine Daten ein:
 // ==========================================
 // MQTT Broker-Konfiguration
 // ==========================================
-#define MQTT_HOST "tsunami-events.de"      // ← ÄNDERN falls anderer Server
+#define MQTT_HOST "mqtt.example.com"      // ← ÄNDERN falls anderer Server
 #define MQTT_PORT 1883                     // 1883 = ohne TLS, 8883 = mit TLS
 #define MQTT_USER "mqtt_user"              // ← ÄNDERN!
 #define MQTT_PASS "mqtt_password"          // ← ÄNDERN!
@@ -254,7 +254,7 @@ Trage deine Daten ein:
 |-----------|--------------|----------|
 | `WIFI_SSID` | Dein WiFi-Name | "LagerWiFi" |
 | `WIFI_PASS` | Dein WiFi-Passwort | "GeheimesPasswort123" |
-| `MQTT_HOST` | Server-Adresse | "tsunami-events.de" |
+| `MQTT_HOST` | Server-Adresse | "mqtt.example.com" |
 | `MQTT_USER` | MQTT-Benutzername | "warehouse_mqtt" |
 | `MQTT_PASS` | MQTT-Passwort | "mqtt_secret_pw" |
 | `LED_LENGTH` | Anzahl LEDs am Strip | 300 (für 5m @ 60 LEDs/m) |
@@ -341,7 +341,7 @@ Speichern: **STRG+O**, **Enter**, **STRG+X**
 [WiFi] Connected! IP: 192.168.1.45
 [WiFi] RSSI: -51 dBm
 
-[MQTT] Connecting to tsunami-events.de:1883...
+[MQTT] Connecting to mqtt.example.com:1883...
 [MQTT] Connected!
 [MQTT] Subscribed to: weidelbach/esp-a1b2c3/cmd
 
@@ -378,7 +378,7 @@ Wiederhole Schritte 4.1 - 4.5 für jeden weiteren ESP32:
 
 1. Öffne WarehouseCore im Browser
    ```
-   http://tsunami-events.de:8081
+   http://app.example.com:8081
    ```
 2. Login mit Admin-Account
 3. Navigiere zu: **Admin** → **ESP-Controller**
@@ -620,7 +620,7 @@ Einzelnes Gerät finden:
 
 **Symptom:**
 ```
-[MQTT] Connecting to tsunami-events.de:1883...
+[MQTT] Connecting to mqtt.example.com:1883...
 [MQTT] Failed! State: -2
 [MQTT] Retrying in 5s...
 ```
@@ -641,8 +641,8 @@ Einzelnes Gerät finden:
 
 1. **Server erreichbar?**
    ```bash
-   ping tsunami-events.de
-   telnet tsunami-events.de 1883
+   ping mqtt.example.com
+   telnet mqtt.example.com 1883
    ```
 
 2. **Port korrekt?**
@@ -861,4 +861,4 @@ Guru Meditation Error: Core 1 panic'ed (LoadProhibited)
 
 **Version:** 1.0
 **Letzte Aktualisierung:** 23.10.2025
-**Autor:** Tsunami Events UG Development Team
+**Autor:** WarehouseCore Development Team
