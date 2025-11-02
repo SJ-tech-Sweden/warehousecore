@@ -39,6 +39,8 @@ type Product struct {
 	CategoryName        *string `json:"category_name,omitempty"`
 	SubcategoryName     *string `json:"subcategory_name,omitempty"`
 	SubbiercategoryName *string `json:"subbiercategory_name,omitempty"`
+	BrandName           *string `json:"brand_name,omitempty"`
+	ManufacturerName    *string `json:"manufacturer_name,omitempty"`
 }
 
 // DeviceCreateRequest represents a request to create devices
@@ -83,11 +85,15 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 			p.pos_in_category,
 			c.name as category_name,
 			sc.name as subcategory_name,
-			sbc.name as subbiercategory_name
+			sbc.name as subbiercategory_name,
+			b.name as brand_name,
+			m.name as manufacturer_name
 		FROM products p
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
 		LEFT JOIN subcategories sc ON p.subcategoryID = sc.subcategoryID
 		LEFT JOIN subbiercategories sbc ON p.subbiercategoryID = sbc.subbiercategoryID
+		LEFT JOIN brands b ON p.brandID = b.brandID
+		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		WHERE 1=1
 	`
 
@@ -142,6 +148,8 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 			&p.CategoryName,
 			&p.SubcategoryName,
 			&p.SubbiercategoryName,
+			&p.BrandName,
+			&p.ManufacturerName,
 		)
 		if err != nil {
 			log.Printf("Failed to scan product: %v", err)
@@ -183,11 +191,15 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 			p.pos_in_category,
 			c.name as category_name,
 			sc.name as subcategory_name,
-			sbc.name as subbiercategory_name
+			sbc.name as subbiercategory_name,
+			b.name as brand_name,
+			m.name as manufacturer_name
 		FROM products p
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
 		LEFT JOIN subcategories sc ON p.subcategoryID = sc.subcategoryID
 		LEFT JOIN subbiercategories sbc ON p.subbiercategoryID = sbc.subbiercategoryID
+		LEFT JOIN brands b ON p.brandID = b.brandID
+		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		WHERE p.productID = ?
 	`
 
@@ -212,6 +224,8 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 		&p.CategoryName,
 		&p.SubcategoryName,
 		&p.SubbiercategoryName,
+		&p.BrandName,
+		&p.ManufacturerName,
 	)
 
 	if err == sql.ErrNoRows {
