@@ -393,6 +393,108 @@ export default function LabelDesignerPage() {
     }
   };
 
+  const generateMissingLabels = async () => {
+    // Filter devices and cases without labels
+    const devicesWithoutLabels = devices.filter(d => !d.label_path);
+    const casesWithoutLabels = cases.filter(c => !c.label_path);
+    const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length;
+
+    if (totalMissing === 0) {
+      alert('Alle Devices und Cases haben bereits Labels!');
+      return;
+    }
+
+    if (!confirm(`${totalMissing} Items ohne Labels gefunden (${devicesWithoutLabels.length} Devices + ${casesWithoutLabels.length} Cases).\n\nLabels jetzt generieren?`)) {
+      return;
+    }
+
+    // Find default template
+    const defaultTemplate = templates.find((t) => t.is_default);
+    if (!defaultTemplate) {
+      alert('Bitte zuerst ein Template als Standard setzen!');
+      return;
+    }
+
+    // Save current state
+    const originalTemplateId = currentTemplateId;
+
+    setExporting(true);
+    let successCount = 0;
+    let failCount = 0;
+    try {
+      // Load default template temporarily
+      loadTemplate(defaultTemplate);
+      await new Promise((r) => setTimeout(r, 1000)); // Wait for template to fully load
+
+      // Generate labels for devices without labels
+      for (const device of devicesWithoutLabels) {
+        setPreviewDevice(device);
+        await new Promise((r) => setTimeout(r, 500)); // Longer wait for canvas render
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          try {
+            await labelsApi.saveLabel(device.device_id, imageData);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to save label for ${device.device_id}:`, error);
+            failCount++;
+          }
+        }
+      }
+
+      // Generate labels for cases without labels
+      for (const caseItem of casesWithoutLabels) {
+        // Convert case to device-like object for rendering
+        const caseAsDevice: Device = {
+          device_id: `CASE-${caseItem.case_id}`,
+          product_name: caseItem.name,
+          status: caseItem.status,
+          zone_code: caseItem.zone_code,
+          zone_name: caseItem.zone_name,
+          zone_id: caseItem.zone_id,
+        };
+
+        setPreviewDevice(caseAsDevice);
+        await new Promise((r) => setTimeout(r, 500)); // Same wait time as devices for consistent rendering
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          try {
+            await labelsApi.saveCaseLabel(caseItem.case_id, imageData);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to save label for CASE-${caseItem.case_id}:`, error);
+            failCount++;
+          }
+        }
+      }
+
+      alert(`${successCount}/${totalMissing} fehlende Labels generiert!\n(${devicesWithoutLabels.length} Devices + ${casesWithoutLabels.length} Cases)${failCount > 0 ? `\n${failCount} Fehler` : ''}`);
+
+      // Reload devices and cases to refresh label_path info
+      await loadDevices();
+      await loadCases();
+    } catch (error) {
+      console.error('Generation failed:', error);
+      alert('Fehler beim Generieren');
+    } finally {
+      setExporting(false);
+      if (devices.length > 0) {
+        setPreviewDevice(devices[0]);
+      }
+      // Restore original template
+      if (originalTemplateId) {
+        const originalTemplate = templates.find((t) => t.id === originalTemplateId);
+        if (originalTemplate) {
+          loadTemplate(originalTemplate);
+        }
+      }
+    }
+  };
+
   const exportAllLabels = async () => {
     setExporting(true);
     try {
@@ -831,6 +933,9 @@ export default function LabelDesignerPage() {
             <div className="action-buttons">
               <button onClick={handlePrint} disabled={!previewDevice} className="btn-action">
                 <Printer size={18} /> Vorschau Drucken
+              </button>
+              <button onClick={generateMissingLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary" style={{ backgroundColor: '#10b981' }}>
+                <Save size={18} /> {exporting ? 'Generiere...' : 'Fehlende Labels Generieren'}
               </button>
               <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary">
                 <Save size={18} /> {exporting ? `Generiere ${devices.length + cases.length}...` : `Alle Labels Generieren (${devices.length} Devices + ${cases.length} Cases)`}
