@@ -398,7 +398,7 @@ func GetScanHistory(w http.ResponseWriter, r *http.Request) {
 func GetDevices(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	zoneID := r.URL.Query().Get("zone_id")
-	limit := parseInt(r.URL.Query().Get("limit"), 100)
+	limit := parseInt(r.URL.Query().Get("limit"), 50000)
 
 	db := repository.GetSQLDB()
 	query := `
@@ -1257,7 +1257,7 @@ func GetCases(w http.ResponseWriter, r *http.Request) {
 
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
-	limit := 200
+	limit := 50000
 
 	query := `
 		SELECT

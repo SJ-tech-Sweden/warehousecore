@@ -40,7 +40,8 @@ export default function LabelDesignerPage() {
 
   const loadDevices = async () => {
     try {
-      const { data } = await devicesApi.getAll();
+      // Set high limit to load all devices (default backend limit is only 100)
+      const { data } = await devicesApi.getAll({ limit: 50000 });
       setDevices(data);
       if (data.length > 0) {
         setPreviewDevice(data[0]);
