@@ -1,7 +1,7 @@
 import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb, LightbulbOff, Tag, Download } from 'lucide-react';
 import { ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface DeviceDetailModalProps {
   device: Device | null;
@@ -33,6 +33,12 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
+
+  // Cache-busting for label image - regenerates URL when label_path changes
+  const labelUrl = useMemo(() => {
+    if (!device?.label_path) return null;
+    return `${device.label_path}?t=${Date.now()}`;
+  }, [device?.label_path]);
 
   if (!isOpen || !device) return null;
 
@@ -285,7 +291,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
           )}
 
           {/* Label Preview Section */}
-          {device.label_path && (
+          {labelUrl && (
             <div className="pt-4 border-t border-white/10">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -293,7 +299,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                   Geräte-Label
                 </h3>
                 <a
-                  href={device.label_path}
+                  href={labelUrl}
                   download={`${device.device_id}_label.png`}
                   className="px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
@@ -303,7 +309,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
               </div>
               <div className="flex justify-center p-4 bg-black/20 rounded-xl">
                 <img
-                  src={device.label_path}
+                  src={labelUrl}
                   alt={`Label für ${device.device_id}`}
                   className="max-w-sm h-auto border border-white/10 rounded shadow-lg"
                 />

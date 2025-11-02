@@ -1,6 +1,7 @@
 import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers, Tag, Download, Plus, Trash2 } from 'lucide-react';
 import type { CaseDetail, CaseDevice } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
+import { useMemo } from 'react';
 
 interface CaseDetailModalProps {
   caseInfo: CaseDetail | null;
@@ -29,6 +30,12 @@ export function CaseDetailModal({
   onRemoveDevice,
 }: CaseDetailModalProps) {
   if (!isOpen) return null;
+
+  // Cache-busting for label image - regenerates URL when label_path changes
+  const labelUrl = useMemo(() => {
+    if (!caseInfo?.label_path) return null;
+    return `${caseInfo.label_path}?t=${Date.now()}`;
+  }, [caseInfo?.label_path]);
 
   const formatDimension = (value?: number) => {
     if (value === undefined || Number.isNaN(value)) {
@@ -119,15 +126,15 @@ export function CaseDetailModal({
                 <Tag className="w-3 h-3" />
                 Label
               </p>
-              {caseInfo.label_path ? (
+              {labelUrl ? (
                 <div className="flex flex-col gap-2">
                   <img
-                    src={caseInfo.label_path}
+                    src={labelUrl}
                     alt={`Label für Case ${caseInfo.case_id}`}
                     className="w-full h-auto rounded border border-white/10 shadow-sm"
                   />
                   <a
-                    href={caseInfo.label_path}
+                    href={labelUrl}
                     download={`CASE-${caseInfo.case_id}_label.png`}
                     className="flex items-center justify-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
                   >
