@@ -47,13 +47,22 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
    - Produktzentrierte Geräteübersicht mit Schnellaktionen (Fach aufleuchten, Zone öffnen)
    - **Admin CRUD UI** - Full device management with create, edit, delete, QR/barcode generation
 
-2. **Storage Zones**
+2. **Cable Management**
+   - Full CRUD interface for cable inventory
+   - Search and filter by connectors, cable type, length, and mm²
+   - Support for connector types with gender specification (male/female)
+   - Cable types (power, signal, data, etc.)
+   - Length and cross-section (mm²) tracking
+   - Table and grid view modes
+   - **Admin CRUD UI** - Complete cable management with create, edit, delete, and detailed view
+
+3. **Storage Zones**
    - Hierarchical zone structure
    - Shelf, rack, case, vehicle, stage types
    - Capacity tracking
    - Active/inactive management
 
-3. **Scan System**
+4. **Scan System**
    - Barcode and QR code support
    - Intake/outtake/transfer/check actions
   - Duplicate scan detection
@@ -907,6 +916,45 @@ curl http://localhost:8081/api/v1/health
 
 #### Dashboard
 - `GET /dashboard/stats` - Get warehouse statistics
+
+#### Cables (Admin)
+- `GET /admin/cables` - List all cables (filters: search, connector1, connector2, type, length_min, length_max)
+- `GET /admin/cables/{id}` - Get cable details
+- `POST /admin/cables` - Create new cable
+- `PUT /admin/cables/{id}` - Update cable
+- `DELETE /admin/cables/{id}` - Delete cable
+- `GET /admin/cable-connectors` - List all connector types
+- `GET /admin/cable-types` - List all cable types
+
+**Cable Request Body:**
+```json
+{
+  "name": "Main Power Cable",
+  "connector1": 1,
+  "connector2": 2,
+  "typ": 1,
+  "length": 10.5,
+  "mm2": 2.5
+}
+```
+
+**Cable Response:**
+```json
+{
+  "cable_id": 1,
+  "name": "Main Power Cable",
+  "connector1": 1,
+  "connector2": 2,
+  "typ": 1,
+  "length": 10.5,
+  "mm2": 2.5,
+  "connector1_name": "CEE 16A",
+  "connector2_name": "Schuko",
+  "cable_type_name": "Power Cable",
+  "connector1_gender": "male",
+  "connector2_gender": "female"
+}
+```
 - `GET /movements` - Get recent movements
 
 ---

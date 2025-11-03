@@ -283,6 +283,15 @@ func main() {
 	admin.HandleFunc("/products/{id}", handlers.UpdateProduct).Methods("PUT")
 	admin.HandleFunc("/products/{id}", handlers.DeleteProduct).Methods("DELETE")
 	admin.HandleFunc("/products/{id}/devices", handlers.CreateDevicesForProduct).Methods("POST")
+
+	// Cable admin endpoints
+	admin.HandleFunc("/cables", handlers.GetAllCables).Methods("GET")
+	admin.HandleFunc("/cables", handlers.CreateCable).Methods("POST")
+	admin.HandleFunc("/cables/{id}", handlers.GetCable).Methods("GET")
+	admin.HandleFunc("/cables/{id}", handlers.UpdateCable).Methods("PUT")
+	admin.HandleFunc("/cables/{id}", handlers.DeleteCable).Methods("DELETE")
+	admin.HandleFunc("/cable-connectors", handlers.GetCableConnectors).Methods("GET")
+	admin.HandleFunc("/cable-types", handlers.GetCableTypes).Methods("GET")
 	admin.HandleFunc("/devices-list", handlers.GetAllDevicesAdmin).Methods("GET")
 	admin.HandleFunc("/devices", handlers.CreateDevice).Methods("POST")
 	admin.HandleFunc("/devices/{id}", handlers.GetDeviceAdmin).Methods("GET")
