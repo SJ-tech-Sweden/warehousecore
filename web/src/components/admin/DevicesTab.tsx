@@ -13,8 +13,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { api, devicesAdminApi } from '../../lib/api';
-import type { Device, DeviceCreateInput, DeviceUpdateInput } from '../../lib/api';
+import { api, devicesAdminApi, labelsApi } from '../../lib/api';
+import type { Device, DeviceCreateInput, DeviceUpdateInput, LabelTemplate } from '../../lib/api';
 
 interface Product {
   product_id: number;
@@ -46,6 +46,10 @@ interface DeviceFormData {
   quantity: number;
   device_prefix: string;
   increment_serial: boolean;
+  auto_generate_label: boolean;
+  label_template_id?: number;
+  regenerate_codes: boolean;
+  regenerate_label: boolean;
 }
 
 const initialFormData: DeviceFormData = {
@@ -61,6 +65,9 @@ const initialFormData: DeviceFormData = {
   purchase_date: '',
   last_maintenance: '',
   next_maintenance: '',
+  auto_generate_label: true,
+  regenerate_codes: false,
+  regenerate_label: false,
 };
 
 function useDebouncedValue<T>(value: T, delay: number) {
@@ -83,6 +90,7 @@ export function DevicesTab() {
   const [formData, setFormData] = useState<DeviceFormData>(initialFormData);
   const [products, setProducts] = useState<Product[]>([]);
   const [zones, setZones] = useState<Zone[]>([]);
+  const [labelTemplates, setLabelTemplates] = useState<LabelTemplate[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,13 +116,15 @@ export function DevicesTab() {
 
   const loadMetadata = useCallback(async () => {
     try {
-      const [productsRes, zonesRes] = await Promise.all([
+      const [productsRes, zonesRes, templatesRes] = await Promise.all([
         api.get<Product[]>('/admin/products'),
         api.get<Zone[]>('/zones'),
+        labelsApi.getTemplates(),
       ]);
 
       setProducts(productsRes.data || []);
       setZones(zonesRes.data || []);
+      setLabelTemplates(templatesRes.data || []);
     } catch (error) {
       console.error('Failed to load metadata:', error);
     }
@@ -143,8 +153,10 @@ export function DevicesTab() {
       !debouncedSearch ||
       device.device_id.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.product_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      device.product_category?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.serial_number?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      device.barcode?.toLowerCase().includes(debouncedSearch.toLowerCase());
+      device.barcode?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      device.notes?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
     const matchesStatus = !statusFilter || device.status === statusFilter;
     const matchesProduct =
@@ -156,7 +168,7 @@ export function DevicesTab() {
 
   const openCreateModal = () => {
     setEditingDevice(null);
-    setFormData(initialFormData);
+    setFormData({ ...initialFormData, label_template_id: undefined });
     setModalOpen(true);
   };
 
@@ -172,13 +184,17 @@ export function DevicesTab() {
       zone_id: device.zone_id,
       condition_rating: device.condition_rating,
       usage_hours: device.usage_hours,
-      notes: '',
+      purchase_date: device.purchase_date || '',
+      last_maintenance: device.last_maintenance || '',
+      next_maintenance: device.next_maintenance || '',
+      notes: device.notes || '',
       quantity: 1,
       device_prefix: '',
       increment_serial: false,
-      purchase_date: '',
-      last_maintenance: '',
-      next_maintenance: '',
+      auto_generate_label: true,
+      regenerate_codes: false,
+      regenerate_label: false,
+      label_template_id: undefined,
     });
     setModalOpen(true);
   };
@@ -215,7 +231,20 @@ export function DevicesTab() {
           condition_rating: formData.condition_rating,
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
+          purchase_date: formData.purchase_date || undefined,
+          last_maintenance: formData.last_maintenance || undefined,
+          next_maintenance: formData.next_maintenance || undefined,
         };
+
+        if (formData.regenerate_codes) {
+          updateData.regenerate_codes = true;
+        }
+        if (formData.label_template_id) {
+          updateData.label_template_id = formData.label_template_id;
+        }
+        if (formData.regenerate_label || formData.label_template_id) {
+          updateData.regenerate_label = true;
+        }
 
         await devicesAdminApi.update(editingDevice, updateData);
       } else {
@@ -231,16 +260,27 @@ export function DevicesTab() {
           condition_rating: formData.condition_rating,
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
+          purchase_date: formData.purchase_date || undefined,
+          last_maintenance: formData.last_maintenance || undefined,
+          next_maintenance: formData.next_maintenance || undefined,
           quantity: formData.quantity,
           device_prefix: formData.device_prefix || undefined,
           increment_serial: formData.increment_serial,
         };
 
+        createData.auto_generate_label = formData.auto_generate_label;
+        if (formData.label_template_id) {
+          createData.label_template_id = formData.label_template_id;
+        }
+        if (formData.regenerate_codes) {
+          createData.regenerate_codes = true;
+        }
+
         await devicesAdminApi.create(createData);
       }
 
       setModalOpen(false);
-      setFormData(initialFormData);
+      setFormData({ ...initialFormData, label_template_id: undefined });
       await fetchDevices();
     } catch (error: unknown) {
       console.error('Failed to save device:', error);
@@ -251,7 +291,13 @@ export function DevicesTab() {
   };
 
   const handleViewDevice = async (device: Device) => {
-    setViewDevice(device);
+    try {
+      const { data } = await devicesAdminApi.getById(device.device_id);
+      setViewDevice(data);
+    } catch (error) {
+      console.error('Failed to load device details:', error);
+      setViewDevice(device);
+    }
   };
 
   const downloadQR = (deviceId: string) => {
@@ -260,6 +306,13 @@ export function DevicesTab() {
 
   const downloadBarcode = (deviceId: string) => {
     window.open(devicesAdminApi.downloadBarcode(deviceId), '_blank');
+  };
+
+  const openLabel = (labelPath?: string) => {
+    if (!labelPath) {
+      return;
+    }
+    window.open(labelPath, '_blank');
   };
 
   return (
@@ -407,7 +460,14 @@ export function DevicesTab() {
                 {filteredDevices.map((device) => (
                   <tr key={device.device_id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-300">{device.device_id}</td>
-                    <td className="px-4 py-3 text-sm text-white">{device.product_name || '-'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-white">{device.product_name || '-'}</span>
+                        {device.product_category && (
+                          <span className="text-xs text-gray-400">{device.product_category}</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-300">{device.serial_number || '-'}</td>
                     <td className="px-4 py-3">
                       <span
@@ -479,11 +539,14 @@ export function DevicesTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredDevices.map((device) => (
             <div key={device.device_id} className="glass-dark rounded-xl p-4 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-white">{device.device_id}</h3>
-                  <p className="text-sm text-gray-400">{device.product_name || 'Unbekanntes Produkt'}</p>
-                </div>
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-white">{device.device_id}</h3>
+                <p className="text-sm text-gray-400">{device.product_name || 'Unbekanntes Produkt'}</p>
+                {device.product_category && (
+                  <p className="text-xs text-gray-500">{device.product_category}</p>
+                )}
+              </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-semibold ${
                     device.status === 'free'
@@ -513,6 +576,16 @@ export function DevicesTab() {
                 {device.condition_rating && (
                   <p className="text-gray-300">
                     <span className="text-gray-500">Zustand:</span> {device.condition_rating}/10
+                  </p>
+                )}
+                {device.purchase_date && (
+                  <p className="text-gray-300">
+                    <span className="text-gray-500">Kauf:</span> {device.purchase_date}
+                  </p>
+                )}
+                {device.usage_hours && (
+                  <p className="text-gray-300">
+                    <span className="text-gray-500">Stunden:</span> {device.usage_hours}h
                   </p>
                 )}
               </div>
@@ -746,6 +819,43 @@ export function DevicesTab() {
                     }
                     className="input-field w-full"
                   />
+              </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Kaufdatum
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.purchase_date}
+                    onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Letzte Wartung
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.last_maintenance}
+                    onChange={(e) => setFormData({ ...formData, last_maintenance: e.target.value })}
+                    className="input-field w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Nächste Wartung
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.next_maintenance}
+                    onChange={(e) => setFormData({ ...formData, next_maintenance: e.target.value })}
+                    className="input-field w-full"
+                  />
                 </div>
               </div>
 
@@ -780,6 +890,68 @@ export function DevicesTab() {
                   className="input-field w-full"
                   rows={3}
                 />
+              </div>
+
+              {/* Label & Code Options */}
+              <div className="border-t border-white/10 pt-4 space-y-3">
+                {editingDevice ? (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={formData.regenerate_codes}
+                        onChange={(e) => setFormData({ ...formData, regenerate_codes: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      Barcodes/QR-Codes neu generieren
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={formData.regenerate_label}
+                        onChange={(e) => setFormData({ ...formData, regenerate_label: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      Label mit aktueller Vorlage neu rendern
+                    </label>
+                  </>
+                ) : (
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={formData.auto_generate_label}
+                      onChange={(e) => setFormData({ ...formData, auto_generate_label: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    Label nach Erstellung automatisch speichern
+                  </label>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Label-Vorlage
+                  </label>
+                  <select
+                    value={formData.label_template_id ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        label_template_id: e.target.value ? Number(e.target.value) : undefined,
+                      })
+                    }
+                    className="input-field w-full"
+                  >
+                    <option value="">Standard (Default)</option>
+                    {labelTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} {template.is_default ? '(Standard)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Wird eine Vorlage gewählt, wird das Label mit dieser Vorlage erzeugt bzw. neu gerendert.
+                  </p>
+                </div>
               </div>
 
               {/* Submit Buttons */}
@@ -832,6 +1004,12 @@ export function DevicesTab() {
                   <p className="text-sm text-gray-400">Produkt</p>
                   <p className="text-white font-semibold">{viewDevice.product_name || '-'}</p>
                 </div>
+                {viewDevice.product_category && (
+                  <div>
+                    <p className="text-sm text-gray-400">Kategorie</p>
+                    <p className="text-white font-semibold">{viewDevice.product_category}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-gray-400">Status</p>
                   <p className="text-white font-semibold">{viewDevice.status}</p>
@@ -870,6 +1048,30 @@ export function DevicesTab() {
                     {viewDevice.usage_hours ? `${viewDevice.usage_hours}h` : '-'}
                   </p>
                 </div>
+                {viewDevice.purchase_date && (
+                  <div>
+                    <p className="text-sm text-gray-400">Kaufdatum</p>
+                    <p className="text-white font-semibold">
+                      {viewDevice.purchase_date}
+                    </p>
+                  </div>
+                )}
+                {viewDevice.last_maintenance && (
+                  <div>
+                    <p className="text-sm text-gray-400">Letzte Wartung</p>
+                    <p className="text-white font-semibold">
+                      {viewDevice.last_maintenance}
+                    </p>
+                  </div>
+                )}
+                {viewDevice.next_maintenance && (
+                  <div>
+                    <p className="text-sm text-gray-400">Nächste Wartung</p>
+                    <p className="text-white font-semibold">
+                      {viewDevice.next_maintenance}
+                    </p>
+                  </div>
+                )}
                 {viewDevice.case_name && (
                   <div>
                     <p className="text-sm text-gray-400">Case</p>
@@ -884,7 +1086,14 @@ export function DevicesTab() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4">
+              {viewDevice.notes && (
+                <div className="border border-white/10 rounded-xl p-4 text-sm text-gray-300 bg-white/5">
+                  <p className="font-semibold text-white mb-1">Notizen</p>
+                  <p className="whitespace-pre-line">{viewDevice.notes}</p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-3 pt-4">
                 <button
                   onClick={() => downloadQR(viewDevice.device_id)}
                   className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
@@ -899,6 +1108,15 @@ export function DevicesTab() {
                   <Download className="w-5 h-5" />
                   Barcode
                 </button>
+                {viewDevice.label_path && (
+                  <button
+                    onClick={() => openLabel(viewDevice.label_path)}
+                    className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-5 h-5" />
+                    Label
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setViewDevice(null);

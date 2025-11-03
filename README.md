@@ -1022,7 +1022,7 @@ docker tag nobentie/warehousecore:1.56 nobentie/warehousecore:latest
 **Push to Docker Hub:**
 ```bash
 # Push version tag
-docker push nobentie/warehousecore:1.56
+docker push nobentie/warehousecore:2.51
 
 # Push latest tag
 docker push nobentie/warehousecore:latest
@@ -1044,12 +1044,12 @@ docker pull nobentie/warehousecore:latest
 # (DO NOT use docker-compose restart manually)
 ```
 
-**Current Version:** 1.56
+**Current Version:** 2.51
 
 **Recent Changes:**
-- 1.56: Fixed frontend build process with multi-stage Docker build, added comprehensive debug logging
-- 1.55: Added debug logging to ProductsTab (not working - frontend not rebuilt)
-- 1.54: Previous stable version
+- 2.51: Published product availability APIs consumed by RentalCore’s product-first job builder, refreshed Docker image
+- 2.50: Frontend build pipeline stabilization with multi-stage Docker build, additional debug logging
+- 2.49: Added debug logging coverage for product tab interactions
 
 **Run with docker-compose (local development):**
 ```bash
@@ -1279,57 +1279,12 @@ For issues or questions:
   - Full device management within cases from admin interface
 
 ### Version 2.51 (2025-11-01)
-- **CRITICAL FIX: Async Label Generation - Device Creation No Longer Hangs** 🚀
-  - **Fixed UI hanging issue where device creation popup would freeze with "Speichern..." indefinitely**
-  - **Root Cause:** Label generation was blocking the API response, causing 30-60 second delays per device
-
-  **The Problem:**
-  - Creating devices with auto-label generation would hang the UI
-  - API endpoint blocked waiting for headless Chrome to render each label
-  - Chrome timeouts (30s per device) meant 8 devices = 4+ minutes of waiting
-  - Popup never closed, user experience was terrible
-  - Chrome in Docker was timing out: "context deadline exceeded"
-
-  **Root Cause Analysis:**
-  - Headless Chrome was missing critical Docker flags (--disable-dev-shm-usage)
-  - Label generation was synchronous in the HTTP handler (blocking)
-  - Each device waited for label completion before responding
-  - Chrome was failing to start properly in constrained Docker environment
-
-  **The Solution:**
-  - ✅ **Moved label generation to background goroutine** - API returns immediately
-  - ✅ **Added Docker-optimized Chrome flags** - prevents shared memory issues
-  - ✅ **Increased timeout 30s → 60s** - gives Chrome more time in slow environments
-  - ✅ **Async processing** - devices created instantly, labels generate in background
-
-  **Technical Implementation:**
-  - **Modified `/internal/handlers/product_handlers.go`:**
-    - Wrapped label generation loop in `go func()` goroutine
-    - API now responds immediately after device creation
-    - Labels generate asynchronously without blocking user
-
-  - **Modified `/internal/services/label_service.go`:**
-    - Added `chromedp.Flag("disable-dev-shm-usage", true)` - CRITICAL for Docker
-    - Added `chromedp.Flag("disable-setuid-sandbox", true)`
-    - Added `chromedp.Flag("disable-web-security", true)`
-    - Added `chromedp.Flag("disable-features", "VizDisplayCompositor")`
-    - Increased context timeout from 30s to 60s
-    - Removed verbose Chrome logging (reduces noise)
-
-  **Benefits:**
-  - ✅ Device creation completes instantly (< 1 second)
-  - ✅ Popup closes immediately, no more hanging
-  - ✅ Labels generate quietly in background
-  - ✅ Chrome runs reliably in Docker with proper flags
-  - ✅ Much better user experience
-
-  **Before vs After:**
-  - **Before:** Create 8 devices → 4+ minutes of hanging → popup frozen
-  - **After:** Create 8 devices → instant response → labels generate in background
-
-  **Files Changed:**
-  - `/internal/handlers/product_handlers.go`: Lines 541-552 (async goroutine)
-  - `/internal/services/label_service.go`: Lines 575-595 (Chrome flags + timeout)
+- **Product Availability APIs for RentalCore**
+  - Added tree-based availability endpoint and job-scoped availability query powering RentalCore’s product-first job builder.
+  - Exposed product-level counts alongside device metadata so RentalCore can validate requested quantities.
+- **Release Packaging**
+  - Published Docker image `nobentie/warehousecore:2.51` aligned with RentalCore 1.55.
+  - Coordinated release notes documenting the read-only contract for device data on the RentalCore side.
 
 ### Version 2.50 (2025-11-01)
 - **MAJOR REFACTOR: Headless Browser Label Rendering** 🔧✨

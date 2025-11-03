@@ -15,6 +15,7 @@ export interface Device {
   device_id: string;
   product_id?: number;
   product_name?: string;
+  product_category?: string;
   barcode?: string;
   qr_code?: string;
   serial_number?: string;
@@ -24,10 +25,16 @@ export interface Device {
   zone_name?: string;
   zone_code?: string;
   case_name?: string;
+  case_id?: number;
+  current_job_id?: number;
   job_number?: string;
   condition_rating?: number;
   usage_hours?: number;
   label_path?: string;
+  purchase_date?: string;
+  last_maintenance?: string;
+  next_maintenance?: string;
+  notes?: string;
 }
 
 export interface DeviceTreeDevice {

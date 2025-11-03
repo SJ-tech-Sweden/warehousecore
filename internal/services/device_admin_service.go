@@ -50,6 +50,16 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		status = "free"
 	}
 
+	autoGenerateLabel := true
+	if input.AutoGenerateLabel != nil {
+		autoGenerateLabel = *input.AutoGenerateLabel
+	}
+
+	regenerateCodes := false
+	if input.RegenerateCodes != nil {
+		regenerateCodes = *input.RegenerateCodes
+	}
+
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
@@ -65,15 +75,13 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 	for i := 0; i < input.Quantity; i++ {
 		serialValue := serialForIndex(input.SerialNumber, input.StartingSerial, input.IncrementSerial, i)
 
-		var deviceID string
-		err := tx.QueryRowContext(ctx, `
+		_, err := tx.ExecContext(ctx, `
 			INSERT INTO devices (
 				productID, serialnumber, status, current_location, zone_id,
 				condition_rating, usage_hours, purchaseDate, lastmaintenance, nextmaintenance,
 				notes, barcode, qr_code
 			)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			RETURNING deviceID
 		`,
 			input.ProductID,
 			nullableString(serialValue),
@@ -88,12 +96,24 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 			nullableText(input.Notes),
 			nullableString(trimPtr(input.Barcode)),
 			nullableString(trimPtr(input.QRCode)),
-		).Scan(&deviceID)
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert device: %w", err)
 		}
 
-		if err := s.ensureDeviceCodes(ctx, tx, deviceID, providedBarcode, providedQRCode, input.RegenerateCodes); err != nil {
+		var deviceID string
+		err = tx.QueryRowContext(ctx, `
+			SELECT deviceID
+			FROM devices
+			WHERE productID = ?
+			ORDER BY deviceID DESC
+			LIMIT 1
+		`, input.ProductID).Scan(&deviceID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch device id: %w", err)
+		}
+
+		if err := s.ensureDeviceCodes(ctx, tx, deviceID, providedBarcode, providedQRCode, regenerateCodes); err != nil {
 			return nil, err
 		}
 
@@ -114,7 +134,7 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 	}
 
 	// Trigger async label generation after commit
-	if input.AutoGenerateLabel || input.AutoGenerateLabel == false && input.LabelTemplateID != nil {
+	if autoGenerateLabel || input.LabelTemplateID != nil {
 		templateID := input.LabelTemplateID
 		for i := range createdIDs {
 			deviceID := createdIDs[i]
@@ -308,7 +328,7 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 func (s *DeviceAdminService) DeleteDevice(ctx context.Context, deviceID string) error {
 	if deviceID == "" {
 		return errors.New("deviceID required")
-	  }
+	}
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
@@ -346,7 +366,7 @@ func (s *DeviceAdminService) DeleteDevice(ctx context.Context, deviceID string) 
 	}
 
 	if labelPath.Valid {
-		fullPath := filepath.Join("warehousecore", "web", "dist", strings.TrimPrefix(labelPath.String, "/"))
+		fullPath := filepath.Join("web", "dist", strings.TrimPrefix(labelPath.String, "/"))
 		if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Printf("[DEVICE] Failed to remove label %s: %v", fullPath, err)
 		}
@@ -368,15 +388,17 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 	var device models.DeviceWithDetails
 	err := s.db.QueryRowContext(ctx, `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
-		       d.current_location, d.zone_id, d.case_id, d.current_job_id,
+		       d.current_location, d.zone_id,
 		       d.condition_rating, d.usage_hours, d.purchaseDate, d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
-		       COALESCE(p.name, '') as product_name,
-		       COALESCE(cat.name, '') as product_category,
-		       COALESCE(z.name, '') as zone_name,
-		       COALESCE(z.code, '') as zone_code,
-		       COALESCE(c.name, '') as case_name,
-		       COALESCE(j.job_code, '') as job_number
+		       COALESCE(p.name, '') AS product_name,
+		       COALESCE(cat.name, '') AS product_category,
+		       COALESCE(z.name, '') AS zone_name,
+		       COALESCE(z.code, '') AS zone_code,
+		       dc.caseID,
+		       COALESCE(c.name, '') AS case_name,
+		       jd.jobID,
+		       COALESCE(j.job_code, '') AS job_number
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN categories cat ON p.categoryID = cat.categoryID
@@ -396,8 +418,6 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		&device.Status,
 		&device.CurrentLocation,
 		&device.ZoneID,
-		&device.CaseID,
-		&device.CurrentJobID,
 		&device.ConditionRating,
 		&device.UsageHours,
 		&device.PurchaseDate,
@@ -409,7 +429,9 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		&device.ProductCategory,
 		&device.ZoneName,
 		&device.ZoneCode,
+		&device.CaseID,
 		&device.CaseName,
+		&device.CurrentJobID,
 		&device.JobNumber,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -469,27 +491,38 @@ func (s *DeviceAdminService) resetDeviceCodes(ctx context.Context, tx *sql.Tx, d
 }
 
 func (s *DeviceAdminService) generateLabelForDevice(deviceID string, templateID *int) error {
-	if templateID != nil && *templateID > 0 {
-		labelData, err := s.labelService.GenerateLabelForDevice(deviceID, *templateID)
-		if err != nil {
-			return err
-		}
+	if templateID == nil || *templateID <= 0 {
+		return s.labelService.AutoGenerateDeviceLabel(deviceID)
+	}
 
-		labelJSON, err := jsonMarshal(labelData)
-		if err != nil {
-			return err
-		}
-
-		base64PNG, err := s.labelService.renderLabelWithHeadlessBrowser(labelJSON)
-		if err != nil {
-			return err
-		}
-
-		_, err = s.labelService.SaveLabelImage(deviceID, "data:image/png;base64,"+base64PNG)
+	labelData, err := s.labelService.GenerateLabelForDevice(deviceID, *templateID)
+	if err != nil {
 		return err
 	}
 
-	return s.labelService.AutoGenerateDeviceLabel(deviceID)
+	labelDataJSON, err := json.Marshal(labelData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal label data: %w", err)
+	}
+
+	htmlTemplate, err := os.ReadFile("./internal/services/label_template.html")
+	if err != nil {
+		return fmt.Errorf("failed to load label template: %w", err)
+	}
+
+	htmlContent := strings.Replace(string(htmlTemplate), "{{LABEL_DATA_JSON}}", string(labelDataJSON), 1)
+
+	base64PNG, err := s.labelService.renderLabelWithHeadlessBrowser(htmlContent)
+	if err != nil {
+		return fmt.Errorf("failed to render label: %w", err)
+	}
+
+	_, err = s.labelService.SaveLabelImage(deviceID, "data:image/png;base64,"+base64PNG)
+	if err != nil {
+		return fmt.Errorf("failed to save label image: %w", err)
+	}
+
+	return nil
 }
 
 // Helper conversions ---------------------------------------------------------
@@ -582,12 +615,3 @@ func trimPtr(value *string) *string {
 	trimmed := strings.TrimSpace(*value)
 	return &trimmed
 }
-
-func jsonMarshal(v interface{}) (string, error) {
-	bytes, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf(`{"data":%s}`, string(bytes)), nil
-}
-

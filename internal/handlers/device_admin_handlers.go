@@ -1,17 +1,93 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
 	"warehousecore/internal/services"
 )
+
+type DeviceAdminResponse struct {
+	DeviceID        string  `json:"device_id"`
+	ProductID       *int    `json:"product_id,omitempty"`
+	ProductName     string  `json:"product_name,omitempty"`
+	ProductCategory string  `json:"product_category,omitempty"`
+	SerialNumber    *string `json:"serial_number,omitempty"`
+	Barcode         *string `json:"barcode,omitempty"`
+	QRCode          *string `json:"qr_code,omitempty"`
+	Status          string  `json:"status"`
+	CurrentLocation *string `json:"current_location,omitempty"`
+	ZoneID          *int    `json:"zone_id,omitempty"`
+	ZoneName        string  `json:"zone_name,omitempty"`
+	ZoneCode        string  `json:"zone_code,omitempty"`
+	CaseID          *int    `json:"case_id,omitempty"`
+	CaseName        string  `json:"case_name,omitempty"`
+	CurrentJobID    *int    `json:"current_job_id,omitempty"`
+	JobNumber       string  `json:"job_number,omitempty"`
+	ConditionRating float64 `json:"condition_rating"`
+	UsageHours      float64 `json:"usage_hours"`
+	PurchaseDate    *string `json:"purchase_date,omitempty"`
+	LastMaintenance *string `json:"last_maintenance,omitempty"`
+	NextMaintenance *string `json:"next_maintenance,omitempty"`
+	Notes           *string `json:"notes,omitempty"`
+	LabelPath       *string `json:"label_path,omitempty"`
+}
+
+func formatNullTime(value sql.NullTime) *string {
+	if !value.Valid {
+		return nil
+	}
+	formatted := value.Time.Format("2006-01-02")
+	return &formatted
+}
+
+func nullIntToPtr(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	val := int(n.Int64)
+	return &val
+}
+
+func toDeviceAdminResponse(device *models.DeviceWithDetails) DeviceAdminResponse {
+	if device == nil {
+		return DeviceAdminResponse{}
+	}
+
+	return DeviceAdminResponse{
+		DeviceID:        device.DeviceID,
+		ProductID:       nullIntToPtr(device.ProductID),
+		ProductName:     device.ProductName,
+		ProductCategory: device.ProductCategory,
+		SerialNumber:    ptrString(device.SerialNumber),
+		Barcode:         ptrString(device.Barcode),
+		QRCode:          ptrString(device.QRCode),
+		Status:          device.Status,
+		CurrentLocation: ptrString(device.CurrentLocation),
+		ZoneID:          nullIntToPtr(device.ZoneID),
+		ZoneName:        device.ZoneName,
+		ZoneCode:        device.ZoneCode,
+		CaseID:          nullIntToPtr(device.CaseID),
+		CaseName:        device.CaseName,
+		CurrentJobID:    nullIntToPtr(device.CurrentJobID),
+		JobNumber:       device.JobNumber,
+		ConditionRating: device.ConditionRating,
+		UsageHours:      device.UsageHours,
+		PurchaseDate:    formatNullTime(device.PurchaseDate),
+		LastMaintenance: formatNullTime(device.LastMaintenance),
+		NextMaintenance: formatNullTime(device.NextMaintenance),
+		Notes:           ptrString(device.Notes),
+		LabelPath:       ptrString(device.LabelPath),
+	}
+}
 
 // ===========================
 // DEVICE ADMIN HANDLERS
@@ -23,14 +99,17 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
-		       d.current_location, d.zone_id, d.case_id, d.current_job_id,
-		       d.condition_rating, d.usage_hours, d.label_path,
-		       COALESCE(p.name, '') as product_name,
-		       COALESCE(cat.name, '') as product_category,
-		       COALESCE(z.name, '') as zone_name,
-		       COALESCE(z.code, '') as zone_code,
-		       COALESCE(c.name, '') as case_name,
-		       COALESCE(j.job_code, '') as job_number
+		       d.current_location, d.zone_id,
+		       d.condition_rating, d.usage_hours, d.purchaseDate, d.lastmaintenance, d.nextmaintenance,
+		       d.notes, d.label_path,
+		       COALESCE(p.name, '') AS product_name,
+		       COALESCE(cat.name, '') AS product_category,
+		       COALESCE(z.name, '') AS zone_name,
+		       COALESCE(z.code, '') AS zone_code,
+		       dc.caseID,
+		       COALESCE(c.name, '') AS case_name,
+		       jd.jobID,
+		       COALESCE(j.job_code, '') AS job_number
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN categories cat ON p.categoryID = cat.categoryID
@@ -50,7 +129,7 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var devices []models.DeviceWithDetails
+	var responses []DeviceAdminResponse
 	for rows.Next() {
 		var device models.DeviceWithDetails
 		err := rows.Scan(
@@ -62,26 +141,31 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 			&device.Status,
 			&device.CurrentLocation,
 			&device.ZoneID,
-			&device.CaseID,
-			&device.CurrentJobID,
 			&device.ConditionRating,
 			&device.UsageHours,
+			&device.PurchaseDate,
+			&device.LastMaintenance,
+			&device.NextMaintenance,
+			&device.Notes,
 			&device.LabelPath,
 			&device.ProductName,
 			&device.ProductCategory,
 			&device.ZoneName,
 			&device.ZoneCode,
+			&device.CaseID,
 			&device.CaseName,
+			&device.CurrentJobID,
 			&device.JobNumber,
 		)
 		if err != nil {
 			log.Printf("[DEVICE LIST] Failed to scan device: %v", err)
 			continue
 		}
-		devices = append(devices, device)
+
+		responses = append(responses, toDeviceAdminResponse(&device))
 	}
 
-	respondJSON(w, http.StatusOK, devices)
+	respondJSON(w, http.StatusOK, responses)
 }
 
 // CreateDevice creates a single device or multiple devices with the admin service
@@ -114,9 +198,13 @@ func CreateDevice(w http.ResponseWriter, r *http.Request) {
 
 	// Return single device if quantity was 1, otherwise return array
 	if len(devices) == 1 && input.Quantity <= 1 {
-		respondJSON(w, http.StatusCreated, devices[0])
+		respondJSON(w, http.StatusCreated, toDeviceAdminResponse(devices[0]))
 	} else {
-		respondJSON(w, http.StatusCreated, devices)
+		responses := make([]DeviceAdminResponse, 0, len(devices))
+		for _, device := range devices {
+			responses = append(responses, toDeviceAdminResponse(device))
+		}
+		respondJSON(w, http.StatusCreated, responses)
 	}
 }
 
@@ -147,7 +235,7 @@ func UpdateDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, device)
+	respondJSON(w, http.StatusOK, toDeviceAdminResponse(device))
 }
 
 // DeleteDevice deletes a device
@@ -195,7 +283,7 @@ func GetDeviceAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, device)
+	respondJSON(w, http.StatusOK, toDeviceAdminResponse(device))
 }
 
 // GenerateDeviceQR generates a QR code image for a device
@@ -213,7 +301,7 @@ func GenerateDeviceQR(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow(`SELECT COALESCE(qr_code, ?) FROM devices WHERE deviceID = ?`,
 		"QR-"+deviceID, deviceID).Scan(&qrCode)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondJSON(w, http.StatusNotFound, map[string]string{"error": "Device not found"})
 			return
 		}
@@ -232,6 +320,11 @@ func GenerateDeviceQR(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode base64 to bytes
+	const prefix = "data:image/png;base64,"
+	if strings.HasPrefix(qrImageBase64, prefix) {
+		qrImageBase64 = qrImageBase64[len(prefix):]
+	}
+
 	qrImageBytes, err := base64.StdEncoding.DecodeString(qrImageBase64)
 	if err != nil {
 		log.Printf("[DEVICE QR] Failed to decode base64 QR for %s: %v", deviceID, err)
@@ -260,7 +353,7 @@ func GenerateDeviceBarcode(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow(`SELECT COALESCE(barcode, ?) FROM devices WHERE deviceID = ?`,
 		deviceID, deviceID).Scan(&barcode)
 	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			respondJSON(w, http.StatusNotFound, map[string]string{"error": "Device not found"})
 			return
 		}
@@ -279,6 +372,11 @@ func GenerateDeviceBarcode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Decode base64 to bytes
+	const barcodePrefix = "data:image/png;base64,"
+	if strings.HasPrefix(barcodeImageBase64, barcodePrefix) {
+		barcodeImageBase64 = barcodeImageBase64[len(barcodePrefix):]
+	}
+
 	barcodeImageBytes, err := base64.StdEncoding.DecodeString(barcodeImageBase64)
 	if err != nil {
 		log.Printf("[DEVICE BARCODE] Failed to decode base64 barcode for %s: %v", deviceID, err)

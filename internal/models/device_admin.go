@@ -16,9 +16,9 @@ type DeviceCreateInput struct {
 	NextMaintenance    *string  `json:"next_maintenance,omitempty"`
 	Notes              *string  `json:"notes,omitempty"`
 	Quantity           int      `json:"quantity,omitempty"`
-	AutoGenerateLabel  bool     `json:"auto_generate_label,omitempty"`
+	AutoGenerateLabel  *bool    `json:"auto_generate_label,omitempty"`
 	LabelTemplateID    *int     `json:"label_template_id,omitempty"`
-	RegenerateCodes    bool     `json:"regenerate_codes,omitempty"`
+	RegenerateCodes    *bool    `json:"regenerate_codes,omitempty"`
 	DevicePrefix       *string  `json:"device_prefix,omitempty"`
 	StartingSerial     *int     `json:"starting_serial,omitempty"`
 	IncrementSerial    bool     `json:"increment_serial,omitempty"`
@@ -43,4 +43,3 @@ type DeviceUpdateInput struct {
 	LabelTemplateID  Optional[int]     `json:"label_template_id"`
 	RegenerateCodes  Optional[bool]    `json:"regenerate_codes"`
 }
-
