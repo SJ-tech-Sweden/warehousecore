@@ -56,13 +56,24 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
    - Table and grid view modes
    - **Admin CRUD UI** - Complete cable management with create, edit, delete, and detailed view
 
-3. **Storage Zones**
+3. **Case Management**
+   - Full CRUD interface for case inventory
+   - Search and filter by status and zone
+   - Table and grid view modes with device counts
+   - Support for dimensions (width, height, depth) and weight tracking
+   - Case status management (free, rented, maintenance)
+   - Device assignment and tracking within cases
+   - Label printing integration
+   - Case detail modal with device list view
+   - **Admin CRUD UI** - Complete case management in admin dashboard
+
+4. **Storage Zones**
    - Hierarchical zone structure
    - Shelf, rack, case, vehicle, stage types
    - Capacity tracking
    - Active/inactive management
 
-4. **Scan System**
+5. **Scan System**
    - Barcode and QR code support
    - Intake/outtake/transfer/check actions
   - Duplicate scan detection
@@ -1248,6 +1259,24 @@ For issues or questions:
 ---
 
 ## Changelog
+
+### Version 1.10 (2025-11-03)
+- **Case Management Admin Tab Implementation**
+  - Added CasesTab component with full CRUD functionality in admin dashboard
+  - Integrated Cases tab with PackageOpen icon in AdminPage navigation
+  - Implemented table and cards view modes for case listing
+  - Added search, status, and zone filter capabilities
+  - Included device count statistics dashboard (free, rented, maintenance, total devices)
+  - Support for case creation and editing with:
+    - Dimensions (width, height, depth)
+    - Weight tracking
+    - Status management (free, rented, maintenance)
+    - Zone assignment
+    - Barcode and RFID tag assignment (create only)
+  - Case detail modal with device list view
+  - Label printing integration for cases
+  - Consistent dark theme design matching other admin tabs
+  - Full device management within cases from admin interface
 
 ### Version 2.51 (2025-11-01)
 - **CRITICAL FIX: Async Label Generation - Device Creation No Longer Hangs** 🚀
