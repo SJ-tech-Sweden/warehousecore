@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Users, Layers, Lightbulb, Cpu, FolderTree, Package, Database, Box, Cable } from 'lucide-react';
+import { Settings, Users, Layers, Lightbulb, Cpu, FolderTree, Package, Database, Box, Cable, PackageOpen } from 'lucide-react';
 import { ZoneTypesTab } from '../components/admin/ZoneTypesTab';
 import { LEDSettingsTab } from '../components/admin/LEDSettingsTab';
 import { RolesTab } from '../components/admin/RolesTab';
@@ -8,9 +8,10 @@ import { CategoriesTab } from '../components/admin/CategoriesTab';
 import { ProductsTab } from '../components/admin/ProductsTab';
 import { DevicesTab } from '../components/admin/DevicesTab';
 import { CablesTab } from '../components/admin/CablesTab';
+import { CasesTab } from '../components/admin/CasesTab';
 import { APISettingsTab } from '../components/admin/APISettingsTab';
 
-type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'products' | 'devices' | 'cables' | 'roles' | 'apisettings';
+type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'products' | 'devices' | 'cables' | 'cases' | 'roles' | 'apisettings';
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('zonetypes');
@@ -23,6 +24,7 @@ export function AdminPage() {
     { id: 'products' as TabType, label: 'Produkte', icon: Package },
     { id: 'devices' as TabType, label: 'Geräte', icon: Box },
     { id: 'cables' as TabType, label: 'Kabel', icon: Cable },
+    { id: 'cases' as TabType, label: 'Cases', icon: PackageOpen },
     { id: 'roles' as TabType, label: 'Rollen & Benutzer', icon: Users },
     { id: 'apisettings' as TabType, label: 'API-Einstellungen', icon: Database },
   ];
@@ -71,6 +73,7 @@ export function AdminPage() {
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'devices' && <DevicesTab />}
         {activeTab === 'cables' && <CablesTab />}
+        {activeTab === 'cases' && <CasesTab />}
         {activeTab === 'roles' && <RolesTab />}
         {activeTab === 'apisettings' && <APISettingsTab />}
       </div>
