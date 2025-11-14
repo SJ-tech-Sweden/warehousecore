@@ -488,10 +488,71 @@ func ensurePackageCodeSupport(db *sql.DB) error {
 		return errors.New("database connection is nil")
 	}
 
+	if err := ensureProductPackageTables(db); err != nil {
+		return err
+	}
 	if err := ensurePackageCodeColumn(db); err != nil {
 		return err
 	}
 	return ensureAliasTable(db)
+}
+
+func ensureProductPackageTables(db *sql.DB) error {
+	const tableCheck = `
+		SELECT COUNT(*)
+		FROM information_schema.tables
+		WHERE table_schema = DATABASE()
+		  AND table_name = ?
+	`
+
+	// Ensure product_packages exists with final schema
+	var count int
+	if err := db.QueryRow(tableCheck, "product_packages").Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS product_packages (
+				package_id INT AUTO_INCREMENT PRIMARY KEY,
+				package_code VARCHAR(32) NOT NULL,
+				name VARCHAR(255) NOT NULL,
+				description TEXT,
+				price DECIMAL(10,2),
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+				UNIQUE KEY uq_product_package_code (package_code),
+				INDEX idx_name (name)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+		`); err != nil {
+			return err
+		}
+	}
+
+	// Ensure product_package_items exists
+	count = 0
+	if err := db.QueryRow(tableCheck, "product_package_items").Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		if _, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS product_package_items (
+				package_item_id INT AUTO_INCREMENT PRIMARY KEY,
+				package_id INT NOT NULL,
+				product_id INT NOT NULL,
+				quantity INT NOT NULL DEFAULT 1,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (package_id) REFERENCES product_packages(package_id) ON DELETE CASCADE,
+				FOREIGN KEY (product_id) REFERENCES products(productID) ON DELETE CASCADE,
+				UNIQUE KEY unique_package_product (package_id, product_id),
+				INDEX idx_package_id (package_id),
+				INDEX idx_product_id (product_id)
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+		`); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ensurePackageCodeColumn(db *sql.DB) error {
