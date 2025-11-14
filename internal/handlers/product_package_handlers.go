@@ -23,6 +23,11 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 	search := r.URL.Query().Get("search")
 
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	query := `
 		SELECT
@@ -90,6 +95,11 @@ func GetProductPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	// Get package details
 	var pkg models.ProductPackageWithItems
@@ -394,6 +404,11 @@ func DeleteProductPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	result, err := db.Exec("DELETE FROM product_packages WHERE package_id = ?", id)
 	if err != nil {
@@ -422,6 +437,11 @@ type PackageAliasEntry struct {
 // GetProductPackageAliasMap returns all alias mappings for OCR integrations
 func GetProductPackageAliasMap(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	rows, err := db.Query(`
 		SELECT
@@ -668,6 +688,11 @@ func AddItemToPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	// Check if package exists
 	var exists bool
@@ -716,6 +741,11 @@ func RemoveItemFromPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
+	if err := ensurePackageCodeSupport(db); err != nil {
+		log.Printf("Failed to ensure package code support: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to prepare package storage"})
+		return
+	}
 
 	result, err := db.Exec(`
 		DELETE FROM product_package_items
