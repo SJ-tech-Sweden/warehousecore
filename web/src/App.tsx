@@ -6,7 +6,6 @@ import { RoleGuard } from './components/RoleGuard';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { ScanPage } from './pages/ScanPage';
-import { DevicesPage } from './pages/DevicesPage';
 import { ZonesPage } from './pages/ZonesPage';
 import { ZoneDetailPage } from './pages/ZoneDetailPage';
 import { JobsPage } from './pages/JobsPage';
@@ -29,7 +28,6 @@ function App() {
           {/* Protected routes */}
           <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
           <Route path="/scan" element={<ProtectedRoute><Layout><ScanPage /></Layout></ProtectedRoute>} />
-          <Route path="/devices" element={<ProtectedRoute><Layout><DevicesPage /></Layout></ProtectedRoute>} />
           <Route path="/labels" element={<ProtectedRoute><Layout><LabelDesignerPage /></Layout></ProtectedRoute>} />
           <Route path="/zones" element={<ProtectedRoute><Layout><ZonesPage /></Layout></ProtectedRoute>} />
           <Route path="/zones/:id" element={<ProtectedRoute><Layout><ZoneDetailPage /></Layout></ProtectedRoute>} />

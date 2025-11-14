@@ -1032,7 +1032,7 @@ docker tag nobentie/warehousecore:1.56 nobentie/warehousecore:latest
 **Push to Docker Hub:**
 ```bash
 # Push version tag
-docker push nobentie/warehousecore:2.51
+docker push nobentie/warehousecore:2.57
 
 # Push latest tag
 docker push nobentie/warehousecore:latest
@@ -1054,12 +1054,12 @@ docker pull nobentie/warehousecore:latest
 # (DO NOT use docker-compose restart manually)
 ```
 
-**Current Version:** 2.51
+**Current Version:** 2.57
 
 **Recent Changes:**
-- 2.51: Published product availability APIs consumed by RentalCore’s product-first job builder, refreshed Docker image
-- 2.50: Frontend build pipeline stabilization with multi-stage Docker build, additional debug logging
-- 2.49: Added debug logging coverage for product tab interactions
+- 2.57: Devices tree moved into the Products page (Issue #17) with a dedicated “Gerätebaum” tab, legacy `/devices` route removed
+- 2.56: Infrastructure refinements for Komodo deployment alignment
+- 2.55: Label persistence tweaks for RentalCore synchronization
 
 **Run with docker-compose (local development):**
 ```bash
@@ -1167,7 +1167,7 @@ mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/XXX_new_fea
 - `1.52` - LED Vorschau nutzt optionalen `LED_PREVIEW_BIN_ID` und Gerätekarte bietet Detail-Button
 - `1.51` - Geräte-Liste öffnet wieder Detailmodal per Klick
 - `1.50` - Admin LED preview always lights the first bin
-- `1.49` - Device detail modal on devices page (current)
+- `1.49` - Device detail modal inside legacy /devices page (now merged into Products tab)
 - `1.48` - Device detail modal with orange breathe LED locate
 - `1.47` - Auto-clear LEDs on page exit/browser close
 - `1.46` - Reset pack status on device intake
@@ -1262,7 +1262,7 @@ For issues or questions:
 
 ---
 
-**Version:** 2.49
+**Version:** 2.57
 **Last Updated:** 2025-11-01
 **Maintainer:** WarehouseCore Development Team
 
@@ -1312,6 +1312,13 @@ For issues or questions:
   - Label printing integration for cases
   - Consistent dark theme design matching other admin tabs
   - Full device management within cases from admin interface
+
+### Version 2.57 (2025-11-14)
+- **Feature: Unified Products + Devices Tree** ✨ **[Issue #17]**
+  - Added a third “Gerätebaum” tab to the Products page, mirroring the former /devices view without duplicate layouts.
+  - Device tree retains advanced search, LED locate button, zone navigation, and per-device detail/product modals directly inside the products workspace.
+  - Removed the standalone `/devices` route, sidebar entry, and page to avoid divergent UX paths.
+  - README and navigation instructions updated to point admins to the consolidated entry point.
 
 ### Version 2.51 (2025-11-01)
 - **Product Availability APIs for RentalCore**

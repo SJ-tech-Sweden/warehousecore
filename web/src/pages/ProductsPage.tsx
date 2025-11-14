@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Package, Box } from 'lucide-react';
+import { Package, Box, GitBranch } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductsTab } from '../components/admin/ProductsTab';
 import { ProductPackagesTab } from '../components/admin/ProductPackagesTab';
+import { DeviceTreeTab } from '../components/admin/DeviceTreeTab';
 
-type TabType = 'products' | 'packages';
+type TabType = 'products' | 'packages' | 'tree';
 
 export function ProductsPage() {
   const { t } = useTranslation();
@@ -13,6 +14,7 @@ export function ProductsPage() {
   const tabs = [
     { id: 'products' as TabType, label: 'Produkte', icon: Package },
     { id: 'packages' as TabType, label: 'Produktpakete', icon: Box },
+    { id: 'tree' as TabType, label: 'Gerätebaum', icon: GitBranch },
   ];
 
   return (
@@ -52,6 +54,7 @@ export function ProductsPage() {
       <div className="glass-dark rounded-2xl p-6">
         {activeTab === 'products' && <ProductsTab />}
         {activeTab === 'packages' && <ProductPackagesTab />}
+        {activeTab === 'tree' && <DeviceTreeTab />}
       </div>
     </div>
   );

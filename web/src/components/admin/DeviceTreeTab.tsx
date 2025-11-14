@@ -17,17 +17,17 @@ import {
   type DeviceTreeDevice,
   type DeviceTreeSubcategory,
   type DeviceTreeSubbiercategory,
-} from '../lib/api';
-import { formatStatus, getStatusColor } from '../lib/utils';
-import { ProductDevicesModal } from '../components/ProductDevicesModal';
-import { DeviceDetailModal } from '../components/DeviceDetailModal';
+} from '../../lib/api';
+import { formatStatus, getStatusColor } from '../../lib/utils';
+import { ProductDevicesModal } from '../ProductDevicesModal';
+import { DeviceDetailModal } from '../DeviceDetailModal';
 
 interface ActionMessage {
   type: 'success' | 'error';
   text: string;
 }
 
-export function DevicesPage() {
+export function DeviceTreeTab() {
   const navigate = useNavigate();
   const [devices, setDevices] = useState<Device[]>([]);
   const [treeData, setTreeData] = useState<DeviceTreeCategory[]>([]);
