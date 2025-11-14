@@ -1054,9 +1054,10 @@ docker pull nobentie/warehousecore:latest
 # (DO NOT use docker-compose restart manually)
 ```
 
-**Current Version:** 2.60
+**Current Version:** 2.61
 
 **Recent Changes:**
+- 2.61: Haupt-Kabeltabelle gruppiert nach Typ/Stecker/Länge mit Inline-Details
 - 2.60: Kabelübersicht gruppiert nach Stecker1/Stecker2/Länge und zeigt Gesamtanzahl pro Kombination
 - 2.59: Kabeltypen-Endpunkt liefert Bestandszahlen für jedes Label
 - 2.58: Cable filters show gendered connector labels and dynamically limit Stecker 2 based on Stecker 1 compatibility
@@ -1262,7 +1263,7 @@ For issues or questions:
 
 ---
 
-**Version:** 2.60
+**Version:** 2.61
 **Last Updated:** 2025-11-01
 **Maintainer:** WarehouseCore Development Team
 
@@ -1313,11 +1314,16 @@ For issues or questions:
   - Consistent dark theme design matching other admin tabs
   - Full device management within cases from admin interface
 
+### Version 2.61 (2025-11-14)
+- **Feature: Kabel-Kombinationsübersicht in Haupttabelle**
+  - The cables dashboard now groups the main table by cable type + Stecker 1 + Stecker 2 + Länge so each combination appears exactly once with an `Anzahl` column.
+  - Rows expand inline to show the underlying Einzelkabel inklusive aller Aktionen (Details, Bearbeiten, Löschen); the cards view mirrors the grouped layout.
+  - Summary metadata (Anzahl Kombinationen und Gesamtbestand) updates live after CRUD actions.
+
 ### Version 2.60 (2025-11-14)
 - **Feature: Kabel-Kombinationsübersicht**
-  - The cables dashboard now groups inventory by cable type + Stecker 1 + Stecker 2 + Länge so each combination appears exactly once.
-  - Added “Einzigartige Kombinationen” table that mirrors strings such as `Audio (XLR 3P - XLR 3P) • 1.00 m` plus an “Anzahl”-column.
-  - Counts update live after CRUD actions and the headline shows the summed stock across all combinations.
+  - Added the first “Einzigartige Kombinationen” summary, laying the groundwork for the grouped workflow.
+  - Summary strings follow the `Audio (XLR 3P - XLR 3P) • 1.00 m` pattern and display a global count for easier audits.
 
 ### Version 2.59 (2025-11-14)
 - **Feature: Kabeltypen-Bestand**

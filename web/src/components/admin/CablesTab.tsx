@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Cable,
+  ChevronDown,
+  ChevronRight,
   Eye,
   LayoutGrid,
   List,
@@ -174,6 +176,7 @@ export function CablesTab() {
     setTypeFilter('');
     setLengthMinFilter('');
     setLengthMaxFilter('');
+    setExpandedCombos(new Set());
   };
 
   const openCreateModal = () => {
@@ -289,42 +292,65 @@ export function CablesTab() {
     return type?.name || '-';
   };
 
+  const buildCombinationKey = (cable: CableType) =>
+    `${cable.typ}|${cable.connector1}|${cable.connector2}|${cable.length}`;
+
   const cableCombinationSummary = useMemo(() => {
     const summaryMap = new Map<string, {
+      key: string;
       typeId: number;
       connector1: number;
       connector2: number;
       length: number;
-      count: number;
+      cables: CableType[];
     }>();
 
     cables.forEach((cable) => {
-      const key = `${cable.typ}|${cable.connector1}|${cable.connector2}|${cable.length}`;
+      const key = buildCombinationKey(cable);
       if (!summaryMap.has(key)) {
         summaryMap.set(key, {
+          key,
           typeId: cable.typ,
           connector1: cable.connector1,
           connector2: cable.connector2,
           length: cable.length,
-          count: 0,
+          cables: [],
         });
       }
-      summaryMap.get(key)!.count += 1;
+      summaryMap.get(key)!.cables.push(cable);
     });
 
-    return Array.from(summaryMap.values()).map((entry) => ({
-      ...entry,
-      typeName: getCableTypeName(entry.typeId),
-      connector1Label: getConnectorDisplay(entry.connector1),
-      connector2Label: getConnectorDisplay(entry.connector2),
-      lengthLabel: `${entry.length.toFixed(2)} m`,
-    }));
-  }, [cables, cableTypes, connectorIndex]);
+    return Array.from(summaryMap.values())
+      .map((entry) => ({
+        ...entry,
+        typeName: getCableTypeName(entry.typeId),
+        connector1Label: getConnectorDisplay(entry.connector1),
+        connector2Label: getConnectorDisplay(entry.connector2),
+        lengthLabel: `${entry.length.toFixed(2)} m`,
+        count: entry.cables.length,
+      }))
+      .sort((a, b) => a.typeName.localeCompare(b.typeName, 'de', { sensitivity: 'base' }));
+  }, [cables, getCableTypeName, getConnectorDisplay]);
 
   const totalCableCount = useMemo(
     () => cableCombinationSummary.reduce((sum, entry) => sum + entry.count, 0),
     [cableCombinationSummary]
   );
+
+  const [expandedCombos, setExpandedCombos] = useState<Set<string>>(new Set());
+
+  const toggleComboExpanded = (key: string) => {
+    setExpandedCombos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -341,6 +367,11 @@ export function CablesTab() {
           <Plus className="w-5 h-5" />
           Neues Kabel
         </button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-gray-400">
+        <span>{cableCombinationSummary.length} Kombinationen</span>
+        <span>Gesamtbestand: <span className="text-white font-semibold">{totalCableCount}</span></span>
       </div>
 
       {/* Filters */}
@@ -465,49 +496,10 @@ export function CablesTab() {
         </div>
       </div>
 
-      {/* Cable Combination Summary */}
-      <div className="glass-dark rounded-xl p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <p className="text-sm uppercase tracking-wide text-gray-400">Kabelübersicht</p>
-            <h3 className="text-xl font-semibold text-white">Einzigartige Kombinationen</h3>
-          </div>
-          <div className="text-sm text-gray-300">
-            Gesamtbestand:{' '}
-            <span className="text-white font-semibold">{totalCableCount}</span>
-          </div>
-        </div>
-        {cableCombinationSummary.length === 0 ? (
-          <p className="text-sm text-gray-400">Keine Kabel vorhanden.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-400 border-b border-white/10">
-                  <th className="py-2 pr-4 font-semibold">Bezeichnung</th>
-                  <th className="py-2 text-right font-semibold">Anzahl</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {cableCombinationSummary.map((combo, index) => (
-                  <tr key={`${combo.typeId}-${combo.connector1}-${combo.connector2}-${combo.length}-${index}`}>
-                    <td className="py-2 pr-4 text-white">
-                      {combo.typeName || 'Unbekannt'} (
-                      {combo.connector1Label} - {combo.connector2Label}) • {combo.lengthLabel}
-                    </td>
-                    <td className="py-2 text-right text-gray-200 font-semibold">{combo.count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {/* Cable List */}
       {loadingCables ? (
         <div className="text-center py-12 text-gray-400">Lädt Kabel...</div>
-      ) : cables.length === 0 ? (
+      ) : cableCombinationSummary.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           {debouncedSearch || connector1Filter || connector2Filter || typeFilter || lengthMinFilter || lengthMaxFilter
             ? 'Keine Kabel gefunden mit den aktuellen Filtern'
@@ -519,118 +511,163 @@ export function CablesTab() {
             <table className="w-full">
               <thead className="bg-white/5">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">ID</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Stecker 1</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Stecker 2</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Typ</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Länge</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">mm²</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Kombination</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Anzahl</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {cables.map((cable) => (
-                  <tr key={cable.cable_id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3 text-sm text-gray-300">{cable.cable_id}</td>
-                    <td className="px-4 py-3 text-sm text-white">{cable.name || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-300">
-                      {getConnectorDisplay(cable.connector1, cable.connector1_gender)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">
-                      {getConnectorDisplay(cable.connector2, cable.connector2_gender)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">
-                      {getCableTypeName(cable.typ)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{cable.length}m</td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{cable.mm2 || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleViewCable(cable)}
-                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="Details anzeigen"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => openEditModal(cable)}
-                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-blue-400 hover:text-blue-300"
-                          title="Bearbeiten"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(cable.cable_id)}
-                          className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-red-400 hover:text-red-300"
-                          title="Löschen"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {cableCombinationSummary.map((combo) => {
+                  const isExpanded = expandedCombos.has(combo.key);
+                  return (
+                    <Fragment key={combo.key}>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-white">
+                          <button
+                            onClick={() => toggleComboExpanded(combo.key)}
+                            className="inline-flex items-center gap-2 text-left font-semibold hover:text-accent-red transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-accent-red" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            )}
+                            <span>
+                              {combo.typeName || 'Unbekannt'} ({combo.connector1Label} - {combo.connector2Label}) • {combo.lengthLabel}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-200 font-semibold">{combo.count}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => toggleComboExpanded(combo.key)}
+                            className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors"
+                          >
+                            {isExpanded ? 'Schließen' : 'Details'}
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={3} className="bg-white/5 px-4 pb-4">
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-left text-gray-400">
+                                    <th className="py-2 pr-2">ID</th>
+                                    <th className="py-2 pr-2">Name</th>
+                                    <th className="py-2 pr-2">Stecker 1</th>
+                                    <th className="py-2 pr-2">Stecker 2</th>
+                                    <th className="py-2 pr-2">Typ</th>
+                                    <th className="py-2 pr-2">Länge</th>
+                                    <th className="py-2 pr-2">mm²</th>
+                                    <th className="py-2 text-right">Aktionen</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/10">
+                                  {combo.cables.map((cable) => (
+                                    <tr key={cable.cable_id}>
+                                      <td className="py-2 pr-2 text-gray-400">#{cable.cable_id}</td>
+                                      <td className="py-2 pr-2 text-white">{cable.name || '-'}</td>
+                                      <td className="py-2 pr-2 text-gray-300">
+                                        {getConnectorDisplay(cable.connector1, cable.connector1_gender)}
+                                      </td>
+                                      <td className="py-2 pr-2 text-gray-300">
+                                        {getConnectorDisplay(cable.connector2, cable.connector2_gender)}
+                                      </td>
+                                      <td className="py-2 pr-2 text-gray-300">{getCableTypeName(cable.typ)}</td>
+                                      <td className="py-2 pr-2 text-gray-300">{cable.length} m</td>
+                                      <td className="py-2 pr-2 text-gray-300">{cable.mm2 ? `${cable.mm2} mm²` : '-'}</td>
+                                      <td className="py-2 text-right">
+                                        <div className="flex justify-end gap-2">
+                                          <button
+                                            onClick={() => handleViewCable(cable)}
+                                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => openEditModal(cable)}
+                                            className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                                          >
+                                            <Pencil className="w-4 h-4" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDelete(cable.cable_id)}
+                                            className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cables.map((cable) => (
-            <div key={cable.cable_id} className="glass-dark rounded-xl p-4 space-y-3">
+          {cableCombinationSummary.map((combo) => (
+            <div key={combo.key} className="glass-dark rounded-xl p-4 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-white">{cable.name || `Kabel #${cable.cable_id}`}</h3>
-                  <p className="text-sm text-gray-400">{getCableTypeName(cable.typ)}</p>
+                  <h3 className="font-bold text-white">{combo.typeName}</h3>
+                  <p className="text-sm text-gray-400">
+                    {combo.connector1Label} → {combo.connector2Label} • {combo.lengthLabel}
+                  </p>
                 </div>
-                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-semibold">
-                  {cable.length}m
+                <span className="px-2 py-1 bg-white/10 text-white rounded-full text-xs font-semibold">
+                  {combo.count}
                 </span>
               </div>
 
-              <div className="space-y-1 text-sm">
-                <p className="text-gray-300">
-                  <span className="text-gray-500">Stecker 1:</span> {getConnectorDisplay(cable.connector1, cable.connector1_gender)}
-                </p>
-                <p className="text-gray-300">
-                  <span className="text-gray-500">Stecker 2:</span> {getConnectorDisplay(cable.connector2, cable.connector2_gender)}
-                </p>
-                {cable.mm2 && (
-                  <p className="text-gray-300">
-                    <span className="text-gray-500">Querschnitt:</span> {cable.mm2}mm²
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 pt-2 border-t border-white/10">
-                <button
-                  onClick={() => handleViewCable(cable)}
-                  className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Eye className="w-4 h-4" />
-                  Details
-                </button>
-                <button
-                  onClick={() => openEditModal(cable)}
-                  className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-sm text-blue-400 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Bearbeiten
-                </button>
-                <button
-                  onClick={() => handleDelete(cable.cable_id)}
-                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              <div className="space-y-3">
+                {combo.cables.map((cable) => (
+                  <div key={cable.cable_id} className="rounded-xl border border-white/10 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-white font-semibold">{cable.name || `Kabel #${cable.cable_id}`}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewCable(cable)}
+                          className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEditModal(cable)}
+                          className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(cable.cable_id)}
+                          className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-400 flex flex-wrap gap-3">
+                      <span>#{cable.cable_id}</span>
+                      <span>{cable.mm2 ? `${cable.mm2} mm²` : 'mm² n/a'}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
       )}
-
       {/* Create/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
