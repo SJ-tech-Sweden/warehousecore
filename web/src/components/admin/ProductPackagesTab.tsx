@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import {
   Plus,
   Pencil,
@@ -10,7 +9,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { createPortal } from 'react-dom';
+import { ModalPortal } from '../ModalPortal';
 
 interface ProductPackage {
   package_id: number;
@@ -61,20 +60,6 @@ const initialFormData: PackageFormData = {
   price: '',
   items: [],
   aliases: [],
-};
-
-const ModalPortal = ({ children }: { children: ReactNode }) => {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted || typeof document === 'undefined') {
-    return null;
-  }
-
-  return createPortal(children, document.body);
 };
 
 export function ProductPackagesTab() {

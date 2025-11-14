@@ -464,6 +464,10 @@ func GetProductPackageAliasMap(w http.ResponseWriter, r *http.Request) {
 }
 
 func ensurePackageCodeSupport(db *sql.DB) error {
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
+
 	if err := ensurePackageCodeColumn(db); err != nil {
 		return err
 	}
@@ -471,10 +475,6 @@ func ensurePackageCodeSupport(db *sql.DB) error {
 }
 
 func ensurePackageCodeColumn(db *sql.DB) error {
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
 	const columnCheck = `
 		SELECT COUNT(*)
 		FROM information_schema.columns
