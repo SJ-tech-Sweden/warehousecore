@@ -347,8 +347,16 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product package not found"})
-		return
+		var exists bool
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_id = ?)", id).Scan(&exists); err != nil {
+			log.Printf("Failed to confirm product package existence: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update package"})
+			return
+		}
+		if !exists {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product package not found"})
+			return
+		}
 	}
 
 	// Delete existing items
