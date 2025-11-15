@@ -1273,6 +1273,18 @@ For issues or questions:
 
 ## Changelog
 
+### Version 1.61 (2025-11-15)
+- **Mobile Responsiveness Improvements** - Fixed GitLab Issue #20
+  - Products Page: Made tab bar scrollable with optimized button sizing; search field full-width; responsive action buttons
+  - Cable Page: Fixed search icon overlay issue; action buttons wrap properly; shortened button text on mobile
+  - Label Designer Page: Fixed select field overflow; made export buttons responsive
+  - Cases Page: Reduced status card padding and font sizes for mobile screens
+  - Admin Page - LED Behavior Tab: Fixed button text overflow with responsive labels; preview buttons use shortened text
+  - Admin Page - ESP Controller Tab: Fixed horizontal scrolling; controller cards stack vertically; responsive button labels
+  - Admin Page - Roles Tab: Grid switches to single column on mobile; user information truncates properly
+  - All pages now follow mobile-first design principles with proper breakpoints (sm:, md:, lg:)
+  - Improved touch targets and readability on small screens
+
 ### Version 2.62 (2025-11-14)
 - **Feature: Product Package OCR Aliases** ✨ **[Issue #19]**
   - Added permanent `package_code` column plus alias management for every product package.
