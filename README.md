@@ -1055,14 +1055,14 @@ docker pull nobentie/warehousecore:latest
 # (DO NOT use docker-compose restart manually)
 ```
 
-**Current Version:** 2.62
+**Current Version:** 2.69
 
 **Recent Changes:**
+- 2.69: Full device management in product edit modal - add/remove devices, view device list with status
+- 2.68: UI Consistency - Product modal placement standardization with ModalPortal
 - 2.62: Product packages gain package codes, OCR alias management UI, and alias-map API
 - 2.61: Haupt-Kabeltabelle gruppiert nach Typ/Stecker/Länge mit Inline-Details
 - 2.60: Kabelübersicht gruppiert nach Stecker1/Stecker2/Länge und zeigt Gesamtanzahl pro Kombination
-- 2.59: Kabeltypen-Endpunkt liefert Bestandszahlen für jedes Label
-- 2.58: Cable filters show gendered connector labels and dynamically limit Stecker 2 based on Stecker 1 compatibility
 
 **Run with docker-compose (local development):**
 ```bash
@@ -1272,6 +1272,19 @@ For issues or questions:
 ---
 
 ## Changelog
+
+### Version 2.69 (2025-11-15)
+- **Feature: Full Device Management in Product Edit Modal**
+  - Added GET `/admin/products/{id}/devices` endpoint to fetch all devices for a product
+  - Enhanced product edit modal with complete device management capabilities
+  - Users can now view all assigned devices with their current status
+  - Added ability to add multiple devices directly from edit modal
+  - Device removal with visual toggle (mark for deletion, confirm on save)
+  - Real-time device count and loading states
+  - Consistent UI between create and edit modes
+  - Device list shows device ID, status, and removal options
+  - Batch device deletion with confirmation message
+  - Device creation fields (quantity/prefix) available in edit mode with "Add Devices" button
 
 ### Version 2.68 (2025-11-15)
 - **UI Consistency: Product Modal Placement Standardization**
