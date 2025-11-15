@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { ModalPortal } from '../ModalPortal';
 
 interface Product {
   product_id: number;
@@ -707,27 +708,22 @@ export function ProductsTab() {
       )}
 
       {modalOpen && (
-        <div
-          className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 py-10"
-          onClick={closeModal}
-        >
-          <div
-            className="glass-dark relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl shadow-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-              <h2 className="text-2xl font-bold text-white">
-                {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt'}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+        <ModalPortal>
+          <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
+            <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-white">
+                  {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt'}
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-white">
                   Name <span className="text-accent-red">*</span>
@@ -1036,127 +1032,133 @@ export function ProductsTab() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-3 pt-4 sm:flex-row">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 rounded-lg bg-accent-red px-4 py-3 font-semibold text-white transition hover:bg-accent-red/90 disabled:opacity-50"
-                >
-                  {submitting ? 'Speichern …' : editingProduct ? 'Aktualisieren' : 'Erstellen'}
-                </button>
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg bg-white/10 px-4 py-3 font-semibold text-white transition hover:bg-white/20"
+                  className="flex-1 btn-secondary"
+                  disabled={submitting}
                 >
                   Abbrechen
+                </button>
+                <button type="submit" className="flex-1 btn-primary" disabled={submitting}>
+                  {submitting ? 'Speichert...' : editingProduct ? 'Speichern' : 'Erstellen'}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {viewProduct && (
-        <div
-          className="fixed inset-0 z-[5200] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 py-10"
-          onClick={closeDetailModal}
-        >
-          <div
-            className="glass-dark relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl shadow-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{viewProduct.name}</h2>
-                <p className="text-sm text-gray-400">Produkt-ID #{viewProduct.product_id}</p>
+        <ModalPortal>
+          <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
+            <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-white">{viewProduct.name}</h3>
+                <button
+                  onClick={closeDetailModal}
+                  className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <button
-                onClick={closeDetailModal}
-                className="rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {loadingDetail ? (
-                <div className="py-6 text-center text-gray-400">Lade Details …</div>
-              ) : (
-                <div className="space-y-6 text-sm text-gray-200">
+            {loadingDetail ? (
+              <p className="text-gray-400 text-center py-4">Lade Details …</p>
+            ) : (
+              <>
+                {viewProduct.description && (
                   <div>
-                    <h3 className="text-xs uppercase tracking-wide text-gray-400">Beschreibung</h3>
-                    <p className="mt-1 text-base text-white">
-                      {viewProduct.description || 'Keine Beschreibung hinterlegt.'}
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Beschreibung</h4>
+                    <p className="text-white">{viewProduct.description}</p>
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">Kategorie</h4>
+                  <p className="text-white">{categoryPath(viewProduct)}</p>
+                </div>
+
+                {(viewProduct.brand_name || viewProduct.manufacturer_name) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Brand / Hersteller</h4>
+                    <p className="text-white">
+                      {viewProduct.brand_name || '—'}
+                      {viewProduct.manufacturer_name ? ` • ${viewProduct.manufacturer_name}` : ''}
                     </p>
                   </div>
+                )}
 
-                  <div className="grid gap-4 rounded-xl bg-white/5 p-4 md:grid-cols-2">
-                    <div>
-                      <span className="text-xs uppercase text-gray-400">Kategorie</span>
-                      <p className="text-white">{categoryPath(viewProduct)}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs uppercase text-gray-400">Brand / Hersteller</span>
-                      <p className="text-white">
-                        {viewProduct.brand_name || '—'}
-                        {viewProduct.manufacturer_name ? ` • ${viewProduct.manufacturer_name}` : ''}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs uppercase text-gray-400">Preis pro Tag</span>
-                      <p className="text-white">{formatCurrency(viewProduct.item_cost_per_day)}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs uppercase text-gray-400">Wartungsintervall</span>
-                      <p className="text-white">
-                        {viewProduct.maintenance_interval != null
-                          ? `${viewProduct.maintenance_interval} Tage`
-                          : '—'}
-                      </p>
-                    </div>
+                {viewProduct.item_cost_per_day != null && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Preis pro Tag</h4>
+                    <p className="text-white text-xl font-bold">{formatCurrency(viewProduct.item_cost_per_day)}</p>
                   </div>
+                )}
 
-                  <div className="grid gap-4 rounded-xl bg-white/5 p-4 md:grid-cols-4">
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Gewicht</p>
-                      <p className="text-white">{formatMeasurement(viewProduct.weight, 'kg')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Höhe</p>
-                      <p className="text-white">{formatMeasurement(viewProduct.height, 'cm')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Breite</p>
-                      <p className="text-white">{formatMeasurement(viewProduct.width, 'cm')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Tiefe</p>
-                      <p className="text-white">{formatMeasurement(viewProduct.depth, 'cm')}</p>
-                    </div>
+                {viewProduct.maintenance_interval != null && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-1">Wartungsintervall</h4>
+                    <p className="text-white">{viewProduct.maintenance_interval} Tage</p>
                   </div>
+                )}
 
-                  <div className="grid gap-4 rounded-xl bg-white/5 p-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Leistungsaufnahme</p>
-                      <p className="text-white">
-                        {formatMeasurement(viewProduct.power_consumption, 'W')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-400">Position in Kategorie</p>
-                      <p className="text-white">
-                        {viewProduct.pos_in_category != null
-                          ? viewProduct.pos_in_category
-                          : '—'}
-                      </p>
-                    </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-400 mb-3">Physische Eigenschaften</h4>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Gewicht', value: formatMeasurement(viewProduct.weight, 'kg') },
+                      { label: 'Höhe', value: formatMeasurement(viewProduct.height, 'cm') },
+                      { label: 'Breite', value: formatMeasurement(viewProduct.width, 'cm') },
+                      { label: 'Tiefe', value: formatMeasurement(viewProduct.depth, 'cm') },
+                    ].map((item) => (
+                      <div key={item.label} className="bg-gray-800 rounded-lg p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 text-sm">{item.label}</span>
+                          <span className="text-white font-semibold">{item.value}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
+
+                {(viewProduct.power_consumption != null || viewProduct.pos_in_category != null) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-3">Technische Details</h4>
+                    <div className="space-y-2">
+                      {viewProduct.power_consumption != null && (
+                        <div className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">Leistungsaufnahme</span>
+                            <span className="text-white font-semibold">{formatMeasurement(viewProduct.power_consumption, 'W')}</span>
+                          </div>
+                        </div>
+                      )}
+                      {viewProduct.pos_in_category != null && (
+                        <div className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">Position in Kategorie</span>
+                            <span className="text-white font-semibold">{viewProduct.pos_in_category}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button
+              onClick={closeDetailModal}
+              className="w-full mt-6 btn-secondary"
+            >
+              Schließen
+            </button>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
     </div>
   );
