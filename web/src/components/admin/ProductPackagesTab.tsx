@@ -13,6 +13,7 @@ import { ModalPortal } from '../ModalPortal';
 
 interface ProductPackage {
   package_id: number;
+  product_id: number;
   package_code: string;
   name: string;
   description?: string | null;
@@ -21,6 +22,9 @@ interface ProductPackage {
   created_at: string;
   updated_at: string;
   aliases?: string[];
+  category_id?: number | null;
+  category_name?: string | null;
+  subcategory_id?: string | null;
 }
 
 interface PackageItemDetail {
@@ -52,6 +56,9 @@ interface PackageFormData {
     quantity: number;
   }>;
   aliases: string[];
+  category_id: number | '';
+  subcategory_id: string;
+  subbiercategory_id: string;
 }
 
 const initialFormData: PackageFormData = {
@@ -60,6 +67,9 @@ const initialFormData: PackageFormData = {
   price: '',
   items: [],
   aliases: [],
+  category_id: '',
+  subcategory_id: '',
+  subbiercategory_id: '',
 };
 
 function formatPrice(value?: number | string | null, fallback = '-') {
@@ -91,6 +101,7 @@ export function ProductPackagesTab() {
   const [formError, setFormError] = useState<string | null>(null);
   const scrollPosition = useRef(0);
   const viewPackagePriceDisplay = viewPackage ? formatPrice(viewPackage.price, '') : '';
+  const [categories, setCategories] = useState<Array<{ categoryID: number; name: string }>>([]);
 
   const fetchPackages = async () => {
     try {
@@ -114,6 +125,15 @@ export function ProductPackagesTab() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/categories');
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  };
+
   useEffect(() => {
     fetchPackages();
   }, [searchTerm]);
@@ -122,7 +142,10 @@ export function ProductPackagesTab() {
     if ((modalOpen || viewPackage) && products.length === 0) {
       fetchProducts();
     }
-  }, [modalOpen, viewPackage, products.length]);
+    if ((modalOpen || viewPackage) && categories.length === 0) {
+      fetchCategories();
+    }
+  }, [modalOpen, viewPackage, products.length, categories.length]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -166,6 +189,9 @@ export function ProductPackagesTab() {
               quantity: item.quantity,
             })) || [],
             aliases: data.aliases || [],
+            category_id: data.category_id || '',
+            subcategory_id: data.subcategory_id || '',
+            subbiercategory_id: '',
           });
         })
         .catch(err => console.error('Failed to fetch package details:', err));
@@ -212,6 +238,9 @@ export function ProductPackagesTab() {
         price: formData.price ? parseFloat(formData.price) : null,
         items: formData.items,
         aliases: formData.aliases,
+        category_id: formData.category_id || null,
+        subcategory_id: formData.subcategory_id || null,
+        subbiercategory_id: formData.subbiercategory_id || null,
       };
 
       if (editingPackage) {
@@ -466,6 +495,24 @@ export function ProductPackagesTab() {
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Kategorie
+                </label>
+                <select
+                  value={formData.category_id}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value ? Number(e.target.value) : '' })}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                >
+                  <option value="">Keine Kategorie</option>
+                  {categories.map((cat) => (
+                    <option key={cat.categoryID} value={cat.categoryID}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="border-t border-gray-700 pt-4">

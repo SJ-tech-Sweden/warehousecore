@@ -32,15 +32,21 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT
 			pp.package_id,
+			pp.product_id,
 			pp.package_code,
 			pp.name,
 			pp.description,
 			pp.price,
 			pp.created_at,
 			pp.updated_at,
-			COALESCE(SUM(ppi.quantity), 0) as total_items
+			COALESCE(SUM(ppi.quantity), 0) as total_items,
+			p.categoryID,
+			c.name as category_name,
+			p.subcategoryID
 		FROM product_packages pp
 		LEFT JOIN product_package_items ppi ON pp.package_id = ppi.package_id
+		LEFT JOIN products p ON pp.product_id = p.productID
+		LEFT JOIN categories c ON p.categoryID = c.categoryID
 		WHERE 1=1
 	`
 
@@ -67,6 +73,7 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 		var pkg models.ProductPackageWithItems
 		err := rows.Scan(
 			&pkg.PackageID,
+			&pkg.ProductID,
 			&pkg.PackageCode,
 			&pkg.Name,
 			&pkg.Description,
@@ -74,6 +81,9 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 			&pkg.CreatedAt,
 			&pkg.UpdatedAt,
 			&pkg.TotalItems,
+			&pkg.CategoryID,
+			&pkg.CategoryName,
+			&pkg.SubcategoryID,
 		)
 		if err != nil {
 			log.Printf("Failed to scan product package: %v", err)
@@ -101,27 +111,37 @@ func GetProductPackage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get package details
+	// Get package details with product category information
 	var pkg models.ProductPackageWithItems
 	err = db.QueryRow(`
 		SELECT
-			package_id,
-			package_code,
-			name,
-			description,
-			price,
-			created_at,
-			updated_at
-		FROM product_packages
-		WHERE package_id = ?
+			pp.package_id,
+			pp.product_id,
+			pp.package_code,
+			pp.name,
+			pp.description,
+			pp.price,
+			pp.created_at,
+			pp.updated_at,
+			p.categoryID,
+			c.name as category_name,
+			p.subcategoryID
+		FROM product_packages pp
+		LEFT JOIN products p ON pp.product_id = p.productID
+		LEFT JOIN categories c ON p.categoryID = c.categoryID
+		WHERE pp.package_id = ?
 	`, id).Scan(
 		&pkg.PackageID,
+		&pkg.ProductID,
 		&pkg.PackageCode,
 		&pkg.Name,
 		&pkg.Description,
 		&pkg.Price,
 		&pkg.CreatedAt,
 		&pkg.UpdatedAt,
+		&pkg.CategoryID,
+		&pkg.CategoryName,
+		&pkg.SubcategoryID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -191,11 +211,14 @@ func GetProductPackage(w http.ResponseWriter, r *http.Request) {
 // CreateProductPackage creates a new product package
 func CreateProductPackage(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name        string                      `json:"name"`
-		Description *string                     `json:"description"`
-		Price       *float64                    `json:"price"`
-		Items       []models.ProductPackageItem `json:"items"`
-		Aliases     []string                    `json:"aliases"`
+		Name            string                      `json:"name"`
+		Description     *string                     `json:"description"`
+		Price           *float64                    `json:"price"`
+		Items           []models.ProductPackageItem `json:"items"`
+		Aliases         []string                    `json:"aliases"`
+		CategoryID      *int                        `json:"category_id"`      // NEW: Product category
+		SubcategoryID   *string                     `json:"subcategory_id"`   // NEW: Product subcategory
+		SubbiercategoryID *string                   `json:"subbiercategory_id"` // NEW: Product sub-subcategory
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -233,11 +256,26 @@ func CreateProductPackage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	// Create package
+	// Step 1: Create a Product entry for this package
+	productResult, err := tx.Exec(`
+		INSERT INTO products (name, categoryID, subcategoryID, subbiercategoryID, itemcostperday, description)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID, req.Price, req.Description)
+
+	if err != nil {
+		log.Printf("Failed to create package product: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create package product"})
+		return
+	}
+
+	productID, _ := productResult.LastInsertId()
+	log.Printf("[PACKAGE CREATE] Created product ID %d for package '%s'", productID, req.Name)
+
+	// Step 2: Create package linked to the product
 	result, err := tx.Exec(`
-		INSERT INTO product_packages (package_code, name, description, price)
-		VALUES (?, ?, ?, ?)
-	`, packageCode, req.Name, req.Description, req.Price)
+		INSERT INTO product_packages (package_code, product_id, name, description, price)
+		VALUES (?, ?, ?, ?, ?)
+	`, packageCode, productID, req.Name, req.Description, req.Price)
 
 	if err != nil {
 		log.Printf("Failed to create product package: %v", err)
@@ -297,11 +335,14 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name        string                      `json:"name"`
-		Description *string                     `json:"description"`
-		Price       *float64                    `json:"price"`
-		Items       []models.ProductPackageItem `json:"items"`
-		Aliases     []string                    `json:"aliases"`
+		Name            string                      `json:"name"`
+		Description     *string                     `json:"description"`
+		Price           *float64                    `json:"price"`
+		Items           []models.ProductPackageItem `json:"items"`
+		Aliases         []string                    `json:"aliases"`
+		CategoryID      *int                        `json:"category_id"`      // NEW: Product category
+		SubcategoryID   *string                     `json:"subcategory_id"`   // NEW: Product subcategory
+		SubbiercategoryID *string                   `json:"subbiercategory_id"` // NEW: Product sub-subcategory
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -331,6 +372,28 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+
+	// Get the product_id for this package
+	var productID int
+	err = tx.QueryRow("SELECT product_id FROM product_packages WHERE package_id = ?", id).Scan(&productID)
+	if err != nil {
+		log.Printf("Failed to get product_id for package: %v", err)
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Package not found"})
+		return
+	}
+
+	// Update the linked product
+	_, err = tx.Exec(`
+		UPDATE products
+		SET name = ?, categoryID = ?, subcategoryID = ?, subbiercategoryID = ?, itemcostperday = ?, description = ?
+		WHERE productID = ?
+	`, req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID, req.Price, req.Description, productID)
+
+	if err != nil {
+		log.Printf("Failed to update package product: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update package product"})
+		return
+	}
 
 	// Update package
 	result, err := tx.Exec(`
