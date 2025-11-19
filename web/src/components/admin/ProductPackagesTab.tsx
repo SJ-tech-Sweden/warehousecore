@@ -84,6 +84,8 @@ const initialFormData: PackageFormData = {
   device_prefix: '',
 };
 
+const ensureArray = <T,>(value: T[] | undefined | null): T[] => (Array.isArray(value) ? value : []);
+
 function formatPrice(value?: number | string | null, fallback = '-') {
   if (value === undefined || value === null || value === '') {
     return fallback;
@@ -123,7 +125,11 @@ export function ProductPackagesTab() {
       setLoading(true);
       const params = searchTerm ? { search: searchTerm } : {};
       const response = await api.get('/admin/product-packages', { params });
-      setPackages(response.data || []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      if (!Array.isArray(response.data)) {
+        console.warn('Unexpected product packages payload:', response.data);
+      }
+      setPackages(data);
     } catch (error) {
       console.error('Failed to fetch product packages:', error);
     } finally {
@@ -134,7 +140,11 @@ export function ProductPackagesTab() {
   const fetchProducts = async () => {
     try {
       const response = await api.get('/admin/products');
-      setProducts(response.data || []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      if (!Array.isArray(response.data)) {
+        console.warn('Unexpected products payload for packages tab:', response.data);
+      }
+      setProducts(data);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -143,7 +153,11 @@ export function ProductPackagesTab() {
   const fetchCategories = async () => {
     try {
       const response = await api.get('/categories');
-      setCategories(response.data || []);
+      const data = Array.isArray(response.data) ? response.data : [];
+      if (!Array.isArray(response.data)) {
+        console.warn('Unexpected categories payload for packages tab:', response.data);
+      }
+      setCategories(data);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
     }
@@ -192,7 +206,11 @@ export function ProductPackagesTab() {
     setLoadingDevices(true);
     try {
       const { data } = await api.get<Device[]>(`/admin/products/${productId}/devices`);
-      setPackageDevices(data || []);
+      const devices = Array.isArray(data) ? data : [];
+      if (!Array.isArray(data)) {
+        console.warn('Unexpected package devices payload:', data);
+      }
+      setPackageDevices(devices);
       setDevicesToDelete(new Set());
     } catch (error) {
       console.error('Failed to load package devices:', error);
@@ -246,15 +264,17 @@ export function ProductPackagesTab() {
       try {
         const res = await api.get<ProductPackageWithItems>(`/admin/product-packages/${pkg.package_id}`);
         const data = res.data;
+        const packageItems = Array.isArray(data.items) ? data.items : [];
+        const packageAliases = ensureArray(data.aliases);
         setFormData({
           name: data.name,
           description: data.description || '',
           price: data.price?.toString() || '',
-          items: data.items?.map(item => ({
+          items: packageItems.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
           })) || [],
-          aliases: data.aliases || [],
+          aliases: packageAliases,
           category_id: data.category_id || '',
           subcategory_id: data.subcategory_id || '',
           subbiercategory_id: '',
@@ -387,7 +407,12 @@ export function ProductPackagesTab() {
   const handleViewPackage = async (pkg: ProductPackage) => {
     try {
       const response = await api.get<ProductPackageWithItems>(`/admin/product-packages/${pkg.package_id}`);
-      setViewPackage(response.data);
+      const packageData = response.data;
+      setViewPackage({
+        ...packageData,
+        aliases: ensureArray(packageData?.aliases),
+        items: Array.isArray(packageData?.items) ? packageData.items : [],
+      });
     } catch (error) {
       console.error('Failed to fetch package details:', error);
     }
