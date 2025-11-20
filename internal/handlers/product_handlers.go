@@ -655,6 +655,11 @@ func GetProductDevices(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
 	query := `
+		WITH latest_job AS (
+			SELECT jd.deviceID, MAX(jd.jobID) AS jobID
+			FROM jobdevices jd
+			GROUP BY jd.deviceID
+		)
 		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id,
 		       d.condition_rating, d.usage_hours, d.purchaseDate, d.lastmaintenance, d.nextmaintenance,
@@ -665,7 +670,7 @@ func GetProductDevices(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(z.code, '') AS zone_code,
 		       dc.caseID,
 		       COALESCE(c.name, '') AS case_name,
-		       jd.jobID,
+		       lj.jobID,
 		       COALESCE(j.job_code, '') AS job_number
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
@@ -673,8 +678,8 @@ func GetProductDevices(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases c ON dc.caseID = c.caseID
-		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
-		LEFT JOIN jobs j ON jd.jobID = j.jobID
+		LEFT JOIN latest_job lj ON lj.deviceID = d.deviceID
+		LEFT JOIN jobs j ON lj.jobID = j.jobID
 		WHERE d.productID = ?
 		ORDER BY d.deviceID ASC
 	`
