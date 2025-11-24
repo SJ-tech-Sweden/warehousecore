@@ -335,8 +335,17 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product not found"})
-		return
+		// MySQL returns 0 when values are unchanged; verify existence before treating as not found.
+		var exists bool
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = ?)", id).Scan(&exists); err != nil {
+			log.Printf("Failed to verify product existence after update: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
+			return
+		}
+		if !exists {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product not found"})
+			return
+		}
 	}
 
 	if packageID.Valid {
