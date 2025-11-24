@@ -251,12 +251,13 @@ export function ProductsTab() {
 
   const loadMetadata = useCallback(async () => {
     try {
-      const [catRes, subRes, subbierRes, brandRes, manufacturerRes] = await Promise.all([
+      const [catRes, subRes, subbierRes, brandRes, manufacturerRes, countTypeRes] = await Promise.all([
         api.get<Category[]>('/admin/categories'),
         api.get<Subcategory[]>('/admin/subcategories'),
         api.get<Subbiercategory[]>('/admin/subbiercategories'),
         api.get<Brand[]>('/admin/brands'),
         api.get<Manufacturer[]>('/admin/manufacturers'),
+        api.get<CountType[]>('/admin/count-types'),
       ]);
 
       setCategories(catRes.data || []);
@@ -264,15 +265,7 @@ export function ProductsTab() {
       setSubbiercategories(subbierRes.data || []);
       setBrands(brandRes.data || []);
       setManufacturers(manufacturerRes.data || []);
-
-      // Load count types from RentalCore
-      try {
-        const countTypesRes = await fetch('http://rentalcore:8081/api/count-types');
-        const countTypesData = await countTypesRes.json();
-        setCountTypes(countTypesData.count_types || []);
-      } catch (error) {
-        console.error('Failed to load count types:', error);
-      }
+      setCountTypes(countTypeRes.data || []);
 
       setMetadataLoaded(true);
     } catch (error) {
