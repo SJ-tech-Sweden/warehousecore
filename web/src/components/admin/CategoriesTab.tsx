@@ -31,6 +31,8 @@ export function CategoriesTab() {
   const [activeLevel, setActiveLevel] = useState<Level>('category');
   const [editing, setEditing] = useState<number | string | 'new' | null>(null);
   const [formData, setFormData] = useState<any>({});
+  const [subcategoryFilter, setSubcategoryFilter] = useState<number | ''>('');
+  const [subbiercategoryFilter, setSubbiercategoryFilter] = useState<string | ''>('');
 
   useEffect(() => {
     loadCategories();
@@ -122,6 +124,9 @@ export function CategoriesTab() {
       alert('Fehler: ' + (error.response?.data?.error || error.message));
     }
   };
+
+  const filteredSubcategories = subcategoryFilter === '' ? subcategories : subcategories.filter((subcat) => subcat.category_id === subcategoryFilter);
+  const filteredSubbiercategories = subbiercategoryFilter === '' ? subbiercategories : subbiercategories.filter((subbiercat) => subbiercat.subcategory_id === subbiercategoryFilter);
 
   return (
     <div className="space-y-4">
@@ -220,6 +225,20 @@ export function CategoriesTab() {
             Neue Unterkategorie
           </button>
 
+          <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
+            <div className="text-sm font-semibold text-white">Nach Kategorie filtern</div>
+            <select
+              value={subcategoryFilter}
+              onChange={(e) => setSubcategoryFilter(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+              className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+            >
+              <option value="">Alle Kategorien</option>
+              {categories.map(cat => (
+                <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+
           {editing && (
             <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
               <input
@@ -260,7 +279,7 @@ export function CategoriesTab() {
             </div>
           )}
 
-          {subcategories.map(subcat => {
+          {filteredSubcategories.map(subcat => {
             const parentCategory = categories.find(c => c.category_id === subcat.category_id);
             return (
               <div key={subcat.subcategory_id} className="glass rounded-xl p-4 flex items-center justify-between">
@@ -293,6 +312,25 @@ export function CategoriesTab() {
             <Plus className="w-4 h-4" />
             Neue Sub-Unterkategorie
           </button>
+
+          <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
+            <div className="text-sm font-semibold text-white">Nach Unterkategorie filtern</div>
+            <select
+              value={subbiercategoryFilter}
+              onChange={(e) => setSubbiercategoryFilter(e.target.value === '' ? '' : e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+            >
+              <option value="">Alle Unterkategorien</option>
+              {subcategories.map(subcat => {
+                const parentCategory = categories.find(c => c.category_id === subcat.category_id);
+                return (
+                  <option key={subcat.subcategory_id} value={subcat.subcategory_id}>
+                    {subcat.name}{parentCategory ? ` (${parentCategory.name})` : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
           {editing && (
             <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
@@ -334,7 +372,7 @@ export function CategoriesTab() {
             </div>
           )}
 
-          {subbiercategories.map(subbiercat => {
+          {filteredSubbiercategories.map(subbiercat => {
             const parentSubcategory = subcategories.find(s => s.subcategory_id === subbiercat.subcategory_id);
             return (
               <div key={subbiercat.subbiercategory_id} className="glass rounded-xl p-4 flex items-center justify-between">
