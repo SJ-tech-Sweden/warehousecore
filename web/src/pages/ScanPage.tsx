@@ -44,7 +44,35 @@ export function ScanPage() {
         });
 
         if (data.success) {
-          // Device found - proceed to zone scan
+          // Check if this is an accessory/consumable (has product info with unit)
+          if (data.product && data.product.unit) {
+            // This is an accessory/consumable - ask for quantity
+            const quantityStr = window.prompt(`Menge zum Einlagern (${data.product.unit}):`);
+
+            if (!quantityStr || isNaN(Number(quantityStr)) || Number(quantityStr) <= 0) {
+              setResult({
+                success: false,
+                message: 'Ungültige Menge eingegeben',
+                action,
+                duplicate: false,
+              });
+              setLoading(false);
+              return;
+            }
+
+            // Do the intake directly with quantity (no zone needed for consumables)
+            const intakeResponse = await scansApi.process({
+              scan_code: scanCode,
+              action: 'intake',
+              job_id: Number(quantityStr),
+            });
+            setResult(intakeResponse.data);
+            setScanCode('');
+            setLoading(false);
+            return;
+          }
+
+          // Regular device - proceed to zone scan
           setDeviceScanCode(scanCode);
           setStep('zone');
           setScanCode('');
