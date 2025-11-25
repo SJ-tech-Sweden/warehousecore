@@ -344,11 +344,23 @@ func HandleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if this is an Accessory or Consumable barcode
+	// Check if this barcode belongs to an Accessory or Consumable product
 	scanCode := req.ScanCode
-	if strings.HasPrefix(strings.ToUpper(scanCode), "ACC-") || strings.HasPrefix(strings.ToUpper(scanCode), "CONS-") {
-		// Proxy to RentalCore
-		proxyToRentalCore(w, r, &req)
+	db := repository.GetDB()
+
+	var product struct {
+		IsAccessory  bool `gorm:"column:is_accessory"`
+		IsConsumable bool `gorm:"column:is_consumable"`
+	}
+
+	err := db.Table("products").
+		Select("COALESCE(is_accessory, false) as is_accessory, COALESCE(is_consumable, false) as is_consumable").
+		Where("generic_barcode = ?", scanCode).
+		First(&product).Error
+
+	if err == nil && (product.IsAccessory || product.IsConsumable) {
+		// This is an accessory or consumable - proxy to RentalCore
+		proxyToRentalCore(w, r, &req, product.IsAccessory)
 		return
 	}
 
@@ -365,10 +377,10 @@ func HandleScan(w http.ResponseWriter, r *http.Request) {
 }
 
 // proxyToRentalCore forwards accessory/consumable scans to RentalCore
-func proxyToRentalCore(w http.ResponseWriter, r *http.Request, scanReq *models.ScanRequest) {
-	// Determine endpoint based on barcode prefix
+func proxyToRentalCore(w http.ResponseWriter, r *http.Request, scanReq *models.ScanRequest, isAccessory bool) {
+	// Determine endpoint based on product type
 	var endpoint string
-	if strings.HasPrefix(strings.ToUpper(scanReq.ScanCode), "ACC-") {
+	if isAccessory {
 		endpoint = "/api/scan/accessory"
 	} else {
 		endpoint = "/api/scan/consumable"
@@ -389,7 +401,7 @@ func proxyToRentalCore(w http.ResponseWriter, r *http.Request, scanReq *models.S
 	}
 
 	// For accessories, quantity is always 1
-	if strings.HasPrefix(strings.ToUpper(scanReq.ScanCode), "ACC-") {
+	if isAccessory {
 		requestBody["quantity"] = 1
 	} else {
 		// For consumables, quantity is passed via JobID field (temporary workaround)
