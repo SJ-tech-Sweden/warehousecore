@@ -33,20 +33,6 @@ export function ScanPage() {
       return;
     }
 
-    // Check if scan code is an Accessory (format: ACC-*)
-    const accessoryMatch = scanCode.match(/^ACC-/i);
-    if (accessoryMatch) {
-      await handleAccessoryScan(scanCode);
-      return;
-    }
-
-    // Check if scan code is a Consumable (format: CONS-*)
-    const consumableMatch = scanCode.match(/^CONS-/i);
-    if (consumableMatch) {
-      await handleConsumableScan(scanCode);
-      return;
-    }
-
     setLoading(true);
     try {
       // Step 1: Scan device
@@ -86,9 +72,41 @@ export function ScanPage() {
       }
       // All other actions (outtake, check) - single step
       else {
+        // For consumables with intake/outtake, ask for quantity first
+        let quantity = undefined;
+        if ((action === 'intake' || action === 'outtake')) {
+          // First check if this might be a consumable (quick check without committing)
+          const checkResponse = await scansApi.process({
+            scan_code: scanCode,
+            action: 'check',
+          });
+
+          // If the response includes product info with a unit, it's an accessory/consumable
+          if (checkResponse.data.product && checkResponse.data.product.unit) {
+            const promptText = action === 'intake'
+              ? `Menge zum Einlagern (${checkResponse.data.product.unit}):`
+              : `Menge zum Auslagern (${checkResponse.data.product.unit}):`;
+            const quantityStr = window.prompt(promptText);
+
+            if (!quantityStr || isNaN(Number(quantityStr)) || Number(quantityStr) <= 0) {
+              setResult({
+                success: false,
+                message: 'Ungültige Menge eingegeben',
+                action,
+                duplicate: false,
+              });
+              setLoading(false);
+              return;
+            }
+            quantity = Number(quantityStr);
+          }
+        }
+
+        // Now do the actual scan with quantity if provided
         const { data } = await scansApi.process({
           scan_code: scanCode,
           action,
+          job_id: quantity, // Pass quantity via job_id field (backend expects this)
         });
         setResult(data);
         setScanCode('');
@@ -113,100 +131,6 @@ export function ScanPage() {
     }
   };
 
-  const handleAccessoryScan = async (barcode: string) => {
-    setScanCode('');
-    setLoading(true);
-
-    try {
-      // Send to WarehouseCore backend, which will proxy to RentalCore
-      const response = await scansApi.process({
-        scan_code: barcode,
-        action: action,
-      });
-
-      const data = response.data;
-
-      if (data.success) {
-        setResult({
-          success: true,
-          message: `✅ Accessory gescannt: 1x`,
-          action,
-          duplicate: false,
-        });
-      } else {
-        setResult({
-          success: false,
-          message: data.message || 'Accessory-Scan fehlgeschlagen',
-          action,
-          duplicate: false,
-        });
-      }
-    } catch (error: any) {
-      console.error('Accessory scan failed:', error);
-      setResult({
-        success: false,
-        message: error.response?.data?.error || 'Accessory-Scan fehlgeschlagen',
-        action,
-        duplicate: false,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConsumableScan = async (barcode: string) => {
-    setScanCode('');
-    const quantity = window.prompt('Menge eingeben:');
-
-    if (!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0) {
-      setResult({
-        success: false,
-        message: 'Ungültige Menge eingegeben',
-        action,
-        duplicate: false,
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Send to WarehouseCore backend, which will proxy to RentalCore
-      const response = await scansApi.process({
-        scan_code: barcode,
-        action: action,
-        job_id: Number(quantity), // Use job_id field to pass quantity temporarily
-      });
-
-      const data = response.data;
-
-      if (data.success) {
-        setResult({
-          success: true,
-          message: `✅ Consumable gescannt: ${quantity}x`,
-          action,
-          duplicate: false,
-        });
-      } else {
-        setResult({
-          success: false,
-          message: data.message || 'Consumable-Scan fehlgeschlagen',
-          action,
-          duplicate: false,
-        });
-      }
-    } catch (error: any) {
-      console.error('Consumable scan failed:', error);
-      setResult({
-        success: false,
-        message: error.response?.data?.error || 'Consumable-Scan fehlgeschlagen',
-        action,
-        duplicate: false,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleActionChange = (newAction: 'intake' | 'outtake' | 'check') => {
     setAction(newAction);

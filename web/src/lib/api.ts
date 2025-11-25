@@ -147,6 +147,13 @@ export interface ScanResponse {
   previous_status?: string;
   new_status?: string;
   duplicate: boolean;
+  product?: {
+    product_id: number;
+    name: string;
+    stock_quantity: number;
+    min_stock_level: number;
+    unit: string;
+  };
 }
 
 export interface DashboardStats {
