@@ -2693,8 +2693,8 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
-	// Query for device tree with categories - Modified to include products without devices
-	// We need to ensure products appear even when they have no devices
+	// Query for device tree with categories - Include ALL categories, even empty ones
+	// This ensures newly created categories appear immediately in the tree
 	query := `
 		SELECT
 			c.categoryID,
@@ -2717,7 +2717,6 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN products p ON sbc.subbiercategoryID = p.subbiercategoryID
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE p.productID IS NOT NULL
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
 	`
 
@@ -2757,7 +2756,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Get or create category
+		// Get or create category (always create, even if empty)
 		catID := int(categoryID.Int64)
 		if _, exists := categories[catID]; !exists {
 			categories[catID] = &map[string]interface{}{
@@ -2769,8 +2768,8 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Process subcategory if exists
-		if subcategoryID.Valid {
+		// Process subcategory if exists (create even if empty)
+		if subcategoryID.Valid && subcategoryID.String != "" {
 			subCatID := subcategoryID.String
 			if _, exists := subcategories[subCatID]; !exists {
 				subcategories[subCatID] = &map[string]interface{}{
@@ -2785,8 +2784,8 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 				cat["subcategories"] = append(cat["subcategories"].([]interface{}), subcategories[subCatID])
 			}
 
-			// Process subbiercategory if exists
-			if subbiercategoryID.Valid {
+			// Process subbiercategory if exists (create even if empty)
+			if subbiercategoryID.Valid && subbiercategoryID.String != "" {
 				subBierCatID := subbiercategoryID.String
 				if _, exists := subbiercategories[subBierCatID]; !exists {
 					subbiercategories[subBierCatID] = &map[string]interface{}{
@@ -2801,7 +2800,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Add device to subbiercategory if exists
-				if deviceID.Valid {
+				if deviceID.Valid && deviceID.String != "" {
 					device := map[string]interface{}{
 						"device_id":    deviceID.String,
 						"product_name": productName.String,
