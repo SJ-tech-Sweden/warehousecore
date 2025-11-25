@@ -2868,6 +2868,61 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 						cat["device_count"] = cat["device_count"].(int) + 1
 					}
 				}
+			} else if productID.Valid {
+				// Product belongs directly to subcategory (no subbiercategory)
+				// Handle devices or consumables/accessories at subcategory level
+				if deviceID.Valid && deviceID.String != "" {
+					// Add device directly to subcategory
+					device := map[string]interface{}{
+						"device_id":    deviceID.String,
+						"product_name": productName.String,
+						"status":       status.String,
+					}
+					if barcode.Valid {
+						device["barcode"] = barcode.String
+					}
+					if serialNumber.Valid {
+						device["serial_number"] = serialNumber.String
+					}
+					if zoneID.Valid {
+						device["zone_id"] = zoneID.Int64
+						device["zone_code"] = zoneCode.String
+					}
+
+					subCat := *subcategories[subCatID]
+					subCat["direct_devices"] = append(subCat["direct_devices"].([]interface{}), device)
+					subCat["device_count"] = subCat["device_count"].(int) + 1
+
+					// Update category count
+					cat := *categories[catID]
+					cat["device_count"] = cat["device_count"].(int) + 1
+				} else if (isConsumable == 1 || isAccessory == 1) {
+					// Add consumable/accessory directly to subcategory
+					prodID := int(productID.Int64)
+					if !addedProducts[prodID] {
+						addedProducts[prodID] = true
+
+						productItem := map[string]interface{}{
+							"device_id":      fmt.Sprintf("PROD-%d", prodID),
+							"product_name":   productName.String,
+							"status":         "in_storage",
+							"is_consumable":  isConsumable == 1,
+							"is_accessory":   isAccessory == 1,
+							"stock_quantity": stockQuantity,
+						}
+						if unit.Valid {
+							productItem["unit"] = unit.String
+						}
+
+						subCat := *subcategories[subCatID]
+						subCat["direct_devices"] = append(subCat["direct_devices"].([]interface{}), productItem)
+						subCat["device_count"] = subCat["device_count"].(int) + 1
+
+						// Update category count
+						cat := *categories[catID]
+						cat["device_count"] = cat["device_count"].(int) + 1
+					}
+				}
 			}
 		}
 	}
