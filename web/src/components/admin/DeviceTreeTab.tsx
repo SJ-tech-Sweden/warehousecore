@@ -589,47 +589,80 @@ interface DeviceTreeItemProps {
 }
 
 function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: DeviceTreeItemProps) {
+  const isConsumable = (device as any).is_consumable === true;
+  const isAccessory = (device as any).is_accessory === true;
+  const stockQuantity = (device as any).stock_quantity;
+  const unit = (device as any).unit;
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/[0.02] p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm font-semibold text-white">{device.device_id}</span>
-          <span
-            className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-white/10 ${getStatusColor(device.status)}`}
-          >
-            {formatStatus(device.status)}
-          </span>
+          {isConsumable && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-blue-500/20 text-blue-400">
+              Verbrauchsmaterial
+            </span>
+          )}
+          {isAccessory && (
+            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-purple-500/20 text-purple-400">
+              Zubehör
+            </span>
+          )}
+          {!isConsumable && !isAccessory && (
+            <span
+              className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-white/10 ${getStatusColor(device.status)}`}
+            >
+              {formatStatus(device.status)}
+            </span>
+          )}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
           {device.product_name && <span>{device.product_name}</span>}
-          {device.zone_code && <span className="font-mono text-gray-500">{device.zone_code}</span>}
-          {device.serial_number && <span className="text-gray-500">SN: {device.serial_number}</span>}
+          {(isConsumable || isAccessory) && stockQuantity !== undefined && (
+            <span className="font-semibold text-white">
+              Lagerbestand: {stockQuantity} {unit || ''}
+            </span>
+          )}
+          {!isConsumable && !isAccessory && device.zone_code && (
+            <span className="font-mono text-gray-500">{device.zone_code}</span>
+          )}
+          {!isConsumable && !isAccessory && device.serial_number && (
+            <span className="text-gray-500">SN: {device.serial_number}</span>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onOpenDevice(device.device_id)}
-          className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
-        >
-          Details
-        </button>
-        <button
-          type="button"
-          onClick={() => onLocateDevice(device)}
-          disabled={!device.zone_code}
-          className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Lightbulb className="h-4 w-4 text-yellow-300" /> Licht
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpenZone(device)}
-          disabled={!device.zone_id && !device.zone_code}
-          className="flex items-center gap-1 rounded-lg bg-accent-red/80 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-red disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <MapPin className="h-4 w-4" /> Zone
-        </button>
+        {!isConsumable && !isAccessory && (
+          <>
+            <button
+              type="button"
+              onClick={() => onOpenDevice(device.device_id)}
+              className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              onClick={() => onLocateDevice(device)}
+              disabled={!device.zone_code}
+              className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Lightbulb className="h-4 w-4 text-yellow-300" /> Licht
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenZone(device)}
+              disabled={!device.zone_id && !device.zone_code}
+              className="flex items-center gap-1 rounded-lg bg-accent-red/80 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-red disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <MapPin className="h-4 w-4" /> Zone
+            </button>
+          </>
+        )}
+        {(isConsumable || isAccessory) && (
+          <span className="text-xs text-gray-500 italic">Im Lager verfügbar</span>
+        )}
       </div>
     </div>
   );

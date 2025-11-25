@@ -2693,8 +2693,8 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
-	// Query for device tree with categories - Include ALL categories, even empty ones
-	// This ensures newly created categories appear immediately in the tree
+	// Query for device tree with categories - Include ALL categories, devices, consumables, and accessories
+	// This ensures newly created categories and consumables/accessories appear immediately in the tree
 	query := `
 		SELECT
 			c.categoryID,
@@ -2705,6 +2705,10 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			sbc.name as subbiercategory_name,
 			p.productID,
 			COALESCE(p.name, '') as product_name,
+			COALESCE(p.is_consumable, 0) as is_consumable,
+			COALESCE(p.is_accessory, 0) as is_accessory,
+			COALESCE(p.stock_quantity, 0) as stock_quantity,
+			COALESCE(ct.abbreviation, '') as unit,
 			d.deviceID,
 			d.status,
 			d.barcode,
@@ -2715,6 +2719,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
 		LEFT JOIN subbiercategories sbc ON sc.subcategoryID = sbc.subcategoryID
 		LEFT JOIN products p ON sbc.subbiercategoryID = p.subbiercategoryID
+		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
@@ -2733,18 +2738,25 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	subcategories := make(map[string]*map[string]interface{})
 	subbiercategories := make(map[string]*map[string]interface{})
 
+	// Track which products we've already added (to avoid duplicates for consumables/accessories)
+	addedProducts := make(map[int]bool)
+
 	for rows.Next() {
 		var categoryID sql.NullInt64
 		var subcategoryID, subbiercategoryID sql.NullString
 		var categoryName, subcategoryName, subbiercategoryName sql.NullString
 		var productID sql.NullInt64
 		var productName sql.NullString
+		var isConsumable, isAccessory int
+		var stockQuantity float64
+		var unit sql.NullString
 		var deviceID, status, barcode, serialNumber sql.NullString
 		var zoneID sql.NullInt64
 		var zoneCode sql.NullString
 
 		err := rows.Scan(&categoryID, &categoryName, &subcategoryID, &subcategoryName,
 			&subbiercategoryID, &subbiercategoryName, &productID, &productName,
+			&isConsumable, &isAccessory, &stockQuantity, &unit,
 			&deviceID, &status, &barcode, &serialNumber, &zoneID, &zoneCode)
 		if err != nil {
 			log.Printf("Error scanning row: %v", err)
@@ -2826,6 +2838,35 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 					subCat["device_count"] = subCat["device_count"].(int) + 1
 					cat := *categories[catID]
 					cat["device_count"] = cat["device_count"].(int) + 1
+				} else if productID.Valid && (isConsumable == 1 || isAccessory == 1) {
+					// Add consumable/accessory as product item if no device exists
+					// Only add once per product (avoid duplicates from LEFT JOIN)
+					prodID := int(productID.Int64)
+					if !addedProducts[prodID] {
+						addedProducts[prodID] = true
+
+						productItem := map[string]interface{}{
+							"device_id":     fmt.Sprintf("PROD-%d", prodID),
+							"product_name":  productName.String,
+							"status":        "in_storage",
+							"is_consumable": isConsumable == 1,
+							"is_accessory":  isAccessory == 1,
+							"stock_quantity": stockQuantity,
+						}
+						if unit.Valid {
+							productItem["unit"] = unit.String
+						}
+
+						subBierCat := *subbiercategories[subBierCatID]
+						subBierCat["devices"] = append(subBierCat["devices"].([]interface{}), productItem)
+						subBierCat["device_count"] = subBierCat["device_count"].(int) + 1
+
+						// Update counts
+						subCat := *subcategories[subCatID]
+						subCat["device_count"] = subCat["device_count"].(int) + 1
+						cat := *categories[catID]
+						cat["device_count"] = cat["device_count"].(int) + 1
+					}
 				}
 			}
 		}
