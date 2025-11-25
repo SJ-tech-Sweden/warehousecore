@@ -118,31 +118,25 @@ export function ScanPage() {
     setLoading(true);
 
     try {
-      const direction = action === 'outtake' ? 'out' : action === 'intake' ? 'in' : 'check';
-
-      const response = await fetch('http://rentalcore:8081/api/scan/accessory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          barcode: barcode,
-          direction: direction,
-          quantity: 1, // Always 1 for accessories
-        }),
+      // Send to WarehouseCore backend, which will proxy to RentalCore
+      const response = await scansApi.process({
+        scan_code: barcode,
+        action: action,
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setResult({
           success: true,
-          message: `✅ Accessory scanned: 1x ${data.product.name}`,
+          message: `✅ Accessory gescannt: 1x`,
           action,
           duplicate: false,
         });
       } else {
         setResult({
           success: false,
-          message: data.error || 'Accessory scan failed',
+          message: data.message || 'Accessory-Scan fehlgeschlagen',
           action,
           duplicate: false,
         });
@@ -151,7 +145,7 @@ export function ScanPage() {
       console.error('Accessory scan failed:', error);
       setResult({
         success: false,
-        message: 'Failed to scan accessory',
+        message: error.response?.data?.error || 'Accessory-Scan fehlgeschlagen',
         action,
         duplicate: false,
       });
@@ -162,12 +156,12 @@ export function ScanPage() {
 
   const handleConsumableScan = async (barcode: string) => {
     setScanCode('');
-    const quantity = window.prompt('Enter quantity:');
+    const quantity = window.prompt('Menge eingeben:');
 
     if (!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0) {
       setResult({
         success: false,
-        message: 'Invalid quantity entered',
+        message: 'Ungültige Menge eingegeben',
         action,
         duplicate: false,
       });
@@ -177,31 +171,26 @@ export function ScanPage() {
     setLoading(true);
 
     try {
-      const direction = action === 'outtake' ? 'out' : action === 'intake' ? 'in' : 'check';
-
-      const response = await fetch('http://rentalcore:8081/api/scan/consumable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          barcode: barcode,
-          direction: direction,
-          quantity: Number(quantity),
-        }),
+      // Send to WarehouseCore backend, which will proxy to RentalCore
+      const response = await scansApi.process({
+        scan_code: barcode,
+        action: action,
+        job_id: Number(quantity), // Use job_id field to pass quantity temporarily
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok && data.success) {
+      if (data.success) {
         setResult({
           success: true,
-          message: `✅ Consumable scanned: ${quantity}x ${data.product.name}`,
+          message: `✅ Consumable gescannt: ${quantity}x`,
           action,
           duplicate: false,
         });
       } else {
         setResult({
           success: false,
-          message: data.error || 'Consumable scan failed',
+          message: data.message || 'Consumable-Scan fehlgeschlagen',
           action,
           duplicate: false,
         });
@@ -210,7 +199,7 @@ export function ScanPage() {
       console.error('Consumable scan failed:', error);
       setResult({
         success: false,
-        message: 'Failed to scan consumable',
+        message: error.response?.data?.error || 'Consumable-Scan fehlgeschlagen',
         action,
         duplicate: false,
       });

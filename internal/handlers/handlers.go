@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -341,6 +344,15 @@ func HandleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this is an Accessory or Consumable barcode
+	scanCode := req.ScanCode
+	if strings.HasPrefix(strings.ToUpper(scanCode), "ACC-") || strings.HasPrefix(strings.ToUpper(scanCode), "CONS-") {
+		// Proxy to RentalCore
+		proxyToRentalCore(w, r, &req)
+		return
+	}
+
+	// Regular device scan
 	scanService := services.NewScanService()
 	response, err := scanService.ProcessScan(req, nil, r.RemoteAddr, r.UserAgent())
 	if err != nil {
@@ -350,6 +362,88 @@ func HandleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, response)
+}
+
+// proxyToRentalCore forwards accessory/consumable scans to RentalCore
+func proxyToRentalCore(w http.ResponseWriter, r *http.Request, scanReq *models.ScanRequest) {
+	// Determine endpoint based on barcode prefix
+	var endpoint string
+	if strings.HasPrefix(strings.ToUpper(scanReq.ScanCode), "ACC-") {
+		endpoint = "/api/scan/accessory"
+	} else {
+		endpoint = "/api/scan/consumable"
+	}
+
+	// Map action to direction
+	direction := "check"
+	if scanReq.Action == "intake" {
+		direction = "in"
+	} else if scanReq.Action == "outtake" {
+		direction = "out"
+	}
+
+	// Build request body
+	requestBody := map[string]interface{}{
+		"barcode":   scanReq.ScanCode,
+		"direction": direction,
+	}
+
+	// For accessories, quantity is always 1
+	if strings.HasPrefix(strings.ToUpper(scanReq.ScanCode), "ACC-") {
+		requestBody["quantity"] = 1
+	} else {
+		// For consumables, quantity is passed via JobID field (temporary workaround)
+		if scanReq.JobID != nil {
+			requestBody["quantity"] = *scanReq.JobID
+		} else {
+			requestBody["quantity"] = 1 // Default to 1 if not provided
+		}
+	}
+
+	// Marshal request
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create request"})
+		return
+	}
+
+	// Get RentalCore URL from environment
+	rentalCoreURL := os.Getenv("RENTALCORE_URL")
+	if rentalCoreURL == "" {
+		rentalCoreURL = "http://rentalcore:8081"
+	}
+
+	// Create request to RentalCore
+	req, err := http.NewRequest("POST", rentalCoreURL+endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Failed to create RentalCore request: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to forward to RentalCore"})
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Failed to reach RentalCore: %v", err)
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "RentalCore unavailable"})
+		return
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read RentalCore response"})
+		return
+	}
+
+	// Forward response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	w.Write(body)
 }
 
 // GetScanHistory returns scan event history
