@@ -46,6 +46,29 @@ export function DeviceTreeTab() {
   useEffect(() => {
     loadDevices();
     loadDeviceTree();
+
+    // Auto-refresh when page becomes visible (e.g., switching back from categories tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadDeviceTree();
+        loadDevices();
+      }
+    };
+
+    // Auto-refresh every 30 seconds when page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        loadDeviceTree();
+        loadDevices();
+      }
+    }, 30000);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const deviceMap = useMemo(() => {
