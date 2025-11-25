@@ -2718,7 +2718,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		FROM categories c
 		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
 		LEFT JOIN subbiercategories sbc ON sc.subcategoryID = sbc.subcategoryID
-		LEFT JOIN products p ON sbc.subbiercategoryID = p.subbiercategoryID
+		LEFT JOIN products p ON (sbc.subbiercategoryID = p.subbiercategoryID OR (sc.subcategoryID = p.subcategoryID AND p.subbiercategoryID IS NULL))
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id

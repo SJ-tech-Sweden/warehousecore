@@ -68,6 +68,10 @@ func Load() (*Config, error) {
 		},
 	}
 
+	// Debug logging
+	log.Printf("🔧 Database Config: Host=%s Port=%s User=%s DB=%s (Pass length: %d)",
+		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Database, len(cfg.Database.Password))
+
 	// Validate required fields
 	if cfg.Database.Password == "" {
 		log.Println("Warning: DB_PASS is not set")
