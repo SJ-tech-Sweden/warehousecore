@@ -344,31 +344,8 @@ func HandleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if this barcode belongs to an Accessory or Consumable product
-	scanCode := req.ScanCode
-	db := repository.GetDB()
-
-	var product struct {
-		IsAccessory  bool `gorm:"column:is_accessory"`
-		IsConsumable bool `gorm:"column:is_consumable"`
-	}
-
-	err := db.Table("products").
-		Select("COALESCE(is_accessory, false) as is_accessory, COALESCE(is_consumable, false) as is_consumable").
-		Where("generic_barcode = ?", scanCode).
-		First(&product).Error
-
-	log.Printf("🔍 Scan: %s | DB Query Error: %v | IsAccessory: %v | IsConsumable: %v",
-		scanCode, err, product.IsAccessory, product.IsConsumable)
-
-	if err == nil && (product.IsAccessory || product.IsConsumable) {
-		// This is an accessory or consumable - handle directly in WarehouseCore
-		log.Printf("📦 Processing %s as %s", scanCode, map[bool]string{true: "Accessory", false: "Consumable"}[product.IsAccessory])
-		handleAccessoryConsumableScan(w, &req, product.IsAccessory)
-		return
-	}
-
-	// Regular device scan
+	// All scans (devices, accessories, consumables) now use the unified scan service
+	// The scan service handles automatic zone selection and proper stock synchronization
 	scanService := services.NewScanService()
 	response, err := scanService.ProcessScan(req, nil, r.RemoteAddr, r.UserAgent())
 	if err != nil {
