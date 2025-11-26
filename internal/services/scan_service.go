@@ -467,7 +467,7 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 	// Default quantity is 1 - in future could be extended to ask user
 	quantity := 1.0
 
-	// Update or insert stock in product_locations
+	// Update or insert stock in product_locations (single source of truth)
 	_, err := tx.Exec(`
 		INSERT INTO product_locations (product_id, zone_id, quantity)
 		VALUES (?, ?, ?)
@@ -482,14 +482,21 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 		}, nil
 	}
 
+	// Also update products.stock_quantity to keep it in sync (calculated from sum)
+	_, err = tx.Exec(`
+		UPDATE products
+		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?)
+		WHERE productID = ?
+	`, product.ProductID, product.ProductID)
+	if err != nil {
+		log.Printf("Warning: failed to sync products.stock_quantity: %v", err)
+	}
+
 	s.logScanEvent(tx, scanCode, productIDStr, "intake", nil, zoneID, userID, true, "", ipAddr, userAgent)
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
-
-	// Sync total stock_quantity from product_locations (after commit)
-	s.syncProductStockFromLocations(product.ProductID)
 
 	return &models.ScanResponse{
 		Success: true,
@@ -569,8 +576,8 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 		}, nil
 	}
 
-	// Decrease stock
-	_, err = tx.Exec(`
+	// Decrease stock in product_locations (single source of truth)
+	result, err := tx.Exec(`
 		UPDATE product_locations SET quantity = quantity - ?
 		WHERE product_id = ? AND zone_id <=> ?
 	`, quantity, product.ProductID, zoneID)
@@ -583,14 +590,33 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 		}, nil
 	}
 
+	// Verify the update actually affected a row
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		err := fmt.Errorf("no stock location found for zone_id=%v", zoneID)
+		s.logScanEvent(tx, scanCode, productIDStr, "outtake", jobID, zoneID, userID, false, err.Error(), ipAddr, userAgent)
+		tx.Commit()
+		return &models.ScanResponse{
+			Success: false,
+			Message: err.Error(),
+		}, nil
+	}
+
+	// Also update products.stock_quantity to keep it in sync (calculated from sum)
+	_, err = tx.Exec(`
+		UPDATE products
+		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?)
+		WHERE productID = ?
+	`, product.ProductID, product.ProductID)
+	if err != nil {
+		log.Printf("Warning: failed to sync products.stock_quantity: %v", err)
+	}
+
 	s.logScanEvent(tx, scanCode, productIDStr, "outtake", jobID, zoneID, userID, true, "", ipAddr, userAgent)
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
-
-	// Sync total stock_quantity from product_locations (after commit)
-	s.syncProductStockFromLocations(product.ProductID)
 
 	message := fmt.Sprintf("%s: -%.0f taken from warehouse", product.Name, quantity)
 	if jobID != nil {
