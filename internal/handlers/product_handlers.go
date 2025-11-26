@@ -402,41 +402,44 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Sync stock_quantity to product_locations for consumables/accessories
+	// For consumables/accessories: sync stock changes to product_locations
 	if (req.IsConsumable || req.IsAccessory) && req.StockQuantity != nil {
 		// Get current total from product_locations
 		var currentTotal float64
-		if err := tx.QueryRow(`
+		err := tx.QueryRow(`
 			SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?
-		`, id).Scan(&currentTotal); err != nil {
+		`, id).Scan(&currentTotal)
+
+		if err != nil {
 			log.Printf("Warning: Failed to get current stock total: %v", err)
 		} else {
 			newTotal := *req.StockQuantity
 			difference := newTotal - currentTotal
 
 			if difference != 0 {
-				// Get or create a default zone for this product
+				// Get the zone with most stock, or create default location
 				var defaultZoneID sql.NullInt64
 				err := tx.QueryRow(`
 					SELECT zone_id FROM product_locations WHERE product_id = ? ORDER BY quantity DESC LIMIT 1
 				`, id).Scan(&defaultZoneID)
 
 				if err == sql.ErrNoRows {
-					// No locations exist - create in a default zone (zone_id = 1 or NULL)
-					// For now, we'll just insert with the full quantity and let user assign zone later
+					// No locations exist - create in zone with full quantity
 					_, err = tx.Exec(`
 						INSERT INTO product_locations (product_id, zone_id, quantity) VALUES (?, NULL, ?)
 					`, id, newTotal)
 					if err != nil {
-						log.Printf("Warning: Failed to create default product location: %v", err)
+						log.Printf("Error: Failed to create product location: %v", err)
 					}
 				} else if err == nil {
-					// Update the primary zone (the one with most stock)
+					// Update the primary zone
 					_, err = tx.Exec(`
 						UPDATE product_locations SET quantity = quantity + ? WHERE product_id = ? AND zone_id <=> ?
 					`, difference, id, defaultZoneID)
 					if err != nil {
-						log.Printf("Warning: Failed to sync stock to product_locations: %v", err)
+						log.Printf("Error: Failed to update product_locations: %v", err)
+					} else {
+						log.Printf("Updated product_locations for product %d: %+.2f kg (zone_id=%v)", id, difference, defaultZoneID)
 					}
 				}
 			}
@@ -455,16 +458,9 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		log.Printf("Failed to commit product update transaction: %v", err)
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
-		return
-	}
-
-	// After commit, sync stock_quantity from product_locations for consumables/accessories
-	// This ensures stock_quantity always reflects the sum of all product_locations
+	// BEFORE commit: Recalculate stock_quantity from product_locations (within transaction)
 	if req.IsConsumable || req.IsAccessory {
-		_, err := db.Exec(`
+		_, err := tx.Exec(`
 			UPDATE products
 			SET stock_quantity = (
 				SELECT COALESCE(SUM(quantity), 0)
@@ -474,8 +470,16 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 			WHERE productID = ?
 		`, id, id)
 		if err != nil {
-			log.Printf("Warning: Failed to sync stock_quantity after update: %v", err)
+			log.Printf("Error: Failed to recalculate stock_quantity: %v", err)
+		} else {
+			log.Printf("Recalculated stock_quantity for product %d from product_locations", id)
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("Failed to commit product update transaction: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
+		return
 	}
 
 	message := "Product updated successfully"
