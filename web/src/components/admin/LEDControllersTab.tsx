@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ledApi, api, type LEDController, type LEDControllerPayload, type ZoneTypeDefinition } from '../../lib/api';
 import { Plus, Save, X, RefreshCcw, Trash2, Cpu, Settings, RotateCw } from 'lucide-react';
+import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
 
 type EditorTarget = number | 'new' | null;
 
@@ -54,6 +55,9 @@ export function LEDControllersTab() {
   const [configureChipset, setConfigureChipset] = useState<string>('SK6812_GRBW');
   const [configuring, setConfiguring] = useState(false);
   const [restarting, setRestarting] = useState<number | null>(null);
+
+  // Block body scroll when editor modal is open
+  useBlockBodyScroll(editor !== null);
 
   useEffect(() => {
     loadData();

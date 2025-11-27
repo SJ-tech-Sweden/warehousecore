@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cablesAdminApi } from '../../lib/api';
 import type { Cable as CableType, CableConnector, CableType as CableTypeData, CableCreateInput, CableUpdateInput } from '../../lib/api';
+import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
 
 interface CableFormData {
   name: string;
@@ -63,6 +64,9 @@ export function CablesTab() {
   const [lengthMinFilter, setLengthMinFilter] = useState<number | ''>('');
   const [lengthMaxFilter, setLengthMaxFilter] = useState<number | ''>('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Block body scroll when any modal is open
+  useBlockBodyScroll(modalOpen || viewCable !== null);
 
   const connectorIndex = useMemo(() => {
     return new Map(connectors.map((connector) => [connector.connector_id, connector]));

@@ -17,6 +17,7 @@ import { formatStatus, getStatusColor } from '../lib/utils';
 import { CaseDetailModal } from '../components/CaseDetailModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
 import { DeviceTreeModal } from '../components/DeviceTreeModal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 type StatusFilter = 'all' | 'free' | 'rented' | 'maintance';
 
@@ -65,6 +66,9 @@ export function CasesPage() {
     status: 'free',
   });
   const [submitting, setSubmitting] = useState(false);
+
+  // Block body scroll when form modal is open
+  useBlockBodyScroll(formModalOpen);
 
   useEffect(() => {
     void loadCases();

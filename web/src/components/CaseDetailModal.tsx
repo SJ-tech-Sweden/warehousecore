@@ -3,6 +3,7 @@ import type { CaseDetail, CaseDevice } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 import { useMemo } from 'react';
 import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 interface CaseDetailModalProps {
   caseInfo: CaseDetail | null;
@@ -30,6 +31,9 @@ export function CaseDetailModal({
   onAddDevices,
   onRemoveDevice,
 }: CaseDetailModalProps) {
+  // Block body scroll when modal is open
+  useBlockBodyScroll(isOpen);
+
   if (!isOpen) return null;
 
   // Cache-busting for label image - regenerates URL when label_path changes

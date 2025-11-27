@@ -3,6 +3,7 @@ import { ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
 import { useState, useEffect, useMemo } from 'react';
 import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 interface DeviceDetailModalProps {
   device: Device | null;
@@ -14,6 +15,9 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
   const [locating, setLocating] = useState(false);
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
   const [ledActive, setLedActive] = useState(false);
+
+  // Block body scroll when modal is open
+  useBlockBodyScroll(isOpen);
 
   // Cleanup LEDs when modal closes
   useEffect(() => {
@@ -98,7 +102,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
-        <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl">
+        <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">

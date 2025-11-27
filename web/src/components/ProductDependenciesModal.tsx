@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Package, AlertCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 interface ProductDependency {
   id: number;
@@ -45,6 +46,9 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
   const [isOptional, setIsOptional] = useState(true);
   const [notes, setNotes] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Block body scroll when modal is open
+  useBlockBodyScroll(true);
 
   useEffect(() => {
     loadDependencies();

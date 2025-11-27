@@ -2,6 +2,7 @@ import { Package, MapPin, Lightbulb } from 'lucide-react';
 import type { Device } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 interface ProductDevicesModalProps {
   productName: string;
@@ -24,6 +25,9 @@ export function ProductDevicesModal({
   onOpenDevice,
   loading = false,
 }: ProductDevicesModalProps) {
+  // Block body scroll when modal is open
+  useBlockBodyScroll(isOpen);
+
   if (!isOpen) return null;
 
   return (

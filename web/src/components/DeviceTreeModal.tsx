@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ChevronRight, Package } from 'lucide-react';
 import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 interface Device {
   device_id: string;
@@ -47,6 +48,9 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+
+  // Block body scroll when modal is open
+  useBlockBodyScroll(isOpen);
 
   useEffect(() => {
     if (isOpen) {

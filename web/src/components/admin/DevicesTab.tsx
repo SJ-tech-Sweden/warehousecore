@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api, devicesAdminApi, labelsApi } from '../../lib/api';
 import type { Device, DeviceCreateInput, DeviceUpdateInput, LabelTemplate } from '../../lib/api';
+import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
 
 interface Product {
   product_id: number;
@@ -98,6 +99,9 @@ export function DevicesTab() {
   const [productFilter, setProductFilter] = useState<number | ''>('');
   const [zoneFilter, setZoneFilter] = useState<number | ''>('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Block body scroll when any modal is open
+  useBlockBodyScroll(modalOpen || viewDevice !== null);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 

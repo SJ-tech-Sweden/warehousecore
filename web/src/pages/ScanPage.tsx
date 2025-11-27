@@ -3,6 +3,7 @@ import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb } from 'lucide-react'
 import { useNavigate } from 'react-router-dom';
 import { scansApi, zonesApi, jobsApi, ledApi } from '../lib/api';
 import type { ScanResponse } from '../lib/api';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 type ScanStep = 'device' | 'zone';
 
@@ -21,6 +22,9 @@ export function ScanPage() {
   // Job-Code scan states
   const [showLEDModal, setShowLEDModal] = useState(false);
   const [scannedJobId, setScannedJobId] = useState<number | null>(null);
+
+  // Block body scroll when LED modal is open
+  useBlockBodyScroll(showLEDModal);
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();

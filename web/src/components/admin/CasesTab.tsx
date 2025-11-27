@@ -22,6 +22,7 @@ import {
   type Zone,
 } from '../../lib/api';
 import { formatStatus } from '../../lib/utils';
+import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
 
 interface CaseFormData {
   name: string;
@@ -71,6 +72,9 @@ export function CasesTab() {
   const [zoneFilter, setZoneFilter] = useState<number | ''>('');
   const [refreshing, setRefreshing] = useState(false);
   const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Block body scroll when any modal is open
+  useBlockBodyScroll(modalOpen || viewCase !== null);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
