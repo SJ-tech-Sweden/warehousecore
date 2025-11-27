@@ -37,6 +37,7 @@ type ScanResponse struct {
 	Success       bool              `json:"success"`
 	Message       string            `json:"message"`
 	Device        *DeviceWithDetails `json:"device,omitempty"`
+	Product       *ProductInfo       `json:"product,omitempty"`
 	Movement      *DeviceMovement    `json:"movement,omitempty"`
 	Action        string            `json:"action"`
 	PreviousStatus string           `json:"previous_status,omitempty"`
@@ -51,4 +52,14 @@ type JobInfo struct {
 	JobNumber   string `json:"job_number"`
 	CustomerName string `json:"customer_name,omitempty"`
 	EventDate   string `json:"event_date,omitempty"`
+}
+
+// ProductInfo contains basic product information for scan responses (consumables/accessories)
+type ProductInfo struct {
+	ProductID    int     `json:"product_id"`
+	Name         string  `json:"name"`
+	Unit         string  `json:"unit"` // e.g., "kg", "l", "Stk"
+	Stock        float64 `json:"stock"`
+	IsAccessory  bool    `json:"is_accessory"`
+	IsConsumable bool    `json:"is_consumable"`
 }

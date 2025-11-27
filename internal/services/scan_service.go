@@ -408,20 +408,23 @@ type ConsumableProduct struct {
 	IsConsumable bool
 	IsAccessory  bool
 	Barcode      sql.NullString
+	Unit         string // e.g., "kg", "l", "Stk"
 }
 
 // findConsumableByScan looks up a consumable/accessory by barcode or product ID
 func (s *ScanService) findConsumableByScan(scanCode string) (*ConsumableProduct, error) {
 	var product ConsumableProduct
 	err := s.db.QueryRow(`
-		SELECT productID, name, is_consumable, is_accessory, generic_barcode
-		FROM products
-		WHERE (is_consumable = 1 OR is_accessory = 1)
-		  AND (generic_barcode = ? OR CAST(productID AS CHAR) = ?)
+		SELECT p.productID, p.name, p.is_consumable, p.is_accessory, p.generic_barcode,
+		       COALESCE(ct.abbreviation, 'Stk') as unit
+		FROM products p
+		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
+		WHERE (p.is_consumable = 1 OR p.is_accessory = 1)
+		  AND (p.generic_barcode = ? OR CAST(p.productID AS CHAR) = ?)
 		LIMIT 1
 	`, scanCode, scanCode).Scan(
 		&product.ProductID, &product.Name, &product.IsConsumable,
-		&product.IsAccessory, &product.Barcode,
+		&product.IsAccessory, &product.Barcode, &product.Unit,
 	)
 	if err != nil {
 		return nil, err
@@ -436,7 +439,7 @@ func (s *ScanService) processConsumableScan(tx *sql.Tx, product *ConsumableProdu
 	// Handle different actions
 	switch req.Action {
 	case "intake":
-		return s.processConsumableIntake(tx, product, req.ZoneID, &productIDStr, req.ScanCode, userID, ipAddr, userAgent)
+		return s.processConsumableIntake(tx, product, req.ZoneID, req.JobID, &productIDStr, req.ScanCode, userID, ipAddr, userAgent)
 	case "outtake":
 		return s.processConsumableOuttake(tx, product, req.ZoneID, req.JobID, &productIDStr, req.ScanCode, userID, ipAddr, userAgent)
 	case "check":
@@ -453,7 +456,7 @@ func (s *ScanService) processConsumableScan(tx *sql.Tx, product *ConsumableProdu
 }
 
 // processConsumableIntake increases stock when returning consumable to warehouse
-func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumableProduct, zoneID *int64, productIDStr *string, scanCode string, userID *int64, ipAddr, userAgent string) (*models.ScanResponse, error) {
+func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumableProduct, zoneID *int64, jobID *int64, productIDStr *string, scanCode string, userID *int64, ipAddr, userAgent string) (*models.ScanResponse, error) {
 	if zoneID == nil {
 		err := fmt.Errorf("zone_id is required for consumable intake")
 		s.logScanEvent(tx, scanCode, productIDStr, "intake", nil, zoneID, userID, false, err.Error(), ipAddr, userAgent)
@@ -464,8 +467,11 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 		}, nil
 	}
 
-	// Default quantity is 1 - in future could be extended to ask user
+	// Get quantity from JobID field (frontend passes quantity via this field as a workaround)
 	quantity := 1.0
+	if jobID != nil && *jobID > 0 {
+		quantity = float64(*jobID)
+	}
 
 	// Update or insert stock in product_locations (single source of truth)
 	_, err := tx.Exec(`
@@ -500,15 +506,18 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 
 	return &models.ScanResponse{
 		Success: true,
-		Message: fmt.Sprintf("%s: +%.0f returned to warehouse", product.Name, quantity),
+		Message: fmt.Sprintf("%s: +%.1f %s returned to warehouse", product.Name, quantity, product.Unit),
 		Action:  "intake",
 	}, nil
 }
 
 // processConsumableOuttake decreases stock when taking consumable from warehouse
 func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumableProduct, zoneID *int64, jobID *int64, productIDStr *string, scanCode string, userID *int64, ipAddr, userAgent string) (*models.ScanResponse, error) {
-	// Default quantity is 1 - in future could be extended to ask user
+	// Get quantity from JobID field (frontend passes quantity via this field as a workaround)
 	quantity := 1.0
+	if jobID != nil && *jobID > 0 {
+		quantity = float64(*jobID)
+	}
 
 	// If no zone specified, automatically select the zone with the most stock
 	var selectedZoneID sql.NullInt64
@@ -618,14 +627,9 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 		return nil, fmt.Errorf("failed to commit: %w", err)
 	}
 
-	message := fmt.Sprintf("%s: -%.0f taken from warehouse", product.Name, quantity)
-	if jobID != nil {
-		message = fmt.Sprintf("%s: -%.0f assigned to job %d", product.Name, quantity, *jobID)
-	}
-
 	return &models.ScanResponse{
 		Success: true,
-		Message: message,
+		Message: fmt.Sprintf("%s: -%.1f %s taken from warehouse", product.Name, quantity, product.Unit),
 		Action:  "outtake",
 	}, nil
 }
@@ -656,7 +660,15 @@ func (s *ScanService) processConsumableCheck(tx *sql.Tx, product *ConsumableProd
 
 	return &models.ScanResponse{
 		Success: true,
-		Message: fmt.Sprintf("%s: %s (Stock: %.0f)", product.Name, productType, totalStock),
+		Message: fmt.Sprintf("%s: %s (Stock: %.0f %s)", product.Name, productType, totalStock, product.Unit),
 		Action:  "check",
+		Product: &models.ProductInfo{
+			ProductID:    int(product.ProductID),
+			Name:         product.Name,
+			Unit:         product.Unit,
+			Stock:        totalStock,
+			IsAccessory:  product.IsAccessory,
+			IsConsumable: product.IsConsumable,
+		},
 	}, nil
 }
