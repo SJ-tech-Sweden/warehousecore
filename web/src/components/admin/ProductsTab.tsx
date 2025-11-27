@@ -15,6 +15,7 @@ import {
 import { api } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
 import { DeviceTreeTab } from './DeviceTreeTab';
+import { ProductDependenciesModal } from '../ProductDependenciesModal';
 
 interface Product {
   product_id: number;
@@ -164,6 +165,7 @@ export function ProductsTab() {
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [editingProduct, setEditingProduct] = useState<number | null>(null);
+  const [dependenciesModal, setDependenciesModal] = useState<{ productId: number; productName: string } | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -780,6 +782,13 @@ export function ProductsTab() {
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
+                          onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
+                          className="rounded-lg bg-purple-600/80 p-2 text-white transition hover:bg-purple-600"
+                          title="Dependencies verwalten"
+                        >
+                          <GitBranch className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(product.product_id, product.name)}
                           className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
                           title="Löschen"
@@ -831,6 +840,13 @@ export function ProductsTab() {
                     title="Bearbeiten"
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
+                    className="rounded-lg bg-purple-600/80 p-2 text-white transition hover:bg-purple-600"
+                    title="Dependencies verwalten"
+                  >
+                    <GitBranch className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(product.product_id, product.name)}
@@ -1493,6 +1509,15 @@ export function ProductsTab() {
           </div>
           </div>
         </ModalPortal>
+      )}
+
+      {/* Product Dependencies Modal */}
+      {dependenciesModal && (
+        <ProductDependenciesModal
+          productId={dependenciesModal.productId}
+          productName={dependenciesModal.productName}
+          onClose={() => setDependenciesModal(null)}
+        />
       )}
     </div>
   );

@@ -34,16 +34,17 @@ type ScanRequest struct {
 
 // ScanResponse represents the response to a scan request
 type ScanResponse struct {
-	Success       bool              `json:"success"`
-	Message       string            `json:"message"`
-	Device        *DeviceWithDetails `json:"device,omitempty"`
-	Product       *ProductInfo       `json:"product,omitempty"`
-	Movement      *DeviceMovement    `json:"movement,omitempty"`
-	Action        string            `json:"action"`
-	PreviousStatus string           `json:"previous_status,omitempty"`
-	NewStatus     string            `json:"new_status,omitempty"`
-	Duplicate     bool              `json:"duplicate"`
-	JobInfo       *JobInfo          `json:"job_info,omitempty"`
+	Success          bool                          `json:"success"`
+	Message          string                        `json:"message"`
+	Device           *DeviceWithDetails             `json:"device,omitempty"`
+	Product          *ProductInfo                   `json:"product,omitempty"`
+	Movement         *DeviceMovement                `json:"movement,omitempty"`
+	Action           string                         `json:"action"`
+	PreviousStatus   string                         `json:"previous_status,omitempty"`
+	NewStatus        string                         `json:"new_status,omitempty"`
+	Duplicate        bool                           `json:"duplicate"`
+	JobInfo          *JobInfo                       `json:"job_info,omitempty"`
+	SuggestedDeps    []ProductDependencyWithDetails `json:"suggested_dependencies,omitempty"`
 }
 
 // JobInfo contains basic job information for scan responses

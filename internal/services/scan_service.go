@@ -223,12 +223,69 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	}
 	movement.MovementID, _ = result.LastInsertId()
 
+	// Load suggested dependencies for this product
+	var suggestedDeps []models.ProductDependencyWithDetails
+	rows, err := s.db.Query(`
+		SELECT
+			pd.id,
+			pd.product_id,
+			pd.dependency_product_id,
+			p.name as dependency_name,
+			COALESCE(p.is_accessory, false) as is_accessory,
+			COALESCE(p.is_consumable, false) as is_consumable,
+			p.generic_barcode,
+			ct.abbreviation as count_type_abbr,
+			p.stock_quantity,
+			pd.is_optional,
+			pd.default_quantity,
+			pd.notes,
+			DATE_FORMAT(pd.created_at, '%Y-%m-%d %H:%i:%s') as created_at
+		FROM product_dependencies pd
+		JOIN products p ON pd.dependency_product_id = p.productID
+		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
+		WHERE pd.product_id = ?
+		ORDER BY pd.is_optional ASC, pd.created_at DESC
+	`, device.ProductID)
+	if err != nil {
+		log.Printf("Failed to query product dependencies: %v", err)
+		suggestedDeps = []models.ProductDependencyWithDetails{}
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var dep models.ProductDependencyWithDetails
+			err := rows.Scan(
+				&dep.ID,
+				&dep.ProductID,
+				&dep.DependencyProductID,
+				&dep.DependencyName,
+				&dep.IsAccessory,
+				&dep.IsConsumable,
+				&dep.GenericBarcode,
+				&dep.CountTypeAbbr,
+				&dep.StockQuantity,
+				&dep.IsOptional,
+				&dep.DefaultQuantity,
+				&dep.Notes,
+				&dep.CreatedAt,
+			)
+			if err != nil {
+				log.Printf("Failed to scan dependency row: %v", err)
+				continue
+			}
+			suggestedDeps = append(suggestedDeps, dep)
+		}
+	}
+	if suggestedDeps == nil {
+		suggestedDeps = []models.ProductDependencyWithDetails{}
+	}
+
 	return &models.ScanResponse{
 		Success:        true,
 		Message:        "Device assigned to job",
 		Action:         "outtake",
 		PreviousStatus: previousStatus,
 		NewStatus:      "on_job",
+		SuggestedDeps:  suggestedDeps,
 	}, movement, nil
 }
 
