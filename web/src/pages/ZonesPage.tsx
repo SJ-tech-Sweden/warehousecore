@@ -172,6 +172,13 @@ export function ZonesPage() {
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {formData.type === 'shelf' && (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                <p className="text-sm text-blue-300">
+                  ℹ️ Name und Barcode werden automatisch generiert (Fach 01, Fach 02, etc.)
+                </p>
+              </div>
+            )}
             {formData.type !== 'shelf' && (
               <input
                 type="text"
@@ -181,13 +188,6 @@ export function ZonesPage() {
                 required
                 className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
               />
-            )}
-            {formData.type === 'shelf' && (
-              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
-                <p className="text-sm text-blue-300">
-                  ℹ️ Name und Barcode werden automatisch generiert (Fach 01, Fach 02, etc.)
-                </p>
-              </div>
             )}
             <select
               value={formData.type}
