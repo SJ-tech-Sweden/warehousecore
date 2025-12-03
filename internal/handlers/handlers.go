@@ -319,6 +319,7 @@ func loadAvailableCaseDevices(db *sql.DB, caseID *int64, search string, limit in
 
 	return devices, nil
 }
+
 // HealthCheck returns server health status
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
@@ -363,12 +364,12 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 
 	// Get product details
 	var product struct {
-		ProductID      int     `gorm:"column:productID"`
-		Name           string  `gorm:"column:name"`
-		StockQuantity  float64 `gorm:"column:stock_quantity"`
-		MinStockLevel  float64 `gorm:"column:min_stock_level"`
-		CountTypeName  string  `gorm:"column:count_type_name"`
-		CountTypeAbbr  string  `gorm:"column:count_type_abbr"`
+		ProductID     int     `gorm:"column:productID"`
+		Name          string  `gorm:"column:name"`
+		StockQuantity float64 `gorm:"column:stock_quantity"`
+		MinStockLevel float64 `gorm:"column:min_stock_level"`
+		CountTypeName string  `gorm:"column:count_type_name"`
+		CountTypeAbbr string  `gorm:"column:count_type_abbr"`
 	}
 
 	err := db.Table("products").
@@ -2743,6 +2744,15 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	// Query for device tree with categories - Include ALL categories, devices, consumables, and accessories
 	// This ensures newly created categories and consumables/accessories appear immediately in the tree
 	query := `
+		WITH latest_job AS (
+			SELECT jd.deviceID, jd.jobID
+			FROM jobdevices jd
+			INNER JOIN (
+				SELECT deviceID, MAX(jobID) AS jobID
+				FROM jobdevices
+				GROUP BY deviceID
+			) latest ON jd.deviceID = latest.deviceID AND jd.jobID = latest.jobID
+		)
 		SELECT
 			c.categoryID,
 			c.name as category_name,
@@ -2766,7 +2776,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			COALESCE(z.code, '') as zone_code,
 			dc.caseID as case_id,
 			COALESCE(cs.name, '') as case_name,
-			jd.jobID as current_job_id,
+			lj.jobID as current_job_id,
 			COALESCE(j.job_code, '') as job_number,
 			COALESCE(d.condition_rating, 0) as condition_rating,
 			COALESCE(d.usage_hours, 0) as usage_hours,
@@ -2784,8 +2794,8 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases cs ON dc.caseID = cs.caseID
-		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
-		LEFT JOIN jobs j ON jd.jobID = j.jobID
+		LEFT JOIN latest_job lj ON d.deviceID = lj.deviceID
+		LEFT JOIN jobs j ON lj.jobID = j.jobID
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
 	`
 
@@ -2906,11 +2916,11 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 						addedProducts[prodID] = true
 
 						productItem := map[string]interface{}{
-							"device_id":     fmt.Sprintf("PROD-%d", prodID),
-							"product_name":  productName.String,
-							"status":        "in_storage",
-							"is_consumable": isConsumable == 1,
-							"is_accessory":  isAccessory == 1,
+							"device_id":      fmt.Sprintf("PROD-%d", prodID),
+							"product_name":   productName.String,
+							"status":         "in_storage",
+							"is_consumable":  isConsumable == 1,
+							"is_accessory":   isAccessory == 1,
 							"stock_quantity": stockQuantity,
 						}
 						if unit.Valid {
@@ -2944,7 +2954,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 					// Update category count
 					cat := *categories[catID]
 					cat["device_count"] = cat["device_count"].(int) + 1
-				} else if (isConsumable == 1 || isAccessory == 1) {
+				} else if isConsumable == 1 || isAccessory == 1 {
 					// Add consumable/accessory directly to subcategory
 					prodID := int(productID.Int64)
 					if !addedProducts[prodID] {
