@@ -135,6 +135,8 @@ func (s *ProductPictureService) ListPictures(productName string) ([]ProductPictu
 		return nil, fmt.Errorf("product pictures not configured")
 	}
 	folder := s.productFolder(productName)
+	// Ensure folder hierarchy exists so PROPFIND does not 404 on first access.
+	_ = s.client.EnsureCollections(path.Join(folder, ".placeholder"))
 	entries, err := s.client.List(folder)
 	if err != nil {
 		return nil, fmt.Errorf("list nextcloud folder: %w", err)

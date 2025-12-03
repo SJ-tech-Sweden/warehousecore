@@ -320,6 +320,10 @@ func GetProductPictures(w http.ResponseWriter, r *http.Request) {
 	items, err := productPictureService.ListPictures(productName)
 	if err != nil {
 		log.Printf("[PICTURES] List failed for product %d: %v", id, err)
+		if strings.Contains(strings.ToLower(err.Error()), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			respondJSON(w, http.StatusOK, map[string]interface{}{"pictures": []interface{}{}})
+			return
+		}
 		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "Failed to list pictures"})
 		return
 	}
