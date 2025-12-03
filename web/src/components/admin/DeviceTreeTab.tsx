@@ -628,11 +628,29 @@ function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: De
               Lagerbestand: {stockQuantity} {unit || ''}
             </span>
           )}
+          {!isConsumable && !isAccessory && device.zone_name && (
+            <span className="text-gray-400">📍 {device.zone_name}</span>
+          )}
           {!isConsumable && !isAccessory && device.zone_code && (
-            <span className="font-mono text-gray-500">{device.zone_code}</span>
+            <span className="font-mono text-gray-500">({device.zone_code})</span>
+          )}
+          {!isConsumable && !isAccessory && device.case_name && (
+            <span className="text-gray-400">📦 {device.case_name}</span>
+          )}
+          {!isConsumable && !isAccessory && device.job_number && (
+            <span className="text-gray-400">🔧 Job #{device.job_number}</span>
           )}
           {!isConsumable && !isAccessory && device.serial_number && (
             <span className="text-gray-500">SN: {device.serial_number}</span>
+          )}
+          {!isConsumable && !isAccessory && device.barcode && (
+            <span className="text-gray-500">Barcode: {device.barcode}</span>
+          )}
+          {!isConsumable && !isAccessory && device.condition_rating !== undefined && device.condition_rating > 0 && (
+            <span className="text-gray-400">Zustand: {device.condition_rating}/10</span>
+          )}
+          {!isConsumable && !isAccessory && device.usage_hours !== undefined && device.usage_hours > 0 && (
+            <span className="text-gray-400">Betriebsstunden: {device.usage_hours}h</span>
           )}
         </div>
       </div>

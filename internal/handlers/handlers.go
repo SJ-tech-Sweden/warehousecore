@@ -2666,6 +2666,76 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, movements)
 }
 
+// buildDeviceMap creates a complete device map from database values
+func buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber sql.NullString,
+	productID sql.NullInt64, zoneID sql.NullInt64, zoneName, zoneCode sql.NullString,
+	caseID sql.NullInt64, caseName sql.NullString, currentJobID sql.NullInt64, jobNumber sql.NullString,
+	conditionRating, usageHours int, labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes sql.NullString) map[string]interface{} {
+
+	device := map[string]interface{}{
+		"device_id":    deviceID.String,
+		"product_name": productName.String,
+		"status":       status.String,
+	}
+
+	if productID.Valid {
+		device["product_id"] = productID.Int64
+	}
+	if barcode.Valid && barcode.String != "" {
+		device["barcode"] = barcode.String
+	}
+	if qrCode.Valid && qrCode.String != "" {
+		device["qr_code"] = qrCode.String
+	}
+	if serialNumber.Valid && serialNumber.String != "" {
+		device["serial_number"] = serialNumber.String
+	}
+	if zoneID.Valid {
+		device["zone_id"] = zoneID.Int64
+		if zoneName.Valid && zoneName.String != "" {
+			device["zone_name"] = zoneName.String
+		}
+		if zoneCode.Valid && zoneCode.String != "" {
+			device["zone_code"] = zoneCode.String
+		}
+	}
+	if caseID.Valid {
+		device["case_id"] = caseID.Int64
+		if caseName.Valid && caseName.String != "" {
+			device["case_name"] = caseName.String
+		}
+	}
+	if currentJobID.Valid {
+		device["current_job_id"] = currentJobID.Int64
+		if jobNumber.Valid && jobNumber.String != "" {
+			device["job_number"] = jobNumber.String
+		}
+	}
+	if conditionRating > 0 {
+		device["condition_rating"] = conditionRating
+	}
+	if usageHours > 0 {
+		device["usage_hours"] = usageHours
+	}
+	if labelPath.Valid && labelPath.String != "" {
+		device["label_path"] = labelPath.String
+	}
+	if purchaseDate.Valid && purchaseDate.String != "" {
+		device["purchase_date"] = purchaseDate.String
+	}
+	if lastMaintenance.Valid && lastMaintenance.String != "" {
+		device["last_maintenance"] = lastMaintenance.String
+	}
+	if nextMaintenance.Valid && nextMaintenance.String != "" {
+		device["next_maintenance"] = nextMaintenance.String
+	}
+	if notes.Valid && notes.String != "" {
+		device["notes"] = notes.String
+	}
+
+	return device
+}
+
 // GetDeviceTree returns devices organized in a hierarchical tree structure by categories
 func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
@@ -2689,9 +2759,22 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			d.deviceID,
 			d.status,
 			d.barcode,
+			d.qr_code,
 			d.serialnumber,
 			d.zone_id,
-			COALESCE(z.code, '') as zone_code
+			COALESCE(z.name, '') as zone_name,
+			COALESCE(z.code, '') as zone_code,
+			d.case_id,
+			COALESCE(cs.name, '') as case_name,
+			d.current_job_id,
+			COALESCE(j.jobnumber, '') as job_number,
+			COALESCE(d.condition_rating, 0) as condition_rating,
+			COALESCE(d.usage_hours, 0) as usage_hours,
+			d.label_path,
+			d.purchase_date,
+			d.last_maintenance,
+			d.next_maintenance,
+			d.notes
 		FROM categories c
 		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
 		LEFT JOIN subbiercategories sbc ON sc.subcategoryID = sbc.subcategoryID
@@ -2699,6 +2782,8 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		LEFT JOIN cases cs ON d.case_id = cs.case_id
+		LEFT JOIN jobs j ON d.current_job_id = j.jobid
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
 	`
 
@@ -2727,14 +2812,22 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		var isConsumable, isAccessory int
 		var stockQuantity float64
 		var unit sql.NullString
-		var deviceID, status, barcode, serialNumber sql.NullString
+		var deviceID, status, barcode, qrCode, serialNumber sql.NullString
 		var zoneID sql.NullInt64
-		var zoneCode sql.NullString
+		var zoneName, zoneCode sql.NullString
+		var caseID sql.NullInt64
+		var caseName sql.NullString
+		var currentJobID sql.NullInt64
+		var jobNumber sql.NullString
+		var conditionRating, usageHours int
+		var labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes sql.NullString
 
 		err := rows.Scan(&categoryID, &categoryName, &subcategoryID, &subcategoryName,
 			&subbiercategoryID, &subbiercategoryName, &productID, &productName,
 			&isConsumable, &isAccessory, &stockQuantity, &unit,
-			&deviceID, &status, &barcode, &serialNumber, &zoneID, &zoneCode)
+			&deviceID, &status, &barcode, &qrCode, &serialNumber, &zoneID, &zoneName, &zoneCode,
+			&caseID, &caseName, &currentJobID, &jobNumber,
+			&conditionRating, &usageHours, &labelPath, &purchaseDate, &lastMaintenance, &nextMaintenance, &notes)
 		if err != nil {
 			log.Printf("Error scanning row: %v", err)
 			continue
@@ -2790,21 +2883,9 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 
 				// Add device to subbiercategory if exists
 				if deviceID.Valid && deviceID.String != "" {
-					device := map[string]interface{}{
-						"device_id":    deviceID.String,
-						"product_name": productName.String,
-						"status":       status.String,
-					}
-					if barcode.Valid {
-						device["barcode"] = barcode.String
-					}
-					if serialNumber.Valid {
-						device["serial_number"] = serialNumber.String
-					}
-					if zoneID.Valid {
-						device["zone_id"] = zoneID.Int64
-						device["zone_code"] = zoneCode.String
-					}
+					device := buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber,
+						productID, zoneID, zoneName, zoneCode, caseID, caseName, currentJobID, jobNumber,
+						conditionRating, usageHours, labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes)
 
 					subBierCat := *subbiercategories[subBierCatID]
 					subBierCat["devices"] = append(subBierCat["devices"].([]interface{}), device)
@@ -2850,21 +2931,9 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 				// Handle devices or consumables/accessories at subcategory level
 				if deviceID.Valid && deviceID.String != "" {
 					// Add device directly to subcategory
-					device := map[string]interface{}{
-						"device_id":    deviceID.String,
-						"product_name": productName.String,
-						"status":       status.String,
-					}
-					if barcode.Valid {
-						device["barcode"] = barcode.String
-					}
-					if serialNumber.Valid {
-						device["serial_number"] = serialNumber.String
-					}
-					if zoneID.Valid {
-						device["zone_id"] = zoneID.Int64
-						device["zone_code"] = zoneCode.String
-					}
+					device := buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber,
+						productID, zoneID, zoneName, zoneCode, caseID, caseName, currentJobID, jobNumber,
+						conditionRating, usageHours, labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes)
 
 					subCat := *subcategories[subCatID]
 					subCat["direct_devices"] = append(subCat["direct_devices"].([]interface{}), device)
