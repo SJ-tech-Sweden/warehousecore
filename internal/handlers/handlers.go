@@ -2670,7 +2670,7 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 func buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber sql.NullString,
 	productID sql.NullInt64, zoneID sql.NullInt64, zoneName, zoneCode sql.NullString,
 	caseID sql.NullInt64, caseName sql.NullString, currentJobID sql.NullInt64, jobNumber sql.NullString,
-	conditionRating, usageHours int, labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes sql.NullString) map[string]interface{} {
+	conditionRating, usageHours sql.NullFloat64, labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes sql.NullString) map[string]interface{} {
 
 	device := map[string]interface{}{
 		"device_id":    deviceID.String,
@@ -2711,11 +2711,11 @@ func buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber
 			device["job_number"] = jobNumber.String
 		}
 	}
-	if conditionRating > 0 {
-		device["condition_rating"] = conditionRating
+	if conditionRating.Valid && conditionRating.Float64 > 0 {
+		device["condition_rating"] = conditionRating.Float64
 	}
-	if usageHours > 0 {
-		device["usage_hours"] = usageHours
+	if usageHours.Valid && usageHours.Float64 > 0 {
+		device["usage_hours"] = usageHours.Float64
 	}
 	if labelPath.Valid && labelPath.String != "" {
 		device["label_path"] = labelPath.String
@@ -2821,7 +2821,7 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		var caseName sql.NullString
 		var currentJobID sql.NullInt64
 		var jobNumber sql.NullString
-		var conditionRating, usageHours int
+		var conditionRating, usageHours sql.NullFloat64
 		var labelPath, purchaseDate, lastMaintenance, nextMaintenance, notes sql.NullString
 
 		err := rows.Scan(&categoryID, &categoryName, &subcategoryID, &subcategoryName,
