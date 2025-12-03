@@ -2764,16 +2764,16 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			d.zone_id,
 			COALESCE(z.name, '') as zone_name,
 			COALESCE(z.code, '') as zone_code,
-			d.case_id,
+			dc.caseID as case_id,
 			COALESCE(cs.name, '') as case_name,
-			d.current_job_id,
+			jd.jobID as current_job_id,
 			COALESCE(j.jobnumber, '') as job_number,
 			COALESCE(d.condition_rating, 0) as condition_rating,
 			COALESCE(d.usage_hours, 0) as usage_hours,
 			d.label_path,
-			d.purchase_date,
-			d.last_maintenance,
-			d.next_maintenance,
+			d.purchaseDate,
+			d.lastmaintenance,
+			d.nextmaintenance,
 			d.notes
 		FROM categories c
 		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
@@ -2782,8 +2782,10 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		LEFT JOIN cases cs ON d.case_id = cs.case_id
-		LEFT JOIN jobs j ON d.current_job_id = j.jobid
+		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
+		LEFT JOIN cases cs ON dc.caseID = cs.case_id
+		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
+		LEFT JOIN jobs j ON jd.jobID = j.jobid
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
 	`
 
