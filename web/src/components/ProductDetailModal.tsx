@@ -49,6 +49,8 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [picturesUnavailable, setPicturesUnavailable] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [preloadedUrls, setPreloadedUrls] = useState<Set<string>>(new Set());
+  const [lightboxLoading, setLightboxLoading] = useState(false);
 
   const formatCurrency = (value?: number) => {
     if (value == null) return '—';
@@ -135,6 +137,30 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       setDeleting(null);
     }
   };
+
+  // Preload images to accelerate navigation
+  const preloadImage = (url: string) => {
+    if (!url || preloadedUrls.has(url)) return;
+    const img = new Image();
+    img.onload = () => setPreloadedUrls(prev => new Set(prev).add(url));
+    img.src = url;
+  };
+
+  useEffect(() => {
+    // Preload the first few images for immediate viewing
+    pictures.slice(0, 4).forEach(pic => preloadImage(pic.download_url));
+  }, [pictures]);
+
+  useEffect(() => {
+    if (previewIndex === null || pictures.length === 0) return;
+    const current = pictures[previewIndex];
+    const next = pictures[(previewIndex + 1) % pictures.length];
+    const prev = pictures[(previewIndex - 1 + pictures.length) % pictures.length];
+    preloadImage(current.download_url);
+    preloadImage(next.download_url);
+    preloadImage(prev.download_url);
+    setLightboxLoading(!preloadedUrls.has(current.download_url));
+  }, [previewIndex, pictures, preloadedUrls]);
 
   const formatDate = (iso: string) => {
     const date = new Date(iso);
@@ -473,7 +499,14 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     src={pictures[previewIndex].download_url}
                     alt={pictures[previewIndex].file_name}
                     className="max-h-[80vh] w-full object-contain bg-black"
+                    onLoad={() => setLightboxLoading(false)}
+                    loading="eager"
                   />
+                  {lightboxLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white">
+                      Lädt...
+                    </div>
+                  )}
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm text-gray-200">
                   <div>
