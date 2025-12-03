@@ -537,14 +537,11 @@ export function ProductsTab() {
 
   const handleViewProduct = async (productId: number) => {
     try {
-      setLoadingDetail(true);
       const { data } = await api.get<Product>(`/admin/products/${productId}`);
       setViewProduct(data);
     } catch (error) {
       console.error('Failed to load product details:', error);
       window.alert('Produkt konnte nicht geladen werden.');
-    } finally {
-      setLoadingDetail(false);
     }
   };
 
@@ -560,9 +557,6 @@ export function ProductsTab() {
     [product.category_name, product.subcategory_name, product.subbiercategory_name]
       .filter(Boolean)
       .join(' · ') || 'Keiner Kategorie zugeordnet';
-
-  const formatMeasurement = (value?: number | null, unit?: string) =>
-    value != null ? `${value.toFixed(2)}${unit ? ` ${unit}` : ''}` : '—';
 
   const formatCurrency = (value?: number | null) =>
     value != null ? `${value.toFixed(2)} €` : '—';
