@@ -198,6 +198,7 @@ func (c *NextcloudClient) List(rel string) ([]RemoteEntry, error) {
 
 func (c *NextcloudClient) walk(rel string, results *[]RemoteEntry) error {
 	rel = strings.TrimLeft(rel, "/")
+	current := rel
 	reqBody := `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:">
   <d:prop>
@@ -263,6 +264,9 @@ func (c *NextcloudClient) walk(rel string, results *[]RemoteEntry) error {
 		}
 
 		if isDir {
+			if relPath == current {
+				continue // avoid infinite recursion on self entries
+			}
 			if err := c.walk(relPath, results); err != nil {
 				return err
 			}
