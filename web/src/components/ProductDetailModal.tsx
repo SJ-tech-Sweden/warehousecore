@@ -46,6 +46,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [loadingPictures, setLoadingPictures] = useState(false);
   const [uploadingPictures, setUploadingPictures] = useState(false);
   const [pictureError, setPictureError] = useState<string | null>(null);
+  const [picturesUnavailable, setPicturesUnavailable] = useState(false);
 
   const formatCurrency = (value?: number) => {
     if (value == null) return '—';
@@ -67,12 +68,20 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     if (!product) return;
     setLoadingPictures(true);
     setPictureError(null);
+    setPicturesUnavailable(false);
     try {
       const response = await productPicturesApi.list(product.product_id);
       setPictures(response.data.pictures || []);
     } catch (error) {
       console.error('Failed to load product pictures', error);
-      setPictureError('Bilder konnten nicht geladen werden.');
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 503) {
+        setPicturesUnavailable(true);
+        setPictureError('Bilderablage ist nicht konfiguriert.');
+      } else {
+        setPictureError('Bilder konnten nicht geladen werden.');
+      }
+      setPictures([]);
     } finally {
       setLoadingPictures(false);
     }
@@ -155,13 +164,15 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     accept="image/*"
                     multiple
                     onChange={handleUploadPictures}
-                    disabled={uploadingPictures}
+                    disabled={uploadingPictures || picturesUnavailable}
                     className="hidden"
                   />
                 </label>
               </div>
               {pictureError && <p className="text-sm text-red-400 mb-2">{pictureError}</p>}
-              {loadingPictures ? (
+              {picturesUnavailable ? (
+                <p className="text-gray-400">Bilderablage ist nicht eingerichtet.</p>
+              ) : loadingPictures ? (
                 <div className="flex items-center gap-2 text-gray-300">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Bilder werden geladen...</span>
