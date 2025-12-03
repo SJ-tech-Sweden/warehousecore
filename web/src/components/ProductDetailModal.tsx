@@ -201,17 +201,17 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                 <p className="text-gray-400">Noch keine Bilder hochgeladen.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  {pictures.map(picture => (
+                  {pictures.map((picture, index) => (
                     <div
                       key={picture.download_url}
-                      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/5"
+                      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/5 cursor-zoom-in"
+                      onClick={() => setPreviewIndex(index)}
                     >
                       <img
                         src={picture.download_url}
                         alt={`${product.name} Bild`}
-                        className="h-36 w-full object-cover transition duration-300 group-hover:scale-105 cursor-zoom-in"
+                        className="h-36 w-full object-cover transition duration-300 group-hover:scale-105"
                         loading="lazy"
-                        onClick={() => setPreviewIndex(pictures.findIndex(p => p.file_name === picture.file_name))}
                       />
                       <button
                         type="button"
