@@ -1,0 +1,294 @@
+import { X, Package, Ruler, Weight, Zap, Tag, Box, DollarSign, Wrench, Barcode, Info } from 'lucide-react';
+import { ModalPortal } from './ModalPortal';
+import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
+
+export interface ProductDetail {
+  product_id: number;
+  name: string;
+  description?: string;
+  category_name?: string;
+  subcategory_name?: string;
+  subbiercategory_name?: string;
+  brand_name?: string;
+  manufacturer_name?: string;
+  item_cost_per_day?: number;
+  maintenance_interval?: number;
+  weight?: number;
+  height?: number;
+  width?: number;
+  depth?: number;
+  power_consumption?: number;
+  pos_in_category?: number;
+  is_accessory?: boolean;
+  is_consumable?: boolean;
+  stock_quantity?: number;
+  min_stock_level?: number;
+  generic_barcode?: string;
+  price_per_unit?: number;
+  count_type_abbreviation?: string;
+  device_count?: number;
+}
+
+interface ProductDetailModalProps {
+  product: ProductDetail | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
+  useBlockBodyScroll(isOpen);
+
+  if (!isOpen || !product) return null;
+
+  const formatCurrency = (value?: number) => {
+    if (value == null) return '—';
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+  };
+
+  const formatMeasurement = (value?: number, unit?: string) => {
+    if (value == null) return '—';
+    return `${value.toFixed(2)} ${unit || ''}`;
+  };
+
+  const categoryPath = () => {
+    const parts = [product.category_name, product.subcategory_name, product.subbiercategory_name].filter(Boolean);
+    return parts.length > 0 ? parts.join(' › ') : '—';
+  };
+
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
+        <div className="glass-dark w-full max-w-4xl rounded-2xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-accent-red" />
+              <div>
+                <h2 className="text-2xl font-bold text-white">{product.name}</h2>
+                <p className="text-sm text-gray-400">
+                  Produkt ID: {product.product_id}
+                  {product.device_count !== undefined && ` • ${product.device_count} Geräte`}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="overflow-y-auto p-6 space-y-6">
+            {/* Type Badges */}
+            <div className="flex gap-2">
+              {product.is_consumable && (
+                <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-sm font-semibold">
+                  Verbrauchsmaterial
+                </span>
+              )}
+              {product.is_accessory && (
+                <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-semibold">
+                  Zubehör
+                </span>
+              )}
+              {!product.is_consumable && !product.is_accessory && (
+                <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm font-semibold">
+                  Standard-Produkt
+                </span>
+              )}
+            </div>
+
+            {/* Description */}
+            {product.description && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Info className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Beschreibung</h3>
+                </div>
+                <p className="text-gray-300">{product.description}</p>
+              </div>
+            )}
+
+            {/* Category & Classification */}
+            <div className="glass rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="w-5 h-5 text-accent-red" />
+                <h3 className="text-lg font-semibold text-white">Kategorisierung</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-sm text-gray-400">Kategoriepfad</p>
+                  <p className="text-white font-medium">{categoryPath()}</p>
+                </div>
+                {product.brand_name && (
+                  <div>
+                    <p className="text-sm text-gray-400">Marke</p>
+                    <p className="text-white font-medium">{product.brand_name}</p>
+                  </div>
+                )}
+                {product.manufacturer_name && (
+                  <div>
+                    <p className="text-sm text-gray-400">Hersteller</p>
+                    <p className="text-white font-medium">{product.manufacturer_name}</p>
+                  </div>
+                )}
+                {product.pos_in_category != null && (
+                  <div>
+                    <p className="text-sm text-gray-400">Position in Kategorie</p>
+                    <p className="text-white font-medium">{product.pos_in_category}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Pricing */}
+            {(product.item_cost_per_day != null || product.price_per_unit != null) && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Preise</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {product.item_cost_per_day != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Preis pro Tag</p>
+                      <p className="text-2xl font-bold text-white">{formatCurrency(product.item_cost_per_day)}</p>
+                    </div>
+                  )}
+                  {product.price_per_unit != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Preis pro Einheit</p>
+                      <p className="text-2xl font-bold text-white">{formatCurrency(product.price_per_unit)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Stock Information (for consumables/accessories) */}
+            {(product.is_consumable || product.is_accessory) && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Box className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Lagerbestand</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-sm text-gray-400">Aktueller Bestand</p>
+                    <p className="text-xl font-bold text-white">
+                      {product.stock_quantity != null ? product.stock_quantity : '—'} {product.count_type_abbreviation || ''}
+                    </p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-sm text-gray-400">Mindestbestand</p>
+                    <p className="text-xl font-bold text-white">
+                      {product.min_stock_level != null ? product.min_stock_level : '—'} {product.count_type_abbreviation || ''}
+                    </p>
+                  </div>
+                  {product.generic_barcode && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Barcode</p>
+                      <p className="text-sm font-mono text-white">{product.generic_barcode}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Physical Properties */}
+            {(product.weight != null || product.height != null || product.width != null || product.depth != null) && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Ruler className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Physische Eigenschaften</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {product.weight != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Weight className="w-4 h-4 text-gray-400" />
+                        <p className="text-sm text-gray-400">Gewicht</p>
+                      </div>
+                      <p className="text-lg font-semibold text-white">{formatMeasurement(product.weight, 'kg')}</p>
+                    </div>
+                  )}
+                  {product.height != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Höhe</p>
+                      <p className="text-lg font-semibold text-white">{formatMeasurement(product.height, 'cm')}</p>
+                    </div>
+                  )}
+                  {product.width != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Breite</p>
+                      <p className="text-lg font-semibold text-white">{formatMeasurement(product.width, 'cm')}</p>
+                    </div>
+                  )}
+                  {product.depth != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Tiefe</p>
+                      <p className="text-lg font-semibold text-white">{formatMeasurement(product.depth, 'cm')}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Technical Details */}
+            {(product.power_consumption != null || product.maintenance_interval != null) && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Technische Details</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {product.power_consumption != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm text-gray-400">Leistungsaufnahme</p>
+                      <p className="text-lg font-semibold text-white">{formatMeasurement(product.power_consumption, 'W')}</p>
+                    </div>
+                  )}
+                  {product.maintenance_interval != null && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Wrench className="w-4 h-4 text-gray-400" />
+                        <p className="text-sm text-gray-400">Wartungsintervall</p>
+                      </div>
+                      <p className="text-lg font-semibold text-white">{product.maintenance_interval} Tage</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Barcode */}
+            {product.generic_barcode && !product.is_consumable && !product.is_accessory && (
+              <div className="glass rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Barcode className="w-5 h-5 text-accent-red" />
+                  <h3 className="text-lg font-semibold text-white">Identifikation</h3>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3">
+                  <p className="text-sm text-gray-400">Generischer Barcode</p>
+                  <p className="text-lg font-mono text-white">{product.generic_barcode}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-3 p-6 border-t border-white/10">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalPortal>
+  );
+}

@@ -16,6 +16,7 @@ import { api } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
 import { DeviceTreeTab } from './DeviceTreeTab';
 import { ProductDependenciesModal } from '../ProductDependenciesModal';
+import { ProductDetailModal, type ProductDetail } from '../ProductDetailModal';
 
 interface Product {
   product_id: number;
@@ -1401,115 +1402,35 @@ export function ProductsTab() {
         </ModalPortal>
       )}
 
-      {viewProduct && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
-            <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-white">{viewProduct.name}</h3>
-                <button
-                  onClick={closeDetailModal}
-                  className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-            {loadingDetail ? (
-              <p className="text-gray-400 text-center py-4">Lade Details …</p>
-            ) : (
-              <>
-                {viewProduct.description && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Beschreibung</h4>
-                    <p className="text-white">{viewProduct.description}</p>
-                  </div>
-                )}
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Kategorie</h4>
-                  <p className="text-white">{categoryPath(viewProduct)}</p>
-                </div>
-
-                {(viewProduct.brand_name || viewProduct.manufacturer_name) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Brand / Hersteller</h4>
-                    <p className="text-white">
-                      {viewProduct.brand_name || '—'}
-                      {viewProduct.manufacturer_name ? ` • ${viewProduct.manufacturer_name}` : ''}
-                    </p>
-                  </div>
-                )}
-
-                {viewProduct.item_cost_per_day != null && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Preis pro Tag</h4>
-                    <p className="text-white text-xl font-bold">{formatCurrency(viewProduct.item_cost_per_day)}</p>
-                  </div>
-                )}
-
-                {viewProduct.maintenance_interval != null && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-1">Wartungsintervall</h4>
-                    <p className="text-white">{viewProduct.maintenance_interval} Tage</p>
-                  </div>
-                )}
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-3">Physische Eigenschaften</h4>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Gewicht', value: formatMeasurement(viewProduct.weight, 'kg') },
-                      { label: 'Höhe', value: formatMeasurement(viewProduct.height, 'cm') },
-                      { label: 'Breite', value: formatMeasurement(viewProduct.width, 'cm') },
-                      { label: 'Tiefe', value: formatMeasurement(viewProduct.depth, 'cm') },
-                    ].map((item) => (
-                      <div key={item.label} className="bg-gray-800 rounded-lg p-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400 text-sm">{item.label}</span>
-                          <span className="text-white font-semibold">{item.value}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {(viewProduct.power_consumption != null || viewProduct.pos_in_category != null) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-3">Technische Details</h4>
-                    <div className="space-y-2">
-                      {viewProduct.power_consumption != null && (
-                        <div className="bg-gray-800 rounded-lg p-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-sm">Leistungsaufnahme</span>
-                            <span className="text-white font-semibold">{formatMeasurement(viewProduct.power_consumption, 'W')}</span>
-                          </div>
-                        </div>
-                      )}
-                      {viewProduct.pos_in_category != null && (
-                        <div className="bg-gray-800 rounded-lg p-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-400 text-sm">Position in Kategorie</span>
-                            <span className="text-white font-semibold">{viewProduct.pos_in_category}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={closeDetailModal}
-              className="w-full mt-6 btn-secondary"
-            >
-              Schließen
-            </button>
-          </div>
-          </div>
-        </ModalPortal>
-      )}
+      <ProductDetailModal
+        product={viewProduct ? {
+          product_id: viewProduct.product_id,
+          name: viewProduct.name,
+          description: viewProduct.description || undefined,
+          category_name: viewProduct.category_name || undefined,
+          subcategory_name: viewProduct.subcategory_name || undefined,
+          subbiercategory_name: viewProduct.subbiercategory_name || undefined,
+          brand_name: viewProduct.brand_name || undefined,
+          manufacturer_name: viewProduct.manufacturer_name || undefined,
+          item_cost_per_day: viewProduct.item_cost_per_day || undefined,
+          maintenance_interval: viewProduct.maintenance_interval || undefined,
+          weight: viewProduct.weight || undefined,
+          height: viewProduct.height || undefined,
+          width: viewProduct.width || undefined,
+          depth: viewProduct.depth || undefined,
+          power_consumption: viewProduct.power_consumption || undefined,
+          pos_in_category: viewProduct.pos_in_category || undefined,
+          is_accessory: viewProduct.is_accessory,
+          is_consumable: viewProduct.is_consumable,
+          stock_quantity: viewProduct.stock_quantity || undefined,
+          min_stock_level: viewProduct.min_stock_level || undefined,
+          generic_barcode: viewProduct.generic_barcode || undefined,
+          price_per_unit: viewProduct.price_per_unit || undefined,
+          count_type_abbreviation: viewProduct.count_type_abbr || undefined,
+        } : null}
+        isOpen={!!viewProduct}
+        onClose={closeDetailModal}
+      />
 
       {/* Product Dependencies Modal */}
       {dependenciesModal && (
