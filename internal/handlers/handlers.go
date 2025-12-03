@@ -2783,9 +2783,9 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN devices d ON p.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
-		LEFT JOIN cases cs ON dc.caseID = cs.case_id
+		LEFT JOIN cases cs ON dc.caseID = cs.caseID
 		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
-		LEFT JOIN jobs j ON jd.jobID = j.jobid
+		LEFT JOIN jobs j ON jd.jobID = j.jobID
 		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
 	`
 
