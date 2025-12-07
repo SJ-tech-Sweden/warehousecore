@@ -52,7 +52,6 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const [picturesUnavailable, setPicturesUnavailable] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [preloadedUrls, setPreloadedUrls] = useState<Set<string>>(new Set());
   const [lightboxLoading, setLightboxLoading] = useState(false);
   const [websiteVisible, setWebsiteVisible] = useState(false);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -190,29 +189,22 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
     }
   };
 
-  // Preload images to accelerate navigation
-  const preloadImage = (url: string) => {
-    if (!url || preloadedUrls.has(url)) return;
-    const img = new Image();
-    img.onload = () => setPreloadedUrls(prev => new Set(prev).add(url));
-    img.src = url;
-  };
-
-  useEffect(() => {
-    // Preload the first few images for immediate viewing
-    pictures.slice(0, 4).forEach(pic => preloadImage(pic.download_url));
-  }, [pictures]);
-
   useEffect(() => {
     if (previewIndex === null || pictures.length === 0) return;
     const current = pictures[previewIndex];
+    setLightboxLoading(false);
+    // Preload next/prev lightly without blocking
+    const preload = (url: string) => {
+      if (!url) return;
+      const img = new Image();
+      img.src = url;
+    };
     const next = pictures[(previewIndex + 1) % pictures.length];
     const prev = pictures[(previewIndex - 1 + pictures.length) % pictures.length];
-    preloadImage(current.download_url);
-    preloadImage(next.download_url);
-    preloadImage(prev.download_url);
-    setLightboxLoading(!preloadedUrls.has(current.download_url));
-  }, [previewIndex, pictures, preloadedUrls]);
+    preload(current.download_url);
+    preload(next.download_url);
+    preload(prev.download_url);
+  }, [previewIndex, pictures]);
 
   const formatDate = (iso: string) => {
     const date = new Date(iso);
@@ -337,7 +329,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {pictures.map(pic => (
                       <div key={pic.file_name} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2 min-w-0">
-                        <img src={pic.download_url} alt="" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                        <img
+                          src={pic.download_url}
+                          alt=""
+                          className="h-16 w-16 rounded object-cover flex-shrink-0"
+                          loading="lazy"
+                        />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-white font-semibold break-all">{pic.file_name}</p>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
