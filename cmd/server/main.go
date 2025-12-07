@@ -146,12 +146,14 @@ func main() {
 	// Health check (public)
 	api.HandleFunc("/health", handlers.HealthCheck).Methods("GET")
 
+	// Public product pictures (must be accessible without headers for IMG tags)
+	api.HandleFunc("/public/products/{id}/pictures/{filename}", handlers.DownloadProductPicture).Methods("GET")
+
 	// Public website feeds (protected by API key)
 	public := api.PathPrefix("/public").Subrouter()
 	public.Use(middleware.APIKeyMiddleware)
 	public.HandleFunc("/products", handlers.GetWebsiteProducts).Methods("GET")
 	public.HandleFunc("/packages", handlers.GetWebsitePackages).Methods("GET")
-	public.HandleFunc("/products/{id}/pictures/{filename}", handlers.DownloadProductPicture).Methods("GET")
 
 	// Protected routes - apply auth middleware
 	protected := api.PathPrefix("").Subrouter()
