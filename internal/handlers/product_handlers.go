@@ -1485,7 +1485,8 @@ func filterAllowedImages(productID int, images []string, thumb *string) ([]strin
 
 	pics, err := productPictureService.ListPictures(name)
 	if err != nil {
-		return nil, thumb, err
+		log.Printf("[WEBSITE] Skip image validation for product %d: %v", productID, err)
+		return images, thumb, errPicturesUnavailable
 	}
 	allowed := make(map[string]bool, len(pics))
 	for _, p := range pics {
