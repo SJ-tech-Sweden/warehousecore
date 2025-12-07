@@ -800,26 +800,26 @@ export function ProductsTab() {
           </div>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid w-full gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {sortedProducts.map(product => (
-            <div key={product.product_id} className="glass rounded-xl p-4">
+            <div key={product.product_id} className="glass rounded-xl p-4 min-w-0">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-white">{product.name}</h3>
-                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-gray-300">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-lg font-semibold text-white break-words leading-tight">{product.name}</h3>
+                    <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-gray-300 whitespace-nowrap">
                       #{product.product_id}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-400">{categoryPath(product)}</p>
+                  <p className="text-sm text-gray-400 break-words">{categoryPath(product)}</p>
                   {(product.brand_name || product.manufacturer_name) && (
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 break-words">
                       {product.brand_name || 'Unbekannte Marke'}
                       {product.manufacturer_name ? ` • ${product.manufacturer_name}` : ''}
                     </p>
                   )}
                   {product.description && (
-                    <p className="mt-2 text-xs text-gray-400">{product.description}</p>
+                    <p className="text-xs text-gray-400 break-words line-clamp-3">{product.description}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

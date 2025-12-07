@@ -305,7 +305,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                       </button>
                       <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-xs text-white">
-                        <p className="font-semibold truncate">{picture.file_name}</p>
+                        <p className="font-semibold break-all">{picture.file_name}</p>
                         <p className="text-gray-300">{formatDate(picture.modified_at)}</p>
                       </div>
                     </div>
@@ -336,11 +336,11 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   <p className="text-sm text-gray-400">Bilder auswählen und Thumbnail festlegen:</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {pictures.map(pic => (
-                      <div key={pic.file_name} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2">
-                        <img src={pic.download_url} alt="" className="h-16 w-16 rounded object-cover" />
-                        <div className="flex-1">
-                          <p className="text-sm text-white font-semibold truncate">{pic.file_name}</p>
-                          <div className="flex items-center gap-3 mt-1">
+                      <div key={pic.file_name} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2 min-w-0">
+                        <img src={pic.download_url} alt="" className="h-16 w-16 rounded object-cover flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-semibold break-all">{pic.file_name}</p>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <label className="flex items-center gap-1 text-xs text-gray-200">
                               <input
                                 type="checkbox"
