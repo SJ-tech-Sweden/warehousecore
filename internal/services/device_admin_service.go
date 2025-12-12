@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	mysql "github.com/go-sql-driver/mysql"
+	"github.com/lib/pq"
 
 	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
@@ -347,10 +347,10 @@ func (s *DeviceAdminService) DeleteDevice(ctx context.Context, deviceID string) 
 		return fmt.Errorf("failed to load device: %w", err)
 	}
 
-	result, err := tx.ExecContext(ctx, `DELETE FROM devices WHERE deviceID = ?`, deviceID)
+	result, err := tx.ExecContext(ctx, `DELETE FROM devices WHERE deviceID = $1`, deviceID)
 	if err != nil {
-		var mysqlErr *mysql.MySQLError
-		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1451 {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23503" { // foreign_key_violation
 			return fmt.Errorf("device %s is still linked to cases, jobs, or history entries", deviceID)
 		}
 		return fmt.Errorf("failed to delete device: %w", err)

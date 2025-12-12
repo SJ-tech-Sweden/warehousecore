@@ -368,7 +368,7 @@ func (s *Service) ClearAllLEDs() error {
 	}
 
 	var controllers []models.LEDController
-	if err := db.Where("is_active = ?", true).Find(&controllers).Error; err != nil {
+	if err := db.Where("is_active = 1").Find(&controllers).Error; err != nil {
 		log.Printf("[LED] Failed to query controllers: %v, clearing default only", err)
 		return s.publisher.PublishClear()
 	}

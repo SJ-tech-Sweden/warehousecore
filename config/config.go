@@ -25,16 +25,13 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection configuration
 type DatabaseConfig struct {
-	// SQLite configuration (new)
-	Path        string
-	BusyTimeout int
-
-	// Legacy MySQL fields (kept for backwards compatibility)
+	// PostgreSQL configuration
 	Host     string
 	Port     string
+	Name     string
 	User     string
 	Password string
-	Database string
+	SSLMode  string
 }
 
 // AppConfig holds application-specific configuration
@@ -59,15 +56,13 @@ func Load() (*Config, error) {
 			Host: getEnv("HOST", "0.0.0.0"),
 		},
 		Database: DatabaseConfig{
-			// SQLite configuration (preferred)
-			Path:        getEnv("DB_PATH", "./data/warehousecore.db"),
-			BusyTimeout: getEnvAsInt("DB_BUSY_TIMEOUT", 5000),
-			// Legacy MySQL configuration (for backwards compatibility)
+			// PostgreSQL configuration
 			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASS", ""),
-			Database: getEnv("DB_NAME", "RentalCore"),
+			Port:     getEnv("DB_PORT", "5432"),
+			Name:     getEnv("DB_NAME", "rentalcore"),
+			User:     getEnv("DB_USER", "rentalcore"),
+			Password: getEnv("DB_PASSWORD", "rentalcore123"),
+			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		App: AppConfig{
 			Environment: getEnv("APP_ENV", "development"),
@@ -79,8 +74,8 @@ func Load() (*Config, error) {
 	}
 
 	// Debug logging
-	log.Printf("🔧 Database Config: Path=%s (SQLite mode)",
-		cfg.Database.Path)
+	log.Printf("🔧 Database Config: PostgreSQL %s@%s:%s/%s",
+		cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name)
 
 	return cfg, nil
 }
@@ -95,14 +90,15 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// DSN returns the database connection string
+// DSN returns the PostgreSQL database connection string
 func (c *DatabaseConfig) DSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local&tls=skip-verify",
-		c.User,
-		c.Password,
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		c.Host,
 		c.Port,
-		c.Database,
+		c.User,
+		c.Password,
+		c.Name,
+		c.SSLMode,
 	)
 }
 
