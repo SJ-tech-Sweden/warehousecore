@@ -19,7 +19,7 @@ RUN npm run build
 FROM golang:1.24-alpine AS backend-builder
 
 # Install build dependencies including gcc for CGO (needed for webp and sqlite)
-RUN apk add --no-cache git gcc musl-dev
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
 
 WORKDIR /app
 

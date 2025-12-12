@@ -1,5 +1,5 @@
 // Package repository provides SQLite database connection for WarehouseCore
-// Migration von MySQL zu SQLite mit modernc.org/sqlite (CGO-free)
+// Migration von MySQL zu SQLite mit mattn/go-sqlite3 (CGO-enabled)
 package repository
 
 import (
@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3" // SQLite driver with CGO
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"warehousecore/config"
@@ -46,8 +47,8 @@ func InitDatabase(cfg *config.Config) error {
 	dsn := buildSQLiteDSN(dbPath, cfg.Database.BusyTimeout)
 
 	// Öffne sql.DB für direkte SQL-Queries
-	// Verwende den modernc.org/sqlite Treiber
-	sqlDB, err := sql.Open("sqlite", dsn)
+	// Verwende mattn/go-sqlite3 driver (registriert als "sqlite3")
+	sqlDB, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
