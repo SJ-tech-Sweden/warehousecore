@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -24,6 +25,11 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection configuration
 type DatabaseConfig struct {
+	// SQLite configuration (new)
+	Path        string
+	BusyTimeout int
+
+	// Legacy MySQL fields (kept for backwards compatibility)
 	Host     string
 	Port     string
 	User     string
@@ -53,6 +59,10 @@ func Load() (*Config, error) {
 			Host: getEnv("HOST", "0.0.0.0"),
 		},
 		Database: DatabaseConfig{
+			// SQLite configuration (preferred)
+			Path:        getEnv("DB_PATH", "./data/warehousecore.db"),
+			BusyTimeout: getEnvAsInt("DB_BUSY_TIMEOUT", 5000),
+			// Legacy MySQL configuration (for backwards compatibility)
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "3306"),
 			User:     getEnv("DB_USER", "root"),
@@ -69,15 +79,20 @@ func Load() (*Config, error) {
 	}
 
 	// Debug logging
-	log.Printf("🔧 Database Config: Host=%s Port=%s User=%s DB=%s (Pass length: %d)",
-		cfg.Database.Host, cfg.Database.Port, cfg.Database.User, cfg.Database.Database, len(cfg.Database.Password))
-
-	// Validate required fields
-	if cfg.Database.Password == "" {
-		log.Println("Warning: DB_PASS is not set")
-	}
+	log.Printf("🔧 Database Config: Path=%s (SQLite mode)",
+		cfg.Database.Path)
 
 	return cfg, nil
+}
+
+// getEnvAsInt retrieves an environment variable as an integer or returns a default value
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return defaultValue
 }
 
 // DSN returns the database connection string

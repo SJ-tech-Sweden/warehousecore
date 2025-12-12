@@ -18,7 +18,7 @@ RUN npm run build
 # Stage 2: Build Backend
 FROM golang:1.24-alpine AS backend-builder
 
-# Install build dependencies
+# Install build dependencies including gcc for CGO (needed for webp and sqlite)
 RUN apk add --no-cache git gcc musl-dev
 
 WORKDIR /app
@@ -30,8 +30,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o warehousecore ./cmd/server
+# Build the application with CGO enabled (needed for webp library)
+RUN CGO_ENABLED=1 GOOS=linux go build -a -o warehousecore ./cmd/server
 
 # Stage 3: Final Image
 FROM alpine:latest
