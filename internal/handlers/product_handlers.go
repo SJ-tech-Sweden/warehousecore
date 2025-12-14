@@ -105,14 +105,14 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 			p.depth,
 			p.powerconsumption,
 			p.pos_in_category,
-			p.is_accessory,
-			p.is_consumable,
+			COALESCE(p.is_accessory, false) as is_accessory,
+			COALESCE(p.is_consumable, false) as is_consumable,
 			p.count_type_id,
 			p.stock_quantity,
 			p.min_stock_level,
 			p.generic_barcode,
 			p.price_per_unit,
-			p.website_visible,
+			COALESCE(p.website_visible, false) as website_visible,
 			p.website_thumbnail,
 			p.website_images_json,
 			c.name as category_name,
@@ -240,14 +240,14 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 			p.depth,
 			p.powerconsumption,
 			p.pos_in_category,
-			p.is_accessory,
-			p.is_consumable,
+			COALESCE(p.is_accessory, false) as is_accessory,
+			COALESCE(p.is_consumable, false) as is_consumable,
 			p.count_type_id,
 			p.stock_quantity,
 			p.min_stock_level,
 			p.generic_barcode,
 			p.price_per_unit,
-			p.website_visible,
+			COALESCE(p.website_visible, false) as website_visible,
 			p.website_thumbnail,
 			p.website_images_json,
 			c.name as category_name,
@@ -264,7 +264,7 @@ func GetProduct(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN brands b ON p.brandID = b.brandID
 		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		WHERE p.productID = ?
+		WHERE p.productID = $1
 	`
 
 	var p Product
@@ -1311,7 +1311,7 @@ func GetWebsiteProducts(w http.ResponseWriter, r *http.Request) {
 		SELECT p.productID, p.name, b.name as brand_name, p.description, p.price_per_unit, p.website_thumbnail, p.website_images_json
 		FROM products p
 		LEFT JOIN brands b ON p.brandID = b.brandID
-		WHERE p.website_visible = 1
+		WHERE p.website_visible = TRUE
 		  AND p.productID NOT IN (SELECT COALESCE(product_id, 0) FROM product_packages)
 		ORDER BY COALESCE(p.pos_in_category, 0), p.name
 	`)
@@ -1371,7 +1371,7 @@ func GetWebsitePackages(w http.ResponseWriter, r *http.Request) {
 			p.website_images_json
 		FROM product_packages pp
 		LEFT JOIN products p ON pp.product_id = p.productID
-		WHERE COALESCE(pp.website_visible, 0) = 1 OR COALESCE(p.website_visible, 0) = 1
+		WHERE COALESCE(pp.website_visible, FALSE) = TRUE OR COALESCE(p.website_visible, FALSE) = TRUE
 		ORDER BY pp.name
 	`)
 	if err != nil {
