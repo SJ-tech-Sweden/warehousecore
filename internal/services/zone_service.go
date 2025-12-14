@@ -31,7 +31,7 @@ func (s *ZoneService) GenerateZoneCode(zoneName, zoneType string, parentZoneID *
 	// If there's a parent, get its code and build hierarchically
 	if parentZoneID != nil && *parentZoneID > 0 {
 		var parentCode string
-		err := s.db.QueryRow(`SELECT code FROM storage_zones WHERE zone_id = ?`, *parentZoneID).Scan(&parentCode)
+		err := s.db.QueryRow(`SELECT code FROM storage_zones WHERE zone_id = $1`, *parentZoneID).Scan(&parentCode)
 		if err != nil {
 			return "", fmt.Errorf("parent zone not found: %v", err)
 		}
@@ -44,7 +44,7 @@ func (s *ZoneService) GenerateZoneCode(zoneName, zoneType string, parentZoneID *
 		err = s.db.QueryRow(`
 			SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(code, '-', -1) AS UNSIGNED)), 0)
 			FROM storage_zones
-			WHERE code LIKE ? AND parent_zone_id = ?
+			WHERE code LIKE $1 AND parent_zone_id = $2
 		`, pattern, *parentZoneID).Scan(&maxNum)
 
 		if err != nil && err != sql.ErrNoRows {
@@ -60,7 +60,7 @@ func (s *ZoneService) GenerateZoneCode(zoneName, zoneType string, parentZoneID *
 	// Check if this prefix exists and add number if needed
 	var count int
 	err := s.db.QueryRow(`
-		SELECT COUNT(*) FROM storage_zones WHERE code LIKE ?
+		SELECT COUNT(*) FROM storage_zones WHERE code LIKE $1
 	`, prefix+"%").Scan(&count)
 
 	if err != nil {
@@ -107,7 +107,7 @@ func (s *ZoneService) GenerateShelfName(parentZoneID *int64) (string, error) {
 	var count int
 	err := s.db.QueryRow(`
 		SELECT COUNT(*) FROM storage_zones
-		WHERE parent_zone_id = ? AND type = 'shelf' AND is_active = TRUE
+		WHERE parent_zone_id = $1 AND type = 'shelf' AND is_active = TRUE
 	`, *parentZoneID).Scan(&count)
 
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *ZoneService) GetZoneDetails(zoneID int64) (map[string]interface{}, erro
 	err := s.db.QueryRow(`
 		SELECT zone_id, code, name, type, description, parent_zone_id, capacity, is_active
 		FROM storage_zones
-		WHERE zone_id = ? AND is_active = TRUE
+		WHERE zone_id = $1 AND is_active = TRUE
 	`, zoneID).Scan(&zoneID, &code, &name, &zoneType, &description, &parentZoneID, &capacity, &isActive)
 
 	if err == sql.ErrNoRows {
@@ -202,7 +202,7 @@ func (s *ZoneService) getSubzones(parentID int64) ([]map[string]interface{}, err
 		SELECT zone_id, code, name, type, capacity,
 		       (SELECT COUNT(*) FROM storage_zones WHERE parent_zone_id = sz.zone_id AND is_active = TRUE) as subzone_count
 		FROM storage_zones sz
-		WHERE parent_zone_id = ? AND is_active = TRUE
+		WHERE parent_zone_id = $1 AND is_active = TRUE
 		ORDER BY code
 	`, parentID)
 
@@ -259,7 +259,7 @@ func (s *ZoneService) getBreadcrumb(zoneID int64) ([]map[string]interface{}, err
 		err := s.db.QueryRow(`
 			SELECT zone_id, code, name, parent_zone_id
 			FROM storage_zones
-			WHERE zone_id = ?
+			WHERE zone_id = $1
 		`, currentID).Scan(&id, &code, &name, &parentID)
 
 		if err != nil {
@@ -287,7 +287,7 @@ func (s *ZoneService) getDeviceCountRecursive(zoneID int64) int {
 	err := s.db.QueryRow(`
 		WITH RECURSIVE zone_tree AS (
 			-- Start with the given zone
-			SELECT zone_id FROM storage_zones WHERE zone_id = ? AND is_active = TRUE
+			SELECT zone_id FROM storage_zones WHERE zone_id = $1 AND is_active = TRUE
 			UNION ALL
 			-- Recursively add all child zones
 			SELECT sz.zone_id

@@ -132,7 +132,7 @@ func GetProductPackage(w http.ResponseWriter, r *http.Request) {
 		FROM product_packages pp
 		LEFT JOIN products p ON pp.product_id = p.productID
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
-		WHERE pp.package_id = ?
+		WHERE pp.package_id = $1
 	`, id).Scan(
 		&pkg.PackageID,
 		&pkg.ProductID,
@@ -170,7 +170,7 @@ func GetProductPackage(w http.ResponseWriter, r *http.Request) {
 		JOIN products p ON ppi.product_id = p.productID
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
 		LEFT JOIN brands b ON p.brandID = b.brandID
-		WHERE ppi.package_id = ?
+		WHERE ppi.package_id = $1
 		ORDER BY p.name
 	`, id)
 
@@ -264,7 +264,7 @@ func CreateProductPackage(w http.ResponseWriter, r *http.Request) {
 	// Step 1: Create a Product entry for this package
 	productResult, err := tx.Exec(`
 		INSERT INTO products (name, categoryID, subcategoryID, subbiercategoryID, itemcostperday, description, website_visible)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`, req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID, req.Price, req.Description, req.WebsiteVisible)
 
 	if err != nil {
@@ -279,7 +279,7 @@ func CreateProductPackage(w http.ResponseWriter, r *http.Request) {
 	// Step 2: Create package linked to the product
 	result, err := tx.Exec(`
 		INSERT INTO product_packages (package_code, product_id, name, description, price, website_visible)
-		VALUES (?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6)
 	`, packageCode, productID, req.Name, req.Description, req.Price, req.WebsiteVisible)
 
 	if err != nil {
@@ -299,7 +299,7 @@ func CreateProductPackage(w http.ResponseWriter, r *http.Request) {
 
 			_, err := tx.Exec(`
 				INSERT INTO product_package_items (package_id, product_id, quantity)
-				VALUES (?, ?, ?)
+				VALUES ($1, $2, $3)
 			`, packageID, item.ProductID, item.Quantity)
 
 			if err != nil {
@@ -391,8 +391,8 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 	// Update the linked product
 	_, err = tx.Exec(`
 		UPDATE products
-		SET name = ?, categoryID = ?, subcategoryID = ?, subbiercategoryID = ?, itemcostperday = ?, description = ?, website_visible = ?
-		WHERE productID = ?
+		SET name = $1, categoryID = $2, subcategoryID = $3, subbiercategoryID = $4, itemcostperday = $5, description = $6, website_visible = $7
+		WHERE productID = $8
 	`, req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID, req.Price, req.Description, req.WebsiteVisible, productID)
 
 	if err != nil {
@@ -404,8 +404,8 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 	// Update package
 	result, err := tx.Exec(`
 		UPDATE product_packages
-		SET name = ?, description = ?, price = ?, website_visible = ?
-		WHERE package_id = ?
+		SET name = $1, description = $2, price = $3, website_visible = $4
+		WHERE package_id = $5
 	`, req.Name, req.Description, req.Price, req.WebsiteVisible, id)
 
 	if err != nil {
@@ -445,7 +445,7 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 
 			_, err := tx.Exec(`
 				INSERT INTO product_package_items (package_id, product_id, quantity)
-				VALUES (?, ?, ?)
+				VALUES ($1, $2, $3)
 			`, id, item.ProductID, item.Quantity)
 
 			if err != nil {
@@ -850,8 +850,8 @@ func AddItemToPackage(w http.ResponseWriter, r *http.Request) {
 	// Add or update item
 	_, err = db.Exec(`
 		INSERT INTO product_package_items (package_id, product_id, quantity)
-		VALUES (?, ?, ?)
-		ON DUPLICATE KEY UPDATE quantity = ?
+		VALUES ($1, $2, $3)
+		ON DUPLICATE KEY UPDATE quantity = $4
 	`, packageID, req.ProductID, req.Quantity, req.Quantity)
 
 	if err != nil {
@@ -887,7 +887,7 @@ func RemoveItemFromPackage(w http.ResponseWriter, r *http.Request) {
 
 	result, err := db.Exec(`
 		DELETE FROM product_package_items
-		WHERE package_id = ? AND package_item_id = ?
+		WHERE package_id = $1 AND package_item_id = $2
 	`, packageID, itemID)
 
 	if err != nil {

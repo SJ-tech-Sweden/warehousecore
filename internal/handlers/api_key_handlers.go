@@ -67,7 +67,7 @@ func CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	hash := repository.HashAPIKey(rawKey)
 
 	db := repository.GetSQLDB()
-	res, err := db.Exec(`INSERT INTO api_keys (name, api_key_hash, is_active) VALUES (?, ?, 1)`, body.Name, hash)
+	res, err := db.Exec(`INSERT INTO api_keys (name, api_key_hash, is_active) VALUES ($1, $2, 1)`, body.Name, hash)
 	if err != nil {
 		log.Printf("[APIKEY] failed to create key: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create API key"})
@@ -104,7 +104,7 @@ func UpdateAPIKeyStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
-	res, err := db.Exec(`UPDATE api_keys SET is_active = ? WHERE id = ?`, body.IsActive, id)
+	res, err := db.Exec(`UPDATE api_keys SET is_active = $1 WHERE id = $2`, body.IsActive, id)
 	if err != nil {
 		log.Printf("[APIKEY] failed to update key %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update API key"})
@@ -126,7 +126,7 @@ func DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	db := repository.GetSQLDB()
-	res, err := db.Exec(`DELETE FROM api_keys WHERE id = ?`, id)
+	res, err := db.Exec(`DELETE FROM api_keys WHERE id = $1`, id)
 	if err != nil {
 		log.Printf("[APIKEY] failed to delete key %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete API key"})

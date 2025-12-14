@@ -586,7 +586,7 @@ func CreateProduct(w http.ResponseWriter, r *http.Request) {
 			powerconsumption, pos_in_category, is_accessory, is_consumable, count_type_id,
 			stock_quantity, min_stock_level, generic_barcode, price_per_unit,
 			website_visible, website_thumbnail, website_images_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
 	`,
 		req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID,
 		req.ManufacturerID, req.BrandID, req.Description, req.MaintenanceInterval,
@@ -656,14 +656,14 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	result, err := tx.Exec(`
 		UPDATE products SET
-			name = ?, categoryID = ?, subcategoryID = ?, subbiercategoryID = ?,
-			manufacturerID = ?, brandID = ?, description = ?, maintenanceInterval = ?,
-			itemcostperday = ?, weight = ?, height = ?, width = ?, depth = ?,
-			powerconsumption = ?, pos_in_category = ?,
-			is_accessory = ?, is_consumable = ?, count_type_id = ?,
-			stock_quantity = ?, min_stock_level = ?, generic_barcode = ?, price_per_unit = ?,
-			website_visible = ?, website_thumbnail = ?, website_images_json = ?
-		WHERE productID = ?
+			name = $1, categoryID = $2, subcategoryID = $3, subbiercategoryID = $4,
+			manufacturerID = $5, brandID = $6, description = $7, maintenanceInterval = $8,
+			itemcostperday = $9, weight = $10, height = $11, width = $12, depth = $13,
+			powerconsumption = $14, pos_in_category = $15,
+			is_accessory = $16, is_consumable = $17, count_type_id = $18,
+			stock_quantity = $19, min_stock_level = $20, generic_barcode = $21, price_per_unit = $22,
+			website_visible = $23, website_thumbnail = $24, website_images_json = $25
+		WHERE productID = $26
 	`,
 		req.Name, req.CategoryID, req.SubcategoryID, req.SubbiercategoryID,
 		req.ManufacturerID, req.BrandID, req.Description, req.MaintenanceInterval,
@@ -701,7 +701,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		// Get current total from product_locations
 		var currentTotal float64
 		err := tx.QueryRow(`
-			SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?
+			SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = $1
 		`, id).Scan(&currentTotal)
 
 		if err != nil {
@@ -714,13 +714,13 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 				// Get the zone with most stock, or create default location
 				var defaultZoneID sql.NullInt64
 				err := tx.QueryRow(`
-					SELECT zone_id FROM product_locations WHERE product_id = ? ORDER BY quantity DESC LIMIT 1
+					SELECT zone_id FROM product_locations WHERE product_id = $1 ORDER BY quantity DESC LIMIT 1
 				`, id).Scan(&defaultZoneID)
 
 				if err == sql.ErrNoRows {
 					// No locations exist - create in zone with full quantity
 					_, err = tx.Exec(`
-						INSERT INTO product_locations (product_id, zone_id, quantity) VALUES (?, NULL, ?)
+						INSERT INTO product_locations (product_id, zone_id, quantity) VALUES ($1, NULL, $2)
 					`, id, newTotal)
 					if err != nil {
 						log.Printf("Error: Failed to create product location: %v", err)
@@ -728,7 +728,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 				} else if err == nil {
 					// Update the primary zone
 					_, err = tx.Exec(`
-						UPDATE product_locations SET quantity = quantity + ? WHERE product_id = ? AND zone_id <=> ?
+						UPDATE product_locations SET quantity = quantity + $1 WHERE product_id = $2 AND zone_id <=> $3
 					`, difference, id, defaultZoneID)
 					if err != nil {
 						log.Printf("Error: Failed to update product_locations: %v", err)
@@ -743,8 +743,8 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	if packageID.Valid {
 		if _, err := tx.Exec(`
 			UPDATE product_packages
-			SET name = ?, description = ?, price = ?
-			WHERE package_id = ?
+			SET name = $1, description = $2, price = $3
+			WHERE package_id = $4
 		`, req.Name, req.Description, req.ItemCostPerDay, packageID.Int64); err != nil {
 			log.Printf("Failed to update linked product package for product %d: %v", id, err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update linked product package"})
@@ -759,9 +759,9 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 			SET stock_quantity = (
 				SELECT COALESCE(SUM(quantity), 0)
 				FROM product_locations
-				WHERE product_id = ?
+				WHERE product_id = $1
 			)
-			WHERE productID = ?
+			WHERE productID = $2
 		`, id, id)
 		if err != nil {
 			log.Printf("Error: Failed to recalculate stock_quantity: %v", err)
@@ -935,7 +935,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 		SELECT p.name, s.abbreviation, p.pos_in_category
 		FROM products p
 		LEFT JOIN subcategories s ON p.subcategoryID = s.subcategoryID
-		WHERE p.productID = ?
+		WHERE p.productID = $1
 	`, req.ProductID).Scan(&productName, &abbreviation, &posInCategory)
 
 	if err == sql.ErrNoRows {
@@ -1182,7 +1182,7 @@ func GetLowStockAlerts(w http.ResponseWriter, r *http.Request) {
 			COALESCE(p.is_consumable, false) as is_consumable
 		FROM products p
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		WHERE (p.is_consumable = 1 OR p.is_accessory = 1)
+		WHERE (p.is_consumable = TRUE OR p.is_accessory = TRUE)
 		  AND p.min_stock_level IS NOT NULL
 		  AND p.min_stock_level > 0
 		  AND COALESCE(p.stock_quantity, 0) < p.min_stock_level
@@ -1250,8 +1250,8 @@ func UpdateProductWebsite(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	result, err := db.Exec(`
 		UPDATE products
-		SET website_visible = ?, website_thumbnail = ?, website_images_json = ?
-		WHERE productID = ?
+		SET website_visible = $1, website_thumbnail = $2, website_images_json = $3
+		WHERE productID = $4
 	`, websiteVisible, filteredThumb, nullJSONFromSlice(filteredImages), id)
 	if err != nil {
 		log.Printf("[WEBSITE] Failed to update product %d: %v", id, err)
@@ -1457,7 +1457,7 @@ func loadPackageItems(db *sql.DB, packageID int) ([]packageItemRow, error) {
 		SELECT ppi.product_id, ppi.quantity, p.name
 		FROM product_package_items ppi
 		JOIN products p ON p.productID = ppi.product_id
-		WHERE ppi.package_id = ?
+		WHERE ppi.package_id = $1
 	`, packageID)
 	if err != nil {
 		return nil, err

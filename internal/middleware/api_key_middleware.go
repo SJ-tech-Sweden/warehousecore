@@ -35,7 +35,7 @@ func isAPIKeyValid(raw string) bool {
 	hash := hashAPIKey(raw)
 
 	var id int
-	err := db.QueryRow(`SELECT id FROM api_keys WHERE api_key_hash = ? AND is_active = 1 LIMIT 1`, hash).Scan(&id)
+	err := db.QueryRow(`SELECT id FROM api_keys WHERE api_key_hash = ? AND is_active = TRUE LIMIT 1`, hash).Scan(&id)
 	if err != nil {
 		return false
 	}

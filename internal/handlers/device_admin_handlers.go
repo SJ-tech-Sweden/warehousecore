@@ -298,7 +298,7 @@ func GenerateDeviceQR(w http.ResponseWriter, r *http.Request) {
 	// Verify device exists and get QR code value
 	db := repository.GetSQLDB()
 	var qrCode string
-	err := db.QueryRow(`SELECT COALESCE(qr_code, ?) FROM devices WHERE deviceID = ?`,
+	err := db.QueryRow(`SELECT COALESCE(qr_code, $1) FROM devices WHERE deviceID = $2`,
 		"QR-"+deviceID, deviceID).Scan(&qrCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -350,7 +350,7 @@ func GenerateDeviceBarcode(w http.ResponseWriter, r *http.Request) {
 	// Verify device exists and get barcode value
 	db := repository.GetSQLDB()
 	var barcode string
-	err := db.QueryRow(`SELECT COALESCE(barcode, ?) FROM devices WHERE deviceID = ?`,
+	err := db.QueryRow(`SELECT COALESCE(barcode, $1) FROM devices WHERE deviceID = $2`,
 		deviceID, deviceID).Scan(&barcode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

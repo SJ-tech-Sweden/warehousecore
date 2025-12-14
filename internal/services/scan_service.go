@@ -124,8 +124,8 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 	// Update device status to in_storage
 	_, err := tx.Exec(`
 		UPDATE devices
-		SET status = 'in_storage', zone_id = ?, current_location = 'warehouse'
-		WHERE deviceID = ?
+		SET status = 'in_storage', zone_id = $1, current_location = 'warehouse'
+		WHERE deviceID = $2
 	`, zoneID, device.DeviceID)
 	if err != nil {
 		return nil, nil, err
@@ -137,7 +137,7 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 		_, err = tx.Exec(`
 			UPDATE jobdevices
 			SET pack_status = 'pending', pack_ts = NULL
-			WHERE deviceID = ? AND jobID = ?
+			WHERE deviceID = $1 AND jobID = $2
 		`, device.DeviceID, *fromJobID)
 		if err != nil {
 			log.Printf("Warning: failed to reset pack status: %v", err)
@@ -157,7 +157,7 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 
 	result, err := tx.Exec(`
 		INSERT INTO device_movements (device_id, action, from_job_id, to_zone_id, timestamp)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5)
 	`, movement.DeviceID, movement.Action, movement.FromJobID, movement.ToZoneID, movement.Timestamp)
 	if err != nil {
 		return nil, nil, err
@@ -189,7 +189,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	_, err := tx.Exec(`
 		UPDATE devices
 		SET status = 'on_job', zone_id = NULL
-		WHERE deviceID = ?
+		WHERE deviceID = $1
 	`, device.DeviceID)
 	if err != nil {
 		return nil, nil, err
@@ -198,7 +198,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	// Assign to job and update pack_status to issued
 	_, err = tx.Exec(`
 		INSERT INTO jobdevices (deviceID, jobID, pack_status)
-		VALUES (?, ?, 'issued')
+		VALUES ($1, $2, 'issued')
 		ON DUPLICATE KEY UPDATE pack_status = 'issued'
 	`, device.DeviceID, *jobID)
 	if err != nil {
@@ -216,7 +216,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 
 	result, err := tx.Exec(`
 		INSERT INTO device_movements (device_id, action, from_zone_id, to_job_id, timestamp)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5)
 	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToJobID, movement.Timestamp)
 	if err != nil {
 		return nil, nil, err
@@ -243,7 +243,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 		FROM product_dependencies pd
 		JOIN products p ON pd.dependency_product_id = p.productID
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		WHERE pd.product_id = ?
+		WHERE pd.product_id = $1
 		ORDER BY pd.is_optional ASC, pd.created_at DESC
 	`, device.ProductID)
 	if err != nil {
@@ -310,7 +310,7 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 	}
 
 	// Update device zone
-	_, err := tx.Exec(`UPDATE devices SET zone_id = ? WHERE deviceID = ?`, *toZoneID, device.DeviceID)
+	_, err := tx.Exec(`UPDATE devices SET zone_id = $1 WHERE deviceID = $2`, *toZoneID, device.DeviceID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -326,7 +326,7 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 
 	result, err := tx.Exec(`
 		INSERT INTO device_movements (device_id, action, from_zone_id, to_zone_id, timestamp)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5)
 	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToZoneID, movement.Timestamp)
 	if err != nil {
 		return nil, nil, err
@@ -347,7 +347,7 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 		SELECT deviceID, productID, serialnumber, barcode, qr_code, status,
 		       current_location, zone_id, condition_rating, usage_hours
 		FROM devices
-		WHERE barcode = ? OR qr_code = ? OR deviceID = ?
+		WHERE barcode = $1 OR qr_code = $2 OR deviceID = $3
 		LIMIT 1
 	`, scanCode, scanCode, scanCode).Scan(
 		&device.DeviceID, &device.ProductID, &device.SerialNumber,
@@ -361,7 +361,7 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 	// Get current job if on_job
 	if device.Status == "on_job" || device.Status == "rented" {
 		s.db.QueryRow(`
-			SELECT jobID FROM jobdevices WHERE deviceID = ? LIMIT 1
+			SELECT jobID FROM jobdevices WHERE deviceID = $1 LIMIT 1
 		`, device.DeviceID).Scan(&device.CurrentJobID)
 	}
 
@@ -385,7 +385,7 @@ func (s *ScanService) getDeviceWithDetails(deviceID string) *models.DeviceWithDe
 		LEFT JOIN cases c ON dc.caseID = c.caseID
 		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
 		LEFT JOIN jobs j ON jd.jobID = j.jobID
-		WHERE d.deviceID = ?
+		WHERE d.deviceID = $1
 		LIMIT 1
 	`, deviceID).Scan(
 		&device.DeviceID, &device.ProductID, &device.SerialNumber,
@@ -405,7 +405,7 @@ func (s *ScanService) logScanEvent(tx *sql.Tx, scanCode string, deviceID *string
 	_, err := tx.Exec(`
 		INSERT INTO scan_events
 		(scan_code, device_id, action, job_id, zone_id, user_id, success, error_message, ip_address, user_agent, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`, scanCode, deviceID, action, jobID, zoneID, userID, success, errorMsg, ipAddr, userAgent, time.Now())
 	if err != nil {
 		log.Printf("Failed to log scan event: %v", err)
@@ -419,10 +419,10 @@ func (s *ScanService) syncProductStockFromLocations(productID int64) error {
 		SET stock_quantity = (
 			SELECT COALESCE(SUM(quantity), 0)
 			FROM product_locations
-			WHERE product_id = ?
+			WHERE product_id = $1
 		)
-		WHERE productID = ?
-		AND (is_consumable = 1 OR is_accessory = 1)
+		WHERE productID = $2
+		AND (is_consumable = TRUE OR is_accessory = TRUE)
 	`, productID, productID)
 	if err != nil {
 		log.Printf("Warning: Failed to sync stock_quantity for product %d: %v", productID, err)
@@ -435,7 +435,7 @@ func (s *ScanService) updateLEDsAfterOuttake(jobID int64, fromZoneID int64) {
 	// Get zone code from zone ID
 	var zoneCode string
 	err := s.db.QueryRow(`
-		SELECT code FROM storage_zones WHERE zone_id = ?
+		SELECT code FROM storage_zones WHERE zone_id = $1
 	`, fromZoneID).Scan(&zoneCode)
 	if err != nil {
 		log.Printf("[LED] Failed to get zone code for zone_id %d: %v", fromZoneID, err)
@@ -476,8 +476,8 @@ func (s *ScanService) findConsumableByScan(scanCode string) (*ConsumableProduct,
 		       COALESCE(ct.abbreviation, 'Stk') as unit
 		FROM products p
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		WHERE (p.is_consumable = 1 OR p.is_accessory = 1)
-		  AND (p.generic_barcode = ? OR CAST(p.productID AS CHAR) = ?)
+		WHERE (p.is_consumable = TRUE OR p.is_accessory = TRUE)
+		  AND (p.generic_barcode = $1 OR CAST(p.productID AS CHAR) = $2)
 		LIMIT 1
 	`, scanCode, scanCode).Scan(
 		&product.ProductID, &product.Name, &product.IsConsumable,
@@ -533,8 +533,8 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 	// Update or insert stock in product_locations (single source of truth)
 	_, err := tx.Exec(`
 		INSERT INTO product_locations (product_id, zone_id, quantity)
-		VALUES (?, ?, ?)
-		ON DUPLICATE KEY UPDATE quantity = quantity + ?
+		VALUES ($1, $2, $3)
+		ON DUPLICATE KEY UPDATE quantity = quantity + $4
 	`, product.ProductID, *zoneID, quantity, quantity)
 	if err != nil {
 		s.logScanEvent(tx, scanCode, productIDStr, "intake", nil, zoneID, userID, false, err.Error(), ipAddr, userAgent)
@@ -548,8 +548,8 @@ func (s *ScanService) processConsumableIntake(tx *sql.Tx, product *ConsumablePro
 	// Also update products.stock_quantity to keep it in sync (calculated from sum)
 	_, err = tx.Exec(`
 		UPDATE products
-		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?)
-		WHERE productID = ?
+		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = $1)
+		WHERE productID = $2
 	`, product.ProductID, product.ProductID)
 	if err != nil {
 		log.Printf("Warning: failed to sync products.stock_quantity: %v", err)
@@ -586,7 +586,7 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 		err = tx.QueryRow(`
 			SELECT zone_id, quantity
 			FROM product_locations
-			WHERE product_id = ? AND quantity >= ?
+			WHERE product_id = $1 AND quantity >= $2
 			ORDER BY quantity DESC
 			LIMIT 1
 		`, product.ProductID, quantity).Scan(&selectedZoneID, &currentStock)
@@ -620,7 +620,7 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 		// Use specified zone - check stock
 		err = tx.QueryRow(`
 			SELECT COALESCE(quantity, 0) FROM product_locations
-			WHERE product_id = ? AND zone_id = ?
+			WHERE product_id = $1 AND zone_id = $2
 		`, product.ProductID, *zoneID).Scan(&currentStock)
 		if err != nil && err != sql.ErrNoRows {
 			s.logScanEvent(tx, scanCode, productIDStr, "outtake", jobID, zoneID, userID, false, err.Error(), ipAddr, userAgent)
@@ -644,8 +644,8 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 
 	// Decrease stock in product_locations (single source of truth)
 	result, err := tx.Exec(`
-		UPDATE product_locations SET quantity = quantity - ?
-		WHERE product_id = ? AND zone_id <=> ?
+		UPDATE product_locations SET quantity = quantity - $1
+		WHERE product_id = $2 AND zone_id <=> $3
 	`, quantity, product.ProductID, zoneID)
 	if err != nil {
 		s.logScanEvent(tx, scanCode, productIDStr, "outtake", jobID, zoneID, userID, false, err.Error(), ipAddr, userAgent)
@@ -671,8 +671,8 @@ func (s *ScanService) processConsumableOuttake(tx *sql.Tx, product *ConsumablePr
 	// Also update products.stock_quantity to keep it in sync (calculated from sum)
 	_, err = tx.Exec(`
 		UPDATE products
-		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = ?)
-		WHERE productID = ?
+		SET stock_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM product_locations WHERE product_id = $1)
+		WHERE productID = $2
 	`, product.ProductID, product.ProductID)
 	if err != nil {
 		log.Printf("Warning: failed to sync products.stock_quantity: %v", err)
@@ -696,7 +696,7 @@ func (s *ScanService) processConsumableCheck(tx *sql.Tx, product *ConsumableProd
 	// Get total stock
 	var totalStock float64
 	err := s.db.QueryRow(`
-		SELECT COALESCE(stock_quantity, 0) FROM products WHERE productID = ?
+		SELECT COALESCE(stock_quantity, 0) FROM products WHERE productID = $1
 	`, product.ProductID).Scan(&totalStock)
 	if err != nil {
 		s.logScanEvent(tx, scanCode, productIDStr, "check", nil, nil, userID, false, err.Error(), ipAddr, userAgent)

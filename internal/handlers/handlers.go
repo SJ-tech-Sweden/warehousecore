@@ -468,8 +468,8 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 			// Add quantity to this zone location
 			err = db.Exec(`
 				INSERT INTO product_locations (product_id, zone_id, quantity)
-				VALUES (?, ?, ?)
-				ON DUPLICATE KEY UPDATE quantity = quantity + ?
+				VALUES ($1, $2, $3)
+				ON DUPLICATE KEY UPDATE quantity = quantity + $4
 			`, product.ProductID, *scanReq.ZoneID, quantity, quantity).Error
 
 			if err != nil {
@@ -479,8 +479,8 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 			// Remove quantity from this zone location
 			err = db.Exec(`
 				UPDATE product_locations
-				SET quantity = GREATEST(0, quantity - ?)
-				WHERE product_id = ? AND zone_id = ?
+				SET quantity = GREATEST(0, quantity - $1)
+				WHERE product_id = $2 AND zone_id = $3
 			`, quantity, product.ProductID, *scanReq.ZoneID).Error
 
 			if err != nil {
@@ -789,7 +789,7 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases c ON dc.caseID = c.caseID
 		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
-		WHERE d.deviceID = ?
+		WHERE d.deviceID = $1
 	`, deviceID).Scan(&device.DeviceID, &device.ProductID, &device.SerialNumber, &device.Status,
 		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ConditionRating, &device.UsageHours, &device.LabelPath,
 		&device.ProductName, &device.ZoneName, &device.ZoneCode, &caseName, &jobNumber)
@@ -852,7 +852,7 @@ func UpdateDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
-	_, err := db.Exec(`UPDATE devices SET status = ? WHERE deviceID = ?`, req.Status, deviceID)
+	_, err := db.Exec(`UPDATE devices SET status = $1 WHERE deviceID = $2`, req.Status, deviceID)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -870,7 +870,7 @@ func GetDeviceMovements(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT movement_id, device_id, action, from_zone_id, to_zone_id, to_job_id, timestamp
 		FROM device_movements
-		WHERE device_id = ?
+		WHERE device_id = $1
 		ORDER BY timestamp DESC
 		LIMIT 50
 	`, deviceID)
@@ -1041,7 +1041,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 
 	result, err := db.Exec(`
 		INSERT INTO storage_zones (code, barcode, name, type, description, parent_zone_id, capacity, is_active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`, zoneCode, barcode, zoneName, input.Type, description, parentZoneID, capacity, input.IsActive)
 	if err != nil {
 		log.Printf("Zone creation error - SQL insert: %v", err)
@@ -1055,7 +1055,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 	var generatedBarcode *string
 	if input.Type == "shelf" {
 		barcodeStr := fmt.Sprintf("FACH-%08d", id)
-		_, err := db.Exec(`UPDATE storage_zones SET barcode = ? WHERE zone_id = ?`, barcodeStr, id)
+		_, err := db.Exec(`UPDATE storage_zones SET barcode = $1 WHERE zone_id = $2`, barcodeStr, id)
 		if err != nil {
 			log.Printf("Failed to update barcode: %v", err)
 		} else {
@@ -1132,7 +1132,7 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		LEFT JOIN brands b ON p.brandID = b.brandID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE d.zone_id = ? AND d.status = 'in_storage'
+		WHERE d.zone_id = $1 AND d.status = 'in_storage'
 		ORDER BY p.name, d.deviceID
 	`, zoneID)
 
@@ -1213,7 +1213,7 @@ func GetZoneProducts(w http.ResponseWriter, r *http.Request) {
 		FROM product_locations pl
 		LEFT JOIN products p ON pl.product_id = p.productID
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		WHERE pl.zone_id = ? AND pl.quantity > 0
+		WHERE pl.zone_id = $1 AND pl.quantity > 0
 		ORDER BY p.name
 	`, zoneID)
 
@@ -1250,8 +1250,8 @@ func UpdateZone(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	_, err := db.Exec(`
 		UPDATE storage_zones
-		SET code = ?, name = ?, type = ?, description = ?, parent_zone_id = ?, capacity = ?
-		WHERE zone_id = ?
+		SET code = $1, name = $2, type = $3, description = $4, parent_zone_id = $5, capacity = $6
+		WHERE zone_id = $7
 	`, zone.Code, zone.Name, zone.Type, zone.Description, zone.ParentZoneID, zone.Capacity, id)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -1267,7 +1267,7 @@ func DeleteZone(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	db := repository.GetSQLDB()
-	_, err := db.Exec(`UPDATE storage_zones SET is_active = FALSE WHERE zone_id = ?`, id)
+	_, err := db.Exec(`UPDATE storage_zones SET is_active = FALSE WHERE zone_id = $1`, id)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
@@ -1289,7 +1289,7 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow(`
 		SELECT zone_id, code, barcode, name, type, description, parent_zone_id, capacity, is_active
 		FROM storage_zones
-		WHERE (barcode = ? OR code = ?) AND is_active = TRUE
+		WHERE (barcode = $1 OR code = $2) AND is_active = TRUE
 		LIMIT 1
 	`, scanCode, scanCode).Scan(&zone.ZoneID, &zone.Code, &zone.Barcode, &zone.Name, &zone.Type,
 		&zone.Description, &zone.ParentZoneID, &zone.Capacity, &zone.IsActive)
@@ -1440,7 +1440,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		FROM jobs j
 		LEFT JOIN status s ON j.statusID = s.statusID
 		LEFT JOIN customers c ON j.customerID = c.customerID
-		WHERE j.jobID = ?
+		WHERE j.jobID = $1
 	`, jobID).Scan(&jobCode, &description, &startDate, &endDate, &status, &customerFirstName, &customerLastName)
 
 	if err == sql.ErrNoRows {
@@ -1463,7 +1463,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN devices d ON jd.deviceID = d.deviceID
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE jd.jobID = ?
+		WHERE jd.jobID = $1
 		ORDER BY p.name, jd.deviceID
 	`, jobID)
 
@@ -1913,7 +1913,7 @@ func CreateCase(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	result, err := db.Exec(`
 		INSERT INTO cases (name, description, width, height, depth, weight, status, zone_id, barcode, rfid_tag)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`, req.Name, req.Description, req.Width, req.Height, req.Depth, req.Weight, req.Status, req.ZoneID, req.Barcode, req.RFIDTag)
 
 	if err != nil {
@@ -1971,9 +1971,9 @@ func UpdateCase(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	result, err := db.Exec(`
 		UPDATE cases
-		SET name = ?, description = ?, width = ?, height = ?, depth = ?,
-		    weight = ?, status = ?, zone_id = ?, barcode = ?, rfid_tag = ?
-		WHERE caseID = ?
+		SET name = $1, description = $2, width = $3, height = $4, depth = $5,
+		    weight = $6, status = $7, zone_id = $8, barcode = $9, rfid_tag = $10
+		WHERE caseID = $11
 	`, req.Name, req.Description, req.Width, req.Height, req.Depth, req.Weight, req.Status, req.ZoneID, req.Barcode, req.RFIDTag, caseID)
 
 	if err != nil {
@@ -2297,7 +2297,7 @@ func CreateDefect(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
 	// Set device status to defective
-	_, err := db.Exec(`UPDATE devices SET status = 'defective' WHERE deviceID = ?`, input.DeviceID)
+	_, err := db.Exec(`UPDATE devices SET status = 'defective' WHERE deviceID = $1`, input.DeviceID)
 	if err != nil {
 		log.Printf("Error updating device status: %v", err)
 	}
@@ -2305,7 +2305,7 @@ func CreateDefect(w http.ResponseWriter, r *http.Request) {
 	// Create defect report
 	result, err := db.Exec(`
 		INSERT INTO defect_reports (device_id, severity, title, description, assigned_to, status)
-		VALUES (?, ?, ?, ?, ?, 'open')
+		VALUES ($1, $2, $3, $4, $5, 'open')
 	`, input.DeviceID, input.Severity, input.Title, input.Description, input.AssignedTo)
 
 	if err != nil {
@@ -2386,9 +2386,9 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 	// If status is repaired or closed, update device status
 	if input.Status != nil && (*input.Status == "repaired" || *input.Status == "closed") {
 		var deviceID string
-		db.QueryRow(`SELECT device_id FROM defect_reports WHERE defect_id = ?`, defectID).Scan(&deviceID)
+		db.QueryRow(`SELECT device_id FROM defect_reports WHERE defect_id = $1`, defectID).Scan(&deviceID)
 		if deviceID != "" {
-			db.Exec(`UPDATE devices SET status = 'in_storage' WHERE deviceID = ?`, deviceID)
+			db.Exec(`UPDATE devices SET status = 'in_storage' WHERE deviceID = $1`, deviceID)
 		}
 	}
 
@@ -2413,11 +2413,11 @@ func GetInspections(w http.ResponseWriter, r *http.Request) {
 	args := []interface{}{}
 
 	if status == "upcoming" {
-		query += " AND i.next_inspection >= NOW() AND i.next_inspection <= DATE_ADD(NOW(), INTERVAL 30 DAY) AND i.is_active = 1"
+		query += " AND i.next_inspection >= NOW() AND i.next_inspection <= NOW() + INTERVAL '30 days' AND i.is_active = TRUE"
 	} else if status == "overdue" {
-		query += " AND i.next_inspection < NOW() AND i.is_active = 1"
+		query += " AND i.next_inspection < NOW() AND i.is_active = TRUE"
 	} else if status == "active" {
-		query += " AND i.is_active = 1"
+		query += " AND i.is_active = TRUE"
 	}
 
 	if deviceID != "" {
@@ -2537,7 +2537,7 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN jobs tj ON dm.to_job_id = tj.jobID
 		LEFT JOIN users u ON dm.user_id = u.userID
 		ORDER BY dm.timestamp DESC
-		LIMIT ?
+		LIMIT $1
 	`, limit)
 	if err != nil {
 		log.Printf("Error querying movements: %v", err)
@@ -3042,12 +3042,12 @@ func AssignDevicesToZone(w http.ResponseWriter, r *http.Request) {
 	for _, deviceID := range input.DeviceIDs {
 		result, err := db.Exec(`
 			UPDATE devices
-			SET zone_id = ?,
+			SET zone_id = $1,
 			    status = CASE
 			        WHEN status = 'on_job' OR status = 'rented' THEN status
 			        ELSE 'in_storage'
 			    END
-			WHERE deviceID = ?
+			WHERE deviceID = $2
 		`, zoneID, deviceID)
 
 		if err != nil {
@@ -3063,8 +3063,8 @@ func AssignDevicesToZone(w http.ResponseWriter, r *http.Request) {
 			// Log movement
 			_, _ = db.Exec(`
 				INSERT INTO device_movements (device_id, from_zone_id, to_zone_id, movement_type, moved_at)
-				SELECT ?, zone_id, ?, 'assignment', NOW()
-				FROM devices WHERE deviceID = ?
+				SELECT $1, zone_id, $2, 'assignment', NOW()
+				FROM devices WHERE deviceID = $3
 			`, deviceID, zoneID, deviceID)
 		} else {
 			failedDevices = append(failedDevices, deviceID)
@@ -3112,8 +3112,8 @@ func GetMaintenanceStats(w http.ResponseWriter, r *http.Request) {
 	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'open'`).Scan(&openDefects)
 	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'in_progress'`).Scan(&inProgressDefects)
 	db.QueryRow(`SELECT COUNT(*) FROM defect_reports WHERE status = 'repaired'`).Scan(&repairedDefects)
-	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection < NOW() AND is_active = 1`).Scan(&overdueInspections)
-	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection >= NOW() AND next_inspection <= DATE_ADD(NOW(), INTERVAL 30 DAY) AND is_active = 1`).Scan(&upcomingInspections)
+	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection < NOW() AND is_active = TRUE`).Scan(&overdueInspections)
+	db.QueryRow(`SELECT COUNT(*) FROM inspection_schedules WHERE next_inspection >= NOW() AND next_inspection <= NOW() + INTERVAL '30 days' AND is_active = TRUE`).Scan(&upcomingInspections)
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"open_defects":         openDefects,

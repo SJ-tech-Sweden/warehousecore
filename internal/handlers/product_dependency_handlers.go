@@ -115,7 +115,7 @@ func CreateProductDependency(w http.ResponseWriter, r *http.Request) {
 	// Create dependency
 	result := db.Exec(`
 		INSERT INTO product_dependencies (product_id, dependency_product_id, is_optional, default_quantity, notes)
-		VALUES (?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5)
 		ON DUPLICATE KEY UPDATE
 			is_optional = VALUES(is_optional),
 			default_quantity = VALUES(default_quantity),

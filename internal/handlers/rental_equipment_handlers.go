@@ -81,7 +81,7 @@ func GetRentalEquipment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if activeOnly {
-		query += " AND is_active = 1"
+		query += " AND is_active = TRUE"
 	}
 
 	query += " ORDER BY supplier_name, product_name"
@@ -153,7 +153,7 @@ func GetRentalEquipmentByID(w http.ResponseWriter, r *http.Request) {
 			created_at,
 			updated_at
 		FROM rental_equipment
-		WHERE equipment_id = ?
+		WHERE equipment_id = $1
 	`, id).Scan(
 		&e.EquipmentID,
 		&e.ProductName,
@@ -218,7 +218,7 @@ func CreateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 			is_active,
 			created_at,
 			updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
 	`,
 		req.ProductName,
 		req.SupplierName,
@@ -255,7 +255,7 @@ func CreateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 			created_at,
 			updated_at
 		FROM rental_equipment
-		WHERE equipment_id = ?
+		WHERE equipment_id = $1
 	`, id).Scan(
 		&e.EquipmentID,
 		&e.ProductName,
@@ -322,16 +322,16 @@ func UpdateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 
 	_, err = db.Exec(`
 		UPDATE rental_equipment SET
-			product_name = ?,
-			supplier_name = ?,
-			rental_price = ?,
-			customer_price = ?,
-			category = ?,
-			description = ?,
-			notes = ?,
-			is_active = ?,
+			product_name = $1,
+			supplier_name = $2,
+			rental_price = $3,
+			customer_price = $4,
+			category = $5,
+			description = $6,
+			notes = $7,
+			is_active = $8,
 			updated_at = NOW()
-		WHERE equipment_id = ?
+		WHERE equipment_id = $9
 	`,
 		req.ProductName,
 		req.SupplierName,
@@ -367,7 +367,7 @@ func UpdateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 			created_at,
 			updated_at
 		FROM rental_equipment
-		WHERE equipment_id = ?
+		WHERE equipment_id = $1
 	`, id).Scan(
 		&e.EquipmentID,
 		&e.ProductName,
