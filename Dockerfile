@@ -75,8 +75,8 @@ RUN touch .env
 
 EXPOSE 8081
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check with longer start period to allow server initialization
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8081/api/v1/health || exit 1
 
 CMD ["./warehousecore"]

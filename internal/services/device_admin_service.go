@@ -405,7 +405,7 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases c ON dc.caseID = c.caseID
-		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID
+		LEFT JOIN job_devices jd ON d.deviceID = jd.deviceID
 		LEFT JOIN jobs j ON jd.jobID = j.jobID
 		WHERE d.deviceID = ?
 		LIMIT 1

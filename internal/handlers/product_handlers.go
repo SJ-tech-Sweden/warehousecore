@@ -133,20 +133,24 @@ func GetProducts(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var args []interface{}
+	argIdx := 0
 
 	if search != "" {
-		query += " AND (p.name LIKE ? OR p.description LIKE ?)"
+		argIdx++
+		query += fmt.Sprintf(" AND (p.name LIKE $%d OR p.description LIKE $%d)", argIdx, argIdx)
 		searchPattern := "%" + search + "%"
-		args = append(args, searchPattern, searchPattern)
+		args = append(args, searchPattern)
 	}
 
 	if categoryID != "" {
-		query += " AND p.categoryID = ?"
+		argIdx++
+		query += fmt.Sprintf(" AND p.categoryID = $%d", argIdx)
 		args = append(args, categoryID)
 	}
 
 	if subcategoryID != "" {
-		query += " AND p.subcategoryID = ?"
+		argIdx++
+		query += fmt.Sprintf(" AND p.subcategoryID = $%d", argIdx)
 		args = append(args, subcategoryID)
 	}
 
@@ -560,7 +564,7 @@ func DownloadProductPicture(w http.ResponseWriter, r *http.Request) {
 func getProductName(productID int) (string, error) {
 	db := repository.GetSQLDB()
 	var name string
-	err := db.QueryRow("SELECT name FROM products WHERE productID = ?", productID).Scan(&name)
+	err := db.QueryRow("SELECT name FROM products WHERE productID = $1", productID).Scan(&name)
 	return name, err
 }
 
@@ -621,7 +625,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this product is linked to a package so we can keep metadata in sync
 	var packageID sql.NullInt64
-	if err := db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = ?", id).Scan(&packageID); err != nil && err != sql.ErrNoRows {
+	if err := db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = $1", id).Scan(&packageID); err != nil && err != sql.ErrNoRows {
 		log.Printf("Failed to check if product is a package: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
 		return
@@ -683,9 +687,9 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		// MySQL returns 0 when values are unchanged; verify existence before treating as not found.
+		// Check whether values are unchanged; verify existence before treating as not found.
 		var exists bool
-		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = ?)", id).Scan(&exists); err != nil {
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = $1)", id).Scan(&exists); err != nil {
 			log.Printf("Failed to verify product existence after update: %v", err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
 			return
@@ -799,7 +803,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	// Check if this product is a package product (managed by product_packages)
 	var packageID int
-	err = db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = ?", id).Scan(&packageID)
+	err = db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = $1", id).Scan(&packageID)
 	if err == nil {
 		// Product is managed by a package - cannot be deleted directly
 		respondJSON(w, http.StatusBadRequest, map[string]string{
@@ -813,7 +817,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	// Get product name for logging
 	var productName string
-	err = db.QueryRow("SELECT name FROM products WHERE productID = ?", id).Scan(&productName)
+	err = db.QueryRow("SELECT name FROM products WHERE productID = $1", id).Scan(&productName)
 	if err == sql.ErrNoRows {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product not found"})
 		return
@@ -825,7 +829,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	// Count devices to be deleted
 	var deviceCount int
-	err = db.QueryRow("SELECT COUNT(*) FROM devices WHERE productID = ?", id).Scan(&deviceCount)
+	err = db.QueryRow("SELECT COUNT(*) FROM devices WHERE productID = $1", id).Scan(&deviceCount)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to check product devices"})
 		return
@@ -837,7 +841,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	if deviceCount > 0 {
 		// Get device IDs for detailed logging
 		var deviceIDs []string
-		rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = ?", id)
+		rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = $1", id)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -851,7 +855,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[PRODUCT DELETE] Deleting %d devices: %v", len(deviceIDs), deviceIDs)
 
 		// Delete all devices for this product
-		result, err := db.Exec("DELETE FROM devices WHERE productID = ?", id)
+		result, err := db.Exec("DELETE FROM devices WHERE productID = $1", id)
 		if err != nil {
 			log.Printf("[PRODUCT DELETE ERROR] Failed to delete devices for product %d: %v", id, err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{
@@ -866,7 +870,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Now delete the product
-	result, err := db.Exec("DELETE FROM products WHERE productID = ?", id)
+	result, err := db.Exec("DELETE FROM products WHERE productID = $1", id)
 	if err != nil {
 		log.Printf("[PRODUCT DELETE ERROR] Failed to delete product %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete product"})
@@ -969,18 +973,15 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 			req.Quantity, req.ProductID, productName, abbreviation.String, posInCategory.Int64)
 	}
 
-	// Optional prefix: if triggers respect a session variable we pass it through
+	// Optional prefix: PostgreSQL doesn't support session variables like MySQL
+	// The prefix is logged but not used with PostgreSQL triggers
 	if req.Prefix != nil && *req.Prefix != "" {
 		upperPrefix := strings.ToUpper(*req.Prefix)
-		if _, err := db.Exec("SET @device_prefix = ?", upperPrefix); err != nil {
-			log.Printf("Failed to set device prefix session variable: %v", err)
-		} else {
-			defer db.Exec("SET @device_prefix = NULL")
-		}
+		log.Printf("[DEVICE CREATE] Custom prefix requested: %s (note: PostgreSQL triggers may not use this)", upperPrefix)
 	}
 
 	existingIDs := make(map[string]struct{})
-	rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = ?", req.ProductID)
+	rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = $1", req.ProductID)
 	if err == nil {
 		defer rows.Close()
 		var id string
@@ -996,7 +997,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 	// Create devices one by one and track failures
 	failedCount := 0
 	for i := 0; i < req.Quantity; i++ {
-		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES (?, 'free')", req.ProductID); err != nil {
+		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES ($1, 'free')", req.ProductID); err != nil {
 			log.Printf("[DEVICE CREATE ERROR] Failed to create device %d/%d for product %d: %v", i+1, req.Quantity, req.ProductID, err)
 			failedCount++
 		}
@@ -1007,7 +1008,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdDeviceIDs := make([]string, 0, req.Quantity)
-	rowsNew, err := db.Query("SELECT deviceID FROM devices WHERE productID = ?", req.ProductID)
+	rowsNew, err := db.Query("SELECT deviceID FROM devices WHERE productID = $1", req.ProductID)
 	if err != nil {
 		log.Printf("Failed to fetch generated device IDs: %v", err)
 	} else {
@@ -1078,7 +1079,7 @@ func GetProductDevices(w http.ResponseWriter, r *http.Request) {
 	query := `
 		WITH latest_job AS (
 			SELECT jd.deviceID, MAX(jd.jobID) AS jobID
-			FROM jobdevices jd
+			FROM job_devices jd
 			GROUP BY jd.deviceID
 		)
 		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
@@ -1101,7 +1102,7 @@ func GetProductDevices(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN cases c ON dc.caseID = c.caseID
 		LEFT JOIN latest_job lj ON lj.deviceID = d.deviceID
 		LEFT JOIN jobs j ON lj.jobID = j.jobID
-		WHERE d.productID = ?
+		WHERE d.productID = $1
 		ORDER BY d.deviceID ASC
 	`
 
@@ -1240,7 +1241,7 @@ func UpdateProductWebsite(w http.ResponseWriter, r *http.Request) {
 	if payload.WebsiteVisible != nil {
 		websiteVisible = *payload.WebsiteVisible
 	} else {
-		if err := repository.GetSQLDB().QueryRow("SELECT website_visible FROM products WHERE productID = ?", id).Scan(&websiteVisible); err != nil {
+		if err := repository.GetSQLDB().QueryRow("SELECT website_visible FROM products WHERE productID = $1", id).Scan(&websiteVisible); err != nil {
 			log.Printf("[WEBSITE] Failed to load current website visibility for product %d: %v", id, err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
 			return
@@ -1260,7 +1261,7 @@ func UpdateProductWebsite(w http.ResponseWriter, r *http.Request) {
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
 		var exists bool
-		if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = ?)", id).Scan(&exists); err != nil {
+		if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = $1)", id).Scan(&exists); err != nil {
 			log.Printf("[WEBSITE] Failed to verify product %d after website update: %v", id, err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update product"})
 			return
@@ -1284,8 +1285,8 @@ func UpdateProductWebsite(w http.ResponseWriter, r *http.Request) {
 
 	// If this product is a package-product, keep package visibility in sync
 	var pkgID sql.NullInt64
-	if err := db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = ?", id).Scan(&pkgID); err == nil && pkgID.Valid {
-		if _, err := db.Exec("UPDATE product_packages SET website_visible = ? WHERE package_id = ?", websiteVisible, pkgID.Int64); err != nil {
+	if err := db.QueryRow("SELECT package_id FROM product_packages WHERE product_id = $1", id).Scan(&pkgID); err == nil && pkgID.Valid {
+		if _, err := db.Exec("UPDATE product_packages SET website_visible = $1 WHERE package_id = $2", websiteVisible, pkgID.Int64); err != nil {
 			log.Printf("[WEBSITE] Failed to sync package visibility for product %d (package %d): %v", id, pkgID.Int64, err)
 		} else {
 			// Also revalidate packages page

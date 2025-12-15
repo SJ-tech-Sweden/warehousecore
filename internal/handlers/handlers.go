@@ -678,7 +678,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases c ON dc.caseID = c.caseID
-		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
+		LEFT JOIN job_devices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
 		WHERE 1=1`
 
 	args := []interface{}{}
@@ -810,7 +810,7 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases c ON dc.caseID = c.caseID
-		LEFT JOIN jobdevices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
+		LEFT JOIN job_devices jd ON d.deviceID = jd.deviceID AND jd.pack_status IN ('packed', 'issued')
 		WHERE d.deviceID = $1
 	`, deviceID).Scan(&device.DeviceID, &device.ProductID, &device.SerialNumber, &device.Status,
 		&device.Barcode, &device.QRCode, &device.ZoneID, &device.ConditionRating, &device.UsageHours, &device.LabelPath,
@@ -1230,8 +1230,8 @@ func GetZoneProducts(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT pl.product_id, p.name, pl.quantity,
 		       COALESCE(ct.abbreviation, ''),
-		       COALESCE(p.is_accessory, 0),
-		       COALESCE(p.is_consumable, 0)
+		       COALESCE(p.is_accessory, FALSE),
+		       COALESCE(p.is_consumable, FALSE)
 		FROM product_locations pl
 		LEFT JOIN products p ON pl.product_id = p.productID
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
@@ -1379,7 +1379,7 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 		FROM jobs j
 		LEFT JOIN status s ON j.statusID = s.statusID
 		LEFT JOIN customers c ON j.customerID = c.customerID
-		LEFT JOIN jobdevices jd ON j.jobID = jd.jobID
+		LEFT JOIN job_devices jd ON j.jobID = jd.jobID
 		WHERE 1=1`
 
 	args := []interface{}{}
@@ -1482,7 +1482,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(z.name, '') as zone_name,
 		       jd.pack_status
-		FROM jobdevices jd
+		FROM job_devices jd
 		LEFT JOIN devices d ON jd.deviceID = d.deviceID
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
@@ -2777,10 +2777,10 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	query := `
 		WITH latest_job AS (
 			SELECT jd.deviceID, jd.jobID
-			FROM jobdevices jd
+			FROM job_devices jd
 			INNER JOIN (
 				SELECT deviceID, MAX(jobID) AS jobID
-				FROM jobdevices
+				FROM job_devices
 				GROUP BY deviceID
 			) latest ON jd.deviceID = latest.deviceID AND jd.jobID = latest.jobID
 		)
@@ -2793,8 +2793,8 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			sbc.name as subbiercategory_name,
 			p.productID,
 			COALESCE(p.name, '') as product_name,
-			COALESCE(p.is_consumable, 0) as is_consumable,
-			COALESCE(p.is_accessory, 0) as is_accessory,
+			CASE WHEN p.is_consumable = TRUE THEN 1 ELSE 0 END as is_consumable,
+			CASE WHEN p.is_accessory = TRUE THEN 1 ELSE 0 END as is_accessory,
 			COALESCE(p.stock_quantity, 0) as stock_quantity,
 			COALESCE(ct.abbreviation, '') as unit,
 			d.deviceID,

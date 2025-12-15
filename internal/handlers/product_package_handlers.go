@@ -29,6 +29,7 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	qb := NewQueryBuilder()
 	query := `
 		SELECT
 			pp.package_id,
@@ -54,12 +55,12 @@ func GetProductPackages(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 
 	if search != "" {
-		query += " AND (pp.name LIKE ? OR pp.description LIKE ?)"
+		query += " AND (pp.name LIKE " + qb.NextPlaceholder() + " OR pp.description LIKE " + qb.NextPlaceholder() + ")"
 		searchPattern := "%" + search + "%"
 		args = append(args, searchPattern, searchPattern)
 	}
 
-	query += " GROUP BY pp.package_id ORDER BY pp.name"
+	query += " GROUP BY pp.package_id, pp.product_id, pp.package_code, pp.name, pp.description, pp.price, pp.website_visible, pp.created_at, pp.updated_at, p.categoryID, c.name, p.subcategoryID ORDER BY pp.name"
 
 	rows, err := db.Query(query, args...)
 	if err != nil {

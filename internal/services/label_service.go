@@ -200,23 +200,23 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 	// Get device data
 	db := repository.GetDB()
 	var device struct {
-		DeviceID   string `json:"device_id"`
-		DeviceName string `json:"device_name"`
-		Product    string `json:"product"`
-		Category   string `json:"category"`
+		DeviceID    string `json:"device_id"`
+		ProductName string `json:"product_name"`
+		Subcategory string `json:"subcategory"`
+		Category    string `json:"category"`
 	}
 
 	query := `
 		SELECT
 			d.deviceID as device_id,
-			p.name as device_name,
-			sb.name as product,
-			c.name as category
+			COALESCE(p.name, '') as product_name,
+			COALESCE(sb.name, '') as subcategory,
+			COALESCE(c.name, '') as category
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN subbiercategories sb ON p.subbiercategoryID = sb.subbiercategoryID
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
-		WHERE d.deviceID = ?
+		WHERE d.deviceID = $1
 	`
 
 	if err := db.Raw(query, deviceID).Scan(&device).Error; err != nil {
@@ -241,10 +241,11 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 		switch elem.Content {
 		case "device_id":
 			content = device.DeviceID
-		case "device_name":
-			content = device.DeviceName
-		case "product":
-			content = device.Product
+		case "device_name", "product_name", "name":
+			// Support multiple aliases for product name
+			content = device.ProductName
+		case "product", "subcategory":
+			content = device.Subcategory
 		case "category":
 			content = device.Category
 		}
@@ -337,7 +338,7 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 			c.weight,
 			c.status
 		FROM cases c
-		WHERE c.caseID = ?
+		WHERE c.caseID = $1
 	`
 
 	if err := db.Raw(query, caseID).Scan(&caseData).Error; err != nil {
@@ -469,7 +470,7 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 	// Update device record with label path
 	labelPath := fmt.Sprintf("/labels/%s", filename)
 	db := repository.GetDB()
-	result := db.Exec("UPDATE devices SET label_path = ? WHERE deviceID = ?", labelPath, deviceID)
+	result := db.Exec("UPDATE devices SET label_path = $1 WHERE deviceID = $2", labelPath, deviceID)
 	if result.Error != nil {
 		return "", fmt.Errorf("failed to update device label path: %w", result.Error)
 	}
@@ -507,7 +508,7 @@ func (s *LabelService) SaveCaseLabelImage(caseID int, base64Image string) (strin
 	// Update case record with label path
 	labelPath := fmt.Sprintf("/labels/cases/%s", filename)
 	db := repository.GetDB()
-	result := db.Exec("UPDATE cases SET label_path = ? WHERE caseID = ?", labelPath, caseID)
+	result := db.Exec("UPDATE cases SET label_path = $1 WHERE caseID = $2", labelPath, caseID)
 	if result.Error != nil {
 		return "", fmt.Errorf("failed to update case label path: %w", result.Error)
 	}

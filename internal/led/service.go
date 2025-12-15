@@ -676,7 +676,7 @@ func (s *Service) getJobDeviceZonesWithCounts(jobID string) (map[string]int, err
 
 	query := `
 		SELECT z.code, COUNT(*) as device_count
-		FROM jobdevices jd
+		FROM job_devices jd
 		JOIN devices d ON jd.deviceID = d.deviceID
 		JOIN storage_zones z ON d.zone_id = z.zone_id
 		WHERE jd.jobID = ? AND d.status = 'in_storage' AND z.code IS NOT NULL
@@ -713,7 +713,7 @@ func (s *Service) getJobDeviceZones(jobID string) (map[string]string, error) {
 	// The zone code matches the bin_id in the LED mapping configuration
 	query := `
 		SELECT jd.deviceID, COALESCE(z.code, '') as zone_code
-		FROM jobdevices jd
+		FROM job_devices jd
 		LEFT JOIN devices d ON jd.deviceID = d.deviceID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		WHERE jd.jobID = ? AND d.status = 'in_storage' AND z.code IS NOT NULL
