@@ -494,11 +494,44 @@ func UploadProductPictures(w http.ResponseWriter, r *http.Request) {
 		productPictureService.WarmPictureVariants(productName, stored)
 	}
 
+	// Update product's website images in database
+	db := repository.GetSQLDB()
+
+	// Get thumbnail index if provided
+	thumbnailIndexStr := r.FormValue("thumbnail_index")
+	var thumbnailFilename string
+	if thumbnailIndexStr != "" {
+		if thumbnailIdx, err := strconv.Atoi(thumbnailIndexStr); err == nil && thumbnailIdx >= 0 && thumbnailIdx < len(uploaded) {
+			thumbnailFilename = uploaded[thumbnailIdx]
+		}
+	}
+
+	// If no thumbnail specified but images were uploaded, use the first one
+	if thumbnailFilename == "" && len(uploaded) > 0 {
+		thumbnailFilename = uploaded[0]
+	}
+
+	// Convert uploaded filenames to JSON array for website_images_json
+	imagesJSON, err := json.Marshal(uploaded)
+	if err != nil {
+		log.Printf("[PICTURES] Failed to marshal images JSON: %v", err)
+	} else {
+		_, err = db.Exec(`
+			UPDATE products
+			SET website_thumbnail = $1, website_images_json = $2
+			WHERE productID = $3
+		`, thumbnailFilename, imagesJSON, id)
+		if err != nil {
+			log.Printf("[PICTURES] Failed to update product images in database: %v", err)
+		}
+	}
+
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"message":          "Pictures uploaded successfully",
 		"uploaded_files":   uploaded,
 		"uploaded_count":   len(uploaded),
 		"product_name":     productName,
+		"thumbnail":        thumbnailFilename,
 		"nextcloud_folder": productPictureService.FolderForProduct(productName),
 	})
 }

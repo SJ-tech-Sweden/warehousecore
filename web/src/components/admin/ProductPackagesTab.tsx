@@ -75,6 +75,8 @@ interface PackageFormData {
   device_quantity?: number;
   device_prefix?: string;
   website_visible: boolean;
+  website_thumbnail?: string;
+  website_images?: string[];
 }
 
 interface Device {
@@ -97,6 +99,8 @@ const initialFormData: PackageFormData = {
   device_quantity: undefined,
   device_prefix: '',
   website_visible: false,
+  website_thumbnail: undefined,
+  website_images: [],
 };
 
 const ensureArray = <T,>(value: T[] | undefined | null): T[] => (Array.isArray(value) ? value : []);
@@ -136,6 +140,8 @@ export function ProductPackagesTab() {
   const [packageDevices, setPackageDevices] = useState<Device[]>([]);
   const [devicesToDelete, setDevicesToDelete] = useState<Set<string>>(new Set());
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [thumbnailIndex, setThumbnailIndex] = useState<number | null>(null);
 
   const fetchPackages = async () => {
     try {
@@ -169,7 +175,7 @@ export function ProductPackagesTab() {
 
   const fetchCategories = async () => {
     try {
-      const response = await api.get('/categories');
+      const response = await api.get('/admin/categories');
       const data = Array.isArray(response.data) ? response.data : [];
       if (!Array.isArray(response.data)) {
         console.warn('Unexpected categories payload for packages tab:', response.data);
@@ -353,6 +359,26 @@ export function ProductPackagesTab() {
     setModalOpen(true);
   };
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setImageFiles((prev) => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    if (thumbnailIndex === index) {
+      setThumbnailIndex(null);
+    } else if (thumbnailIndex !== null && thumbnailIndex > index) {
+      setThumbnailIndex(thumbnailIndex - 1);
+    }
+  };
+
+  const handleSetThumbnail = (index: number) => {
+    setThumbnailIndex(index);
+  };
+
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingPackage(null);
@@ -363,6 +389,8 @@ export function ProductPackagesTab() {
     setFormError(null);
     setPackageDevices([]);
     setDevicesToDelete(new Set());
+    setImageFiles([]);
+    setThumbnailIndex(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -432,6 +460,28 @@ export function ProductPackagesTab() {
             console.error('Failed to create devices:', deviceError);
             window.alert('Paket erstellt, aber Geräte konnten nicht angelegt werden.');
           }
+        }
+      }
+
+      // Upload images if any were selected
+      if (imageFiles.length > 0 && productId) {
+        try {
+          const uploadFormData = new FormData();
+          imageFiles.forEach((file) => {
+            uploadFormData.append('files', file);
+          });
+          if (thumbnailIndex !== null) {
+            uploadFormData.append('thumbnail_index', thumbnailIndex.toString());
+          }
+
+          await api.post(`/admin/products/${productId}/pictures`, uploadFormData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+        } catch (imageError) {
+          console.error('Failed to upload images:', imageError);
+          window.alert('Paket gespeichert, aber Bilder konnten nicht hochgeladen werden.');
         }
       }
 
@@ -776,6 +826,66 @@ export function ProductPackagesTab() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="border-t border-gray-700 pt-4">
+                <h4 className="text-lg font-semibold text-white mb-3">Website-Bilder</h4>
+                <p className="text-sm text-gray-400 mb-3">
+                  Lade Bilder für die Website hoch. Markiere ein Bild als Thumbnail, das in der Übersicht angezeigt wird.
+                </p>
+
+                <div className="mb-3">
+                  <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Bilder auswählen
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {imageFiles.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {imageFiles.map((file, index) => (
+                      <div key={index} className="relative group bg-gray-800 rounded-lg overflow-hidden">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="w-full h-32 object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleSetThumbnail(index)}
+                            className={`px-3 py-1 text-xs rounded ${
+                              thumbnailIndex === index
+                                ? 'bg-green-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            }`}
+                          >
+                            {thumbnailIndex === index ? '✓ Thumbnail' : 'Als Thumbnail'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(index)}
+                            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                          >
+                            Entfernen
+                          </button>
+                        </div>
+                        {thumbnailIndex === index && (
+                          <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                            Thumbnail
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-gray-700 pt-4">
