@@ -91,7 +91,7 @@ func CreateBrand(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 	var id int64
-	err = db.QueryRow(
+	err := db.QueryRow(
 		"INSERT INTO brands (name, manufacturerID) VALUES ($1, $2) RETURNING brandID",
 		payload.Name,
 		payload.ManufacturerID,
@@ -262,7 +262,7 @@ func CreateManufacturer(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 	var id int64
-	err = db.QueryRow(
+	err := db.QueryRow(
 		"INSERT INTO manufacturer (name, website) VALUES ($1, $2) RETURNING manufacturerID",
 		payload.Name,
 		payload.Website,
