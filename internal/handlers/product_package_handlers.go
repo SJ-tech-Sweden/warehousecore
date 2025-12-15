@@ -381,7 +381,7 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 
 	// Get the product_id for this package
 	var productID int
-	err = tx.QueryRow("SELECT product_id FROM product_packages WHERE package_id = ?", id).Scan(&productID)
+	err = tx.QueryRow("SELECT product_id FROM product_packages WHERE package_id = $1", id).Scan(&productID)
 	if err != nil {
 		log.Printf("Failed to get product_id for package: %v", err)
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Package not found"})
@@ -417,7 +417,7 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		var exists bool
-		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_id = ?)", id).Scan(&exists); err != nil {
+		if err := tx.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_id = $1)", id).Scan(&exists); err != nil {
 			log.Printf("Failed to confirm product package existence: %v", err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update package"})
 			return
@@ -429,7 +429,7 @@ func UpdateProductPackage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete existing items
-	_, err = tx.Exec("DELETE FROM product_package_items WHERE package_id = ?", id)
+	_, err = tx.Exec("DELETE FROM product_package_items WHERE package_id = $1", id)
 	if err != nil {
 		log.Printf("Failed to delete package items: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update package items"})
@@ -487,7 +487,7 @@ func DeleteProductPackage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := db.Exec("DELETE FROM product_packages WHERE package_id = ?", id)
+	result, err := db.Exec("DELETE FROM product_packages WHERE package_id = $1", id)
 	if err != nil {
 		log.Printf("Failed to delete product package: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete package"})
@@ -565,6 +565,8 @@ func ensurePackageCodeSupport(db *sql.DB) error {
 		return errors.New("database connection is nil")
 	}
 
+	// For PostgreSQL, tables should already exist from migration
+	// Just verify they exist
 	if err := ensureProductPackageTables(db); err != nil {
 		return err
 	}
@@ -578,11 +580,11 @@ func ensureProductPackageTables(db *sql.DB) error {
 	const tableCheck = `
 		SELECT COUNT(*)
 		FROM information_schema.tables
-		WHERE table_schema = DATABASE()
-		  AND table_name = ?
+		WHERE table_schema = 'public'
+		  AND table_name = $1
 	`
 
-	// Ensure product_packages exists with final schema
+	// Check product_packages exists
 	var count int
 	if err := db.QueryRow(tableCheck, "product_packages").Scan(&count); err != nil {
 		return err
@@ -590,19 +592,20 @@ func ensureProductPackageTables(db *sql.DB) error {
 	if count == 0 {
 		if _, err := db.Exec(`
 			CREATE TABLE IF NOT EXISTS product_packages (
-				package_id INT AUTO_INCREMENT PRIMARY KEY,
+				package_id SERIAL PRIMARY KEY,
 				package_code VARCHAR(32) NOT NULL,
 				name VARCHAR(255) NOT NULL,
 				description TEXT,
 				price DECIMAL(10,2),
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-				UNIQUE KEY uq_product_package_code (package_code),
-				INDEX idx_name (name)
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+				updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				CONSTRAINT uq_product_package_code UNIQUE (package_code)
+			)
 		`); err != nil {
 			return err
 		}
+		// Create index
+		db.Exec(`CREATE INDEX IF NOT EXISTS idx_product_packages_name ON product_packages(name)`)
 	}
 
 	// Ensure product_package_items exists
@@ -613,20 +616,20 @@ func ensureProductPackageTables(db *sql.DB) error {
 	if count == 0 {
 		if _, err := db.Exec(`
 			CREATE TABLE IF NOT EXISTS product_package_items (
-				package_item_id INT AUTO_INCREMENT PRIMARY KEY,
+				package_item_id SERIAL PRIMARY KEY,
 				package_id INT NOT NULL,
 				product_id INT NOT NULL,
 				quantity INT NOT NULL DEFAULT 1,
 				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-				FOREIGN KEY (package_id) REFERENCES product_packages(package_id) ON DELETE CASCADE,
-				FOREIGN KEY (product_id) REFERENCES products(productID) ON DELETE CASCADE,
-				UNIQUE KEY unique_package_product (package_id, product_id),
-				INDEX idx_package_id (package_id),
-				INDEX idx_product_id (product_id)
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+				CONSTRAINT fk_ppi_package FOREIGN KEY (package_id) REFERENCES product_packages(package_id) ON DELETE CASCADE,
+				CONSTRAINT fk_ppi_product FOREIGN KEY (product_id) REFERENCES products(productID) ON DELETE CASCADE,
+				CONSTRAINT unique_package_product UNIQUE (package_id, product_id)
+			)
 		`); err != nil {
 			return err
 		}
+		db.Exec(`CREATE INDEX IF NOT EXISTS idx_ppi_package_id ON product_package_items(package_id)`)
+		db.Exec(`CREATE INDEX IF NOT EXISTS idx_ppi_product_id ON product_package_items(product_id)`)
 	}
 
 	return nil
@@ -636,7 +639,7 @@ func ensurePackageCodeColumn(db *sql.DB) error {
 	const columnCheck = `
 		SELECT COUNT(*)
 		FROM information_schema.columns
-		WHERE table_schema = DATABASE()
+		WHERE table_schema = 'public'
 		  AND table_name = 'product_packages'
 		  AND column_name = 'package_code'
 	`
@@ -648,31 +651,21 @@ func ensurePackageCodeColumn(db *sql.DB) error {
 		return nil
 	}
 
-	if _, err := db.Exec(`ALTER TABLE product_packages ADD COLUMN package_code VARCHAR(32) NULL AFTER package_id`); err != nil {
+	// PostgreSQL syntax for adding column
+	if _, err := db.Exec(`ALTER TABLE product_packages ADD COLUMN IF NOT EXISTS package_code VARCHAR(32)`); err != nil {
 		return err
 	}
-	if _, err := db.Exec(`UPDATE product_packages SET package_code = CONCAT('PKG-', LPAD(package_id, 6, '0')) WHERE package_code IS NULL OR package_code = ''`); err != nil {
+	// PostgreSQL uses LPAD with CAST
+	if _, err := db.Exec(`UPDATE product_packages SET package_code = CONCAT('PKG-', LPAD(CAST(package_id AS TEXT), 6, '0')) WHERE package_code IS NULL OR package_code = ''`); err != nil {
 		return err
 	}
-	if _, err := db.Exec(`ALTER TABLE product_packages MODIFY COLUMN package_code VARCHAR(32) NOT NULL`); err != nil {
-		return err
+	// PostgreSQL syntax to set NOT NULL
+	if _, err := db.Exec(`ALTER TABLE product_packages ALTER COLUMN package_code SET NOT NULL`); err != nil {
+		// Ignore error if already set
+		return nil
 	}
-	const indexCheck = `
-		SELECT COUNT(*)
-		FROM information_schema.statistics
-		WHERE table_schema = DATABASE()
-		  AND table_name = 'product_packages'
-		  AND index_name = 'uq_product_package_code'
-	`
-	var idxCount int
-	if err := db.QueryRow(indexCheck).Scan(&idxCount); err != nil {
-		return err
-	}
-	if idxCount == 0 {
-		if _, err := db.Exec(`ALTER TABLE product_packages ADD UNIQUE KEY uq_product_package_code (package_code)`); err != nil {
-			return err
-		}
-	}
+	// Add unique constraint if not exists
+	db.Exec(`ALTER TABLE product_packages ADD CONSTRAINT uq_product_package_code UNIQUE (package_code)`)
 	return nil
 }
 
@@ -680,7 +673,7 @@ func ensureAliasTable(db *sql.DB) error {
 	const tableCheck = `
 		SELECT COUNT(*)
 		FROM information_schema.tables
-		WHERE table_schema = DATABASE()
+		WHERE table_schema = 'public'
 		  AND table_name = 'product_package_aliases'
 	`
 	var count int
@@ -693,18 +686,21 @@ func ensureAliasTable(db *sql.DB) error {
 
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS product_package_aliases (
-			alias_id INT AUTO_INCREMENT PRIMARY KEY,
+			alias_id SERIAL PRIMARY KEY,
 			package_id INT NOT NULL,
 			alias VARCHAR(191) NOT NULL,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE KEY uq_package_alias (package_id, alias),
-			INDEX idx_alias (alias),
+			CONSTRAINT uq_package_alias UNIQUE (package_id, alias),
 			CONSTRAINT fk_package_alias_package
 				FOREIGN KEY (package_id) REFERENCES product_packages(package_id)
 				ON DELETE CASCADE
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+		)
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_ppa_alias ON product_package_aliases(alias)`)
+	return nil
 }
 
 func normalizeAliases(values []string) []string {
@@ -730,12 +726,12 @@ func replacePackageAliases(tx *sql.Tx, packageID int64, aliases []string) error 
 		return errors.New("transaction is nil")
 	}
 
-	if _, err := tx.Exec("DELETE FROM product_package_aliases WHERE package_id = ?", packageID); err != nil {
+	if _, err := tx.Exec("DELETE FROM product_package_aliases WHERE package_id = $1", packageID); err != nil {
 		return err
 	}
 
 	for _, alias := range aliases {
-		if _, err := tx.Exec("INSERT INTO product_package_aliases (package_id, alias) VALUES (?, ?)", packageID, alias); err != nil {
+		if _, err := tx.Exec("INSERT INTO product_package_aliases (package_id, alias) VALUES ($1, $2)", packageID, alias); err != nil {
 			return err
 		}
 	}
@@ -743,7 +739,7 @@ func replacePackageAliases(tx *sql.Tx, packageID int64, aliases []string) error 
 }
 
 func fetchPackageAliases(db *sql.DB, packageID int) ([]string, error) {
-	rows, err := db.Query("SELECT alias FROM product_package_aliases WHERE package_id = ? ORDER BY alias", packageID)
+	rows, err := db.Query("SELECT alias FROM product_package_aliases WHERE package_id = $1 ORDER BY alias", packageID)
 	if err != nil {
 		return nil, err
 	}
@@ -790,7 +786,7 @@ func generatePackageCode(db *sql.DB) (string, error) {
 		code := fmt.Sprintf("PKG-%s", segment)
 
 		var exists bool
-		if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_code = ?)", code).Scan(&exists); err != nil {
+		if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_code = $1)", code).Scan(&exists); err != nil {
 			return "", err
 		}
 		if !exists {
@@ -834,25 +830,25 @@ func AddItemToPackage(w http.ResponseWriter, r *http.Request) {
 
 	// Check if package exists
 	var exists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_id = ?)", packageID).Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM product_packages WHERE package_id = $1)", packageID).Scan(&exists)
 	if err != nil || !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product package not found"})
 		return
 	}
 
 	// Check if product exists
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = ?)", req.ProductID).Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM products WHERE productID = $1)", req.ProductID).Scan(&exists)
 	if err != nil || !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product not found"})
 		return
 	}
 
-	// Add or update item
+	// Add or update item (PostgreSQL upsert syntax)
 	_, err = db.Exec(`
 		INSERT INTO product_package_items (package_id, product_id, quantity)
 		VALUES ($1, $2, $3)
-		ON DUPLICATE KEY UPDATE quantity = $4
-	`, packageID, req.ProductID, req.Quantity, req.Quantity)
+		ON CONFLICT (package_id, product_id) DO UPDATE SET quantity = EXCLUDED.quantity
+	`, packageID, req.ProductID, req.Quantity)
 
 	if err != nil {
 		log.Printf("Failed to add item to package: %v", err)
