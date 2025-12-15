@@ -68,6 +68,25 @@ func ptrFloat64(n sql.NullFloat64) *float64 {
 	return &val
 }
 
+// PostgresPlaceholders converts MySQL ? placeholders to PostgreSQL $N placeholders
+// It also returns an argument counter that can be used for building dynamic queries
+type QueryBuilder struct {
+	argCount int
+}
+
+func NewQueryBuilder() *QueryBuilder {
+	return &QueryBuilder{argCount: 0}
+}
+
+func (qb *QueryBuilder) NextPlaceholder() string {
+	qb.argCount++
+	return fmt.Sprintf("$%d", qb.argCount)
+}
+
+func (qb *QueryBuilder) CurrentCount() int {
+	return qb.argCount
+}
+
 func ptrInt(n sql.NullInt64) *int {
 	if !n.Valid {
 		return nil
@@ -120,7 +139,7 @@ func loadCaseDetail(db *sql.DB, caseID int64) (*CaseDetail, error) {
 		FROM cases c
 		LEFT JOIN devicescases dc ON c.caseID = dc.caseID
 		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
-		WHERE c.caseID = ?
+		WHERE c.caseID = $1
 		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, c.label_path, zone_name, zone_code
 	`
 
@@ -188,7 +207,7 @@ func loadCaseDevices(db *sql.DB, caseID int64) ([]CaseDevice, error) {
 		INNER JOIN devices d ON dc.deviceID = d.deviceID
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE dc.caseID = ?
+		WHERE dc.caseID = $1
 		ORDER BY d.deviceID ASC
 	`
 
@@ -239,6 +258,7 @@ func loadCaseDevices(db *sql.DB, caseID int64) ([]CaseDevice, error) {
 }
 
 func loadAvailableCaseDevices(db *sql.DB, caseID *int64, search string, limit int) ([]CaseDevice, error) {
+	qb := NewQueryBuilder()
 	baseQuery := `
 		SELECT DISTINCT
 			d.deviceID,
@@ -259,19 +279,19 @@ func loadAvailableCaseDevices(db *sql.DB, caseID *int64, search string, limit in
 	args := []interface{}{}
 
 	if search != "" {
-		baseQuery += " AND (d.deviceID LIKE ? OR d.serialnumber LIKE ? OR p.name LIKE ?)"
+		baseQuery += " AND (d.deviceID LIKE " + qb.NextPlaceholder() + " OR d.serialnumber LIKE " + qb.NextPlaceholder() + " OR p.name LIKE " + qb.NextPlaceholder() + ")"
 		term := "%" + search + "%"
 		args = append(args, term, term, term)
 	}
 
 	if caseID != nil {
-		baseQuery += " AND (dc.caseID IS NULL OR dc.caseID = ?)"
+		baseQuery += " AND (dc.caseID IS NULL OR dc.caseID = " + qb.NextPlaceholder() + ")"
 		args = append(args, *caseID)
 	} else {
 		baseQuery += " AND dc.caseID IS NULL"
 	}
 
-	baseQuery += " ORDER BY d.deviceID ASC LIMIT ?"
+	baseQuery += " ORDER BY d.deviceID ASC LIMIT " + qb.NextPlaceholder()
 	args = append(args, limit)
 
 	rows, err := db.Query(baseQuery, args...)
@@ -488,7 +508,7 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 			}
 
 			// Delete location if quantity is 0
-			db.Exec("DELETE FROM product_locations WHERE product_id = ? AND zone_id = ? AND quantity = 0",
+			db.Exec("DELETE FROM product_locations WHERE product_id = $1 AND zone_id = $2 AND quantity = 0",
 				product.ProductID, *scanReq.ZoneID)
 		}
 	}
@@ -598,16 +618,17 @@ func GetScanHistory(w http.ResponseWriter, r *http.Request) {
 	deviceID := r.URL.Query().Get("device_id")
 
 	db := repository.GetSQLDB()
+	qb := NewQueryBuilder()
 	query := `SELECT scan_id, scan_code, device_id, action, success, timestamp
 	          FROM scan_events WHERE 1=1`
 	args := []interface{}{}
 
 	if deviceID != "" {
-		query += " AND device_id = ?"
+		query += " AND device_id = " + qb.NextPlaceholder()
 		args = append(args, deviceID)
 	}
 
-	query += " ORDER BY timestamp DESC LIMIT ?"
+	query += " ORDER BY timestamp DESC LIMIT " + qb.NextPlaceholder()
 	args = append(args, limit)
 
 	rows, err := db.Query(query, args...)
@@ -643,6 +664,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 	limit := parseInt(r.URL.Query().Get("limit"), defaultLimit)
 
 	db := repository.GetSQLDB()
+	qb := NewQueryBuilder()
 	query := `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
 		       d.zone_id, d.condition_rating, d.usage_hours, d.label_path,
@@ -661,15 +683,15 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 
 	args := []interface{}{}
 	if status != "" {
-		query += " AND d.status = ?"
+		query += " AND d.status = " + qb.NextPlaceholder()
 		args = append(args, status)
 	}
 	if zoneID != "" {
-		query += " AND d.zone_id = ?"
+		query += " AND d.zone_id = " + qb.NextPlaceholder()
 		args = append(args, zoneID)
 	}
 
-	query += " ORDER BY d.deviceID LIMIT ?"
+	query += " ORDER BY d.deviceID LIMIT " + qb.NextPlaceholder()
 	args = append(args, limit)
 
 	rows, err := db.Query(query, args...)
@@ -1346,9 +1368,10 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 
 	db := repository.GetSQLDB()
+	qb := NewQueryBuilder()
 	query := `
 		SELECT j.jobID,
-		       COALESCE(j.job_code, CONCAT('JOB', LPAD(j.jobID, 6, '0'))) AS job_code,
+		       COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.jobID AS TEXT), 6, '0'))) AS job_code,
 		       j.description, j.startDate, j.endDate, s.status,
 		       COALESCE(c.firstName, '') as customer_first_name,
 		       COALESCE(c.lastName, '') as customer_last_name,
@@ -1361,11 +1384,11 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 
 	args := []interface{}{}
 	if status != "" {
-		query += " AND s.status = ?"
+		query += " AND s.status = " + qb.NextPlaceholder()
 		args = append(args, status)
 	}
 
-	query += " GROUP BY j.jobID ORDER BY j.startDate ASC"
+	query += " GROUP BY j.jobID, j.job_code, j.description, j.startDate, j.endDate, s.status, c.firstName, c.lastName ORDER BY j.startDate ASC"
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -1549,6 +1572,7 @@ func GetCases(w http.ResponseWriter, r *http.Request) {
 	// Get configurable limit from settings
 	limit := services.GetCaseLimit()
 
+	qb := NewQueryBuilder()
 	query := `
 		SELECT
 			c.caseID,
@@ -1573,20 +1597,20 @@ func GetCases(w http.ResponseWriter, r *http.Request) {
 	args := []interface{}{}
 
 	if search != "" {
-		query += " AND (c.name LIKE ? OR c.description LIKE ?)"
+		query += " AND (c.name LIKE " + qb.NextPlaceholder() + " OR c.description LIKE " + qb.NextPlaceholder() + ")"
 		searchTerm := "%" + search + "%"
 		args = append(args, searchTerm, searchTerm)
 	}
 
 	if status != "" {
-		query += " AND c.status = ?"
+		query += " AND c.status = " + qb.NextPlaceholder()
 		args = append(args, status)
 	}
 
 	query += `
 		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, c.label_path, zone_name, zone_code
 		ORDER BY c.name ASC
-		LIMIT ?
+		LIMIT ` + qb.NextPlaceholder() + `
 	`
 	args = append(args, limit)
 
@@ -1685,7 +1709,7 @@ func GetCase(w http.ResponseWriter, r *http.Request) {
 		FROM cases c
 		LEFT JOIN devicescases dc ON c.caseID = dc.caseID
 		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
-		WHERE c.caseID = ?
+		WHERE c.caseID = $1
 		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, c.label_path, zone_name, zone_code
 	`
 
@@ -1800,7 +1824,7 @@ func GetCaseContents(w http.ResponseWriter, r *http.Request) {
 		INNER JOIN devices d ON dc.deviceID = d.deviceID
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		WHERE dc.caseID = ?
+		WHERE dc.caseID = $1
 		ORDER BY d.deviceID ASC
 	`
 
@@ -2006,7 +2030,7 @@ func DeleteCase(w http.ResponseWriter, r *http.Request) {
 
 	// Check if case has devices
 	var deviceCount int
-	err := db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = ?", caseID).Scan(&deviceCount)
+	err := db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = $1", caseID).Scan(&deviceCount)
 	if err != nil {
 		log.Printf("DeleteCase check devices error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to check case devices"})
@@ -2022,7 +2046,7 @@ func DeleteCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete the case
-	result, err := db.Exec("DELETE FROM cases WHERE caseID = ?", caseID)
+	result, err := db.Exec("DELETE FROM cases WHERE caseID = $1", caseID)
 	if err != nil {
 		log.Printf("DeleteCase error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete case"})
@@ -2075,7 +2099,7 @@ func AddDevicesToCase(w http.ResponseWriter, r *http.Request) {
 
 	// Check if case exists
 	var exists int
-	err = db.QueryRow("SELECT COUNT(*) FROM cases WHERE caseID = ?", caseID).Scan(&exists)
+	err = db.QueryRow("SELECT COUNT(*) FROM cases WHERE caseID = $1", caseID).Scan(&exists)
 	if err != nil {
 		log.Printf("AddDevicesToCase check case error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify case"})
@@ -2095,7 +2119,7 @@ func AddDevicesToCase(w http.ResponseWriter, r *http.Request) {
 	for _, deviceID := range req.DeviceIDs {
 		// Check if device exists
 		var deviceExists int
-		err = db.QueryRow("SELECT COUNT(*) FROM devices WHERE deviceID = ?", deviceID).Scan(&deviceExists)
+		err = db.QueryRow("SELECT COUNT(*) FROM devices WHERE deviceID = $1", deviceID).Scan(&deviceExists)
 		if err != nil || deviceExists == 0 {
 			errors = append(errors, fmt.Sprintf("Device %s not found", deviceID))
 			skippedCount++
@@ -2104,7 +2128,7 @@ func AddDevicesToCase(w http.ResponseWriter, r *http.Request) {
 
 		// Check if device is already in a case
 		var existingCaseID sql.NullInt64
-		err = db.QueryRow("SELECT caseID FROM devicescases WHERE deviceID = ?", deviceID).Scan(&existingCaseID)
+		err = db.QueryRow("SELECT caseID FROM devicescases WHERE deviceID = $1", deviceID).Scan(&existingCaseID)
 		if err != nil && err != sql.ErrNoRows {
 			log.Printf("AddDevicesToCase check existing case error: %v", err)
 			errors = append(errors, fmt.Sprintf("Failed to check device %s", deviceID))
@@ -2119,7 +2143,7 @@ func AddDevicesToCase(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Add device to case
-		_, err = db.Exec("INSERT INTO devicescases (deviceID, caseID) VALUES (?, ?)", deviceID, caseID)
+		_, err = db.Exec("INSERT INTO devicescases (deviceID, caseID) VALUES ($1, $2)", deviceID, caseID)
 		if err != nil {
 			log.Printf("AddDevicesToCase insert error for %s: %v", deviceID, err)
 			errors = append(errors, fmt.Sprintf("Failed to add device %s", deviceID))
@@ -2164,7 +2188,7 @@ func RemoveDeviceFromCase(w http.ResponseWriter, r *http.Request) {
 
 	// Check if device is in this case
 	var exists int
-	err = db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = ? AND deviceID = ?", caseID, deviceID).Scan(&exists)
+	err = db.QueryRow("SELECT COUNT(*) FROM devicescases WHERE caseID = $1 AND deviceID = $2", caseID, deviceID).Scan(&exists)
 	if err != nil {
 		log.Printf("RemoveDeviceFromCase check error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify device in case"})
@@ -2177,7 +2201,7 @@ func RemoveDeviceFromCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Remove device from case
-	_, err = db.Exec("DELETE FROM devicescases WHERE caseID = ? AND deviceID = ?", caseID, deviceID)
+	_, err = db.Exec("DELETE FROM devicescases WHERE caseID = $1 AND deviceID = $2", caseID, deviceID)
 	if err != nil {
 		log.Printf("RemoveDeviceFromCase delete error: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to remove device from case"})
@@ -2194,6 +2218,7 @@ func GetDefects(w http.ResponseWriter, r *http.Request) {
 	deviceID := r.URL.Query().Get("device_id")
 
 	db := repository.GetSQLDB()
+	qb := NewQueryBuilder()
 	query := `
 		SELECT dr.defect_id, dr.device_id, dr.severity, dr.status, dr.title, dr.description,
 		       dr.reported_at, dr.repair_cost, dr.repaired_at, dr.closed_at,
@@ -2205,15 +2230,15 @@ func GetDefects(w http.ResponseWriter, r *http.Request) {
 
 	args := []interface{}{}
 	if status != "" {
-		query += " AND dr.status = ?"
+		query += " AND dr.status = " + qb.NextPlaceholder()
 		args = append(args, status)
 	}
 	if severity != "" {
-		query += " AND dr.severity = ?"
+		query += " AND dr.severity = " + qb.NextPlaceholder()
 		args = append(args, severity)
 	}
 	if deviceID != "" {
-		query += " AND dr.device_id = ?"
+		query += " AND dr.device_id = " + qb.NextPlaceholder()
 		args = append(args, deviceID)
 	}
 
@@ -2340,12 +2365,14 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 
-	// Build dynamic UPDATE query
+	// Build dynamic UPDATE query with PostgreSQL placeholders
 	updates := []string{}
 	args := []interface{}{}
+	argNum := 1
 
 	if input.Status != nil {
-		updates = append(updates, "status = ?")
+		updates = append(updates, fmt.Sprintf("status = $%d", argNum))
+		argNum++
 		args = append(args, *input.Status)
 
 		// Update timestamps based on status
@@ -2356,15 +2383,18 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if input.AssignedTo != nil {
-		updates = append(updates, "assigned_to = ?")
+		updates = append(updates, fmt.Sprintf("assigned_to = $%d", argNum))
+		argNum++
 		args = append(args, *input.AssignedTo)
 	}
 	if input.RepairCost != nil {
-		updates = append(updates, "repair_cost = ?")
+		updates = append(updates, fmt.Sprintf("repair_cost = $%d", argNum))
+		argNum++
 		args = append(args, *input.RepairCost)
 	}
 	if input.RepairNotes != nil {
-		updates = append(updates, "repair_notes = ?")
+		updates = append(updates, fmt.Sprintf("repair_notes = $%d", argNum))
+		argNum++
 		args = append(args, *input.RepairNotes)
 	}
 
@@ -2373,7 +2403,7 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "UPDATE defect_reports SET " + strings.Join(updates, ", ") + " WHERE defect_id = ?"
+	query := fmt.Sprintf("UPDATE defect_reports SET %s WHERE defect_id = $%d", strings.Join(updates, ", "), argNum)
 	args = append(args, defectID)
 
 	_, err := db.Exec(query, args...)
@@ -2411,6 +2441,7 @@ func GetInspections(w http.ResponseWriter, r *http.Request) {
 		WHERE 1=1`
 
 	args := []interface{}{}
+	qb := NewQueryBuilder()
 
 	if status == "upcoming" {
 		query += " AND i.next_inspection >= NOW() AND i.next_inspection <= NOW() + INTERVAL '30 days' AND i.is_active = TRUE"
@@ -2421,7 +2452,7 @@ func GetInspections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if deviceID != "" {
-		query += " AND i.device_id = ?"
+		query += " AND i.device_id = " + qb.NextPlaceholder()
 		args = append(args, deviceID)
 	}
 
@@ -3029,7 +3060,7 @@ func AssignDevicesToZone(w http.ResponseWriter, r *http.Request) {
 
 	// Verify zone exists
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM storage_zones WHERE zone_id = ?)", zoneID).Scan(&exists)
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM storage_zones WHERE zone_id = $1)", zoneID).Scan(&exists)
 	if err != nil || !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Zone not found"})
 		return
