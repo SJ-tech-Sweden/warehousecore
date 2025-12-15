@@ -48,6 +48,18 @@ interface Product {
   brand_name?: string | null;
 }
 
+interface Subcategory {
+  subcategory_id: string;
+  name: string;
+  category_id: number;
+}
+
+interface Subbiercategory {
+  subbiercategory_id: string;
+  name: string;
+  subcategory_id: string;
+}
+
 interface PackageFormData {
   name: string;
   description: string;
@@ -119,6 +131,8 @@ export function ProductPackagesTab() {
   const scrollPosition = useRef(0);
   const viewPackagePriceDisplay = viewPackage ? formatPrice(viewPackage.price, '') : '';
   const [categories, setCategories] = useState<Array<{ categoryID: number; name: string }>>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [subbiercategories, setSubbiercategories] = useState<Subbiercategory[]>([]);
   const [packageDevices, setPackageDevices] = useState<Device[]>([]);
   const [devicesToDelete, setDevicesToDelete] = useState<Set<string>>(new Set());
   const [loadingDevices, setLoadingDevices] = useState(false);
@@ -166,6 +180,36 @@ export function ProductPackagesTab() {
     }
   };
 
+  const fetchSubcategories = async () => {
+    try {
+      const response = await api.get('/admin/subcategories');
+      const data = Array.isArray(response.data) ? response.data : [];
+      setSubcategories(data);
+    } catch (error) {
+      console.error('Failed to fetch subcategories:', error);
+    }
+  };
+
+  const fetchSubbiercategories = async () => {
+    try {
+      const response = await api.get('/admin/subbiercategories');
+      const data = Array.isArray(response.data) ? response.data : [];
+      setSubbiercategories(data);
+    } catch (error) {
+      console.error('Failed to fetch subbiercategories:', error);
+    }
+  };
+
+  // Filter subcategories by selected category
+  const filteredSubcategories = subcategories.filter(
+    (sub) => !formData.category_id || sub.category_id === formData.category_id
+  );
+
+  // Filter subbiercategories by selected subcategory
+  const filteredSubbiercategories = subbiercategories.filter(
+    (subbier) => !formData.subcategory_id || subbier.subcategory_id === formData.subcategory_id
+  );
+
   useEffect(() => {
     fetchPackages();
   }, [searchTerm]);
@@ -177,7 +221,13 @@ export function ProductPackagesTab() {
     if ((modalOpen || viewPackage) && categories.length === 0) {
       fetchCategories();
     }
-  }, [modalOpen, viewPackage, products.length, categories.length]);
+    if ((modalOpen || viewPackage) && subcategories.length === 0) {
+      fetchSubcategories();
+    }
+    if ((modalOpen || viewPackage) && subbiercategories.length === 0) {
+      fetchSubbiercategories();
+    }
+  }, [modalOpen, viewPackage, products.length, categories.length, subcategories.length, subbiercategories.length]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -657,13 +707,72 @@ export function ProductPackagesTab() {
                 </label>
                 <select
                   value={formData.category_id}
-                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value ? Number(e.target.value) : '' })}
+                  onChange={(e) => {
+                    const value = e.target.value ? Number(e.target.value) : '';
+                    setFormData({
+                      ...formData,
+                      category_id: value,
+                      subcategory_id: '',
+                      subbiercategory_id: '',
+                    });
+                  }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
                 >
                   <option value="">Keine Kategorie</option>
                   {categories.map((cat) => (
                     <option key={cat.categoryID} value={cat.categoryID}>
                       {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subkategorie
+                </label>
+                <select
+                  value={formData.subcategory_id}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      subcategory_id: value,
+                      subbiercategory_id: '',
+                    });
+                  }}
+                  disabled={!formData.category_id}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Keine Subkategorie</option>
+                  {filteredSubcategories.map((sub) => (
+                    <option key={sub.subcategory_id} value={sub.subcategory_id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Sub-Subkategorie
+                </label>
+                <select
+                  value={formData.subbiercategory_id}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({
+                      ...formData,
+                      subbiercategory_id: value,
+                    });
+                  }}
+                  disabled={!formData.subcategory_id}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Keine Sub-Subkategorie</option>
+                  {filteredSubbiercategories.map((subbier) => (
+                    <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
+                      {subbier.name}
                     </option>
                   ))}
                 </select>
