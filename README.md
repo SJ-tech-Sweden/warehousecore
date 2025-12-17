@@ -1057,7 +1057,8 @@ docker tag nobentie/warehousecore:1.56 nobentie/warehousecore:latest
 ```
 
 **Migrations**
-- Führe neue Migrationen aus, z. B. `mysql ... < migrations/022_add_website_fields.sql` (Website-Flags/Thumbnail/Bildauswahl für Produkte & Packages).
+- **030_device_id_trigger.sql** - PostgreSQL trigger function for automatic device ID generation
+- **022_add_website_fields.sql** - Website-Flags/Thumbnail/Bildauswahl für Produkte & Packages
 
 **Push to Docker Hub:**
 ```bash
@@ -1084,9 +1085,10 @@ docker pull nobentie/warehousecore:latest
 # (DO NOT use docker-compose restart manually)
 ```
 
-**Current Version:** 3.35
+**Current Version:** 3.36
 
 **Recent Changes:**
+- 3.36: PostgreSQL trigger for automatic device ID generation - fixes null deviceID constraint violations
 - 3.35: Produktbilder laden deutlich schneller dank gecachter JPEG-Thumbnails + Admin-UI nutzt die kleinen Varianten
 - 2.71: Gerätebaum als zusätzliche Ansicht direkt in „Produkte“ (View-Toggle)
 - 2.70: Sidebar navigation order aligned with RentalCore (Dashboard, Scan, Produktmanagement, Cases, Lagerbereiche, Aufträge, Admin)
