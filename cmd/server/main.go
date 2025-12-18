@@ -347,6 +347,9 @@ func main() {
 	admin.HandleFunc("/api-limits", handlers.GetAPILimits).Methods("GET")
 	admin.HandleFunc("/api-limits", handlers.UpdateAPILimits).Methods("PUT")
 
+	// CSV Export endpoints (read-only, admin or manager)
+	adminRead.HandleFunc("/export/{type}", handlers.ExportCSV).Methods("GET")
+
 	// Profile endpoints (authenticated users)
 	protected.HandleFunc("/profile/me", handlers.GetMyProfile).Methods("GET")
 	protected.HandleFunc("/profile/me", handlers.UpdateMyProfile).Methods("PUT")

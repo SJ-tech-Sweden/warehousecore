@@ -2,7 +2,7 @@
 
 **Physical Warehouse Management System for RentalCore Deployments**
 
-Version: 5.5
+Version: 5.6
 
 WarehouseCore is the digital twin of the Weidelbach warehouse, providing real-time tracking of devices, cases, zones, and movements with barcode/QR scan-driven workflows.
 
@@ -108,10 +108,26 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
   - Duplicate scan detection
   - Complete event logging with IP/user-agent
 
+8. **CSV Export System** 📊 NEW
+   - Comprehensive data export functionality in Admin Dashboard
+   - 10 different export types for all major data entities
+   - Excel-compatible format (UTF-8 with BOM, semicolon-separated)
+   - German date format (DD.MM.YYYY) and decimal separator (comma)
+   - One-click download with automatic filename generation
+   - Available exports:
+     - Products (basic info, with device count, with brand/manufacturer)
+     - All devices with full details
+     - Manufacturers (standalone and with brands)
+     - Brands
+     - Storage zones with device counts
+     - Cables with specifications
+     - Jobs with complete information
+   - **Admin UI** - Accessible via CSV-Export tab in Admin Dashboard
+
 ## Admin-Dashboard & Rollen
 
-- Admin: verwaltet Zonentypen, LED-Defaults, Rollen; sieht Profilseite.
-- Manager: darf Zonentypen lesen/listen; keine Änderungen/Löschungen.
+- Admin: verwaltet Zonentypen, LED-Defaults, Rollen; CSV-Export; sieht Profilseite.
+- Manager: darf Zonentypen lesen/listen; CSV-Export; keine Änderungen/Löschungen.
 - Worker/Viewer: kein Zugriff auf Admin-Routen.
 
 API Endpoints (unter `\`/api/v1\``):
