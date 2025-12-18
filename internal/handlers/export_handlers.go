@@ -174,8 +174,8 @@ func exportProducts() ([]byte, error) {
 			p.power_consumption,
 			p.generic_barcode
 		FROM products p
-		LEFT JOIN categories c ON p.categoryID = c.id
-		LEFT JOIN subcategories sc ON p.subcategoryID = sc.id
+		LEFT JOIN categories c ON p.categoryID = c.categoryid
+		LEFT JOIN subcategories sc ON p.subcategoryID = sc.subcategoryid
 		ORDER BY p.name
 	`
 
@@ -244,7 +244,7 @@ func exportProductsWithDeviceCount() ([]byte, error) {
 			SUM(CASE WHEN d.status = 'in_use' THEN 1 ELSE 0 END) as in_use_count,
 			SUM(CASE WHEN d.status = 'defect' THEN 1 ELSE 0 END) as defect_count
 		FROM products p
-		LEFT JOIN categories c ON p.categoryID = c.id
+		LEFT JOIN categories c ON p.categoryID = c.categoryid
 		LEFT JOIN devices d ON p.productID = d.productID
 		GROUP BY p.productID, p.name, c.name
 		ORDER BY p.name
@@ -303,11 +303,11 @@ func exportProductsWithBrandManufacturer() ([]byte, error) {
 			m.name as manufacturer_name,
 			b.name as brand_name,
 			p.description,
-			p.item_cost_per_day
+			p.itemcostperday
 		FROM products p
-		LEFT JOIN categories c ON p.categoryID = c.id
-		LEFT JOIN manufacturers m ON p.manufacturerID = m.id
-		LEFT JOIN brands b ON p.brandID = b.id
+		LEFT JOIN categories c ON p.categoryID = c.categoryid
+		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerid
+		LEFT JOIN brands b ON p.brandID = b.brandid
 		ORDER BY p.name
 	`
 
@@ -370,8 +370,8 @@ func exportAllDevices() ([]byte, error) {
 			c.name as case_name
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
-		LEFT JOIN storage_zones z ON d.current_zone_id = z.zone_id
-		LEFT JOIN cases c ON d.case_id = c.id
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		LEFT JOIN cases c ON d.case_id = c.caseid
 		ORDER BY d.deviceID
 	`
 
@@ -426,12 +426,10 @@ func exportManufacturers() ([]byte, error) {
 
 	query := `
 		SELECT
-			id,
+			manufacturerid,
 			name,
-			country,
-			website,
-			notes
-		FROM manufacturers
+			website
+		FROM manufacturer
 		ORDER BY name
 	`
 
@@ -442,7 +440,7 @@ func exportManufacturers() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Name", "Land", "Webseite", "Notizen",
+		"ID", "Name", "Webseite",
 	}
 
 	var csvRows [][]string
@@ -450,9 +448,9 @@ func exportManufacturers() ([]byte, error) {
 	for rows.Next() {
 		var id int
 		var name string
-		var country, website, notes *string
+		var website *string
 
-		err := rows.Scan(&id, &name, &country, &website, &notes)
+		err := rows.Scan(&id, &name, &website)
 		if err != nil {
 			return nil, err
 		}
@@ -460,9 +458,7 @@ func exportManufacturers() ([]byte, error) {
 		csvRows = append(csvRows, []string{
 			strconv.Itoa(id),
 			name,
-			formatNullString(country),
 			formatNullString(website),
-			formatNullString(notes),
 		})
 	}
 
@@ -475,13 +471,12 @@ func exportManufacturersWithBrands() ([]byte, error) {
 
 	query := `
 		SELECT
-			m.id,
+			m.manufacturerid,
 			m.name as manufacturer_name,
-			m.country,
-			GROUP_CONCAT(b.name SEPARATOR ', ') as brands
-		FROM manufacturers m
-		LEFT JOIN brands b ON m.id = b.manufacturerID
-		GROUP BY m.id, m.name, m.country
+			STRING_AGG(b.name, ', ') as brands
+		FROM manufacturer m
+		LEFT JOIN brands b ON m.manufacturerid = b.manufacturerid
+		GROUP BY m.manufacturerid, m.name
 		ORDER BY m.name
 	`
 
@@ -492,7 +487,7 @@ func exportManufacturersWithBrands() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Hersteller", "Land", "Marken",
+		"ID", "Hersteller", "Marken",
 	}
 
 	var csvRows [][]string
@@ -500,9 +495,9 @@ func exportManufacturersWithBrands() ([]byte, error) {
 	for rows.Next() {
 		var id int
 		var manufacturerName string
-		var country, brands *string
+		var brands *string
 
-		err := rows.Scan(&id, &manufacturerName, &country, &brands)
+		err := rows.Scan(&id, &manufacturerName, &brands)
 		if err != nil {
 			return nil, err
 		}
@@ -510,7 +505,6 @@ func exportManufacturersWithBrands() ([]byte, error) {
 		csvRows = append(csvRows, []string{
 			strconv.Itoa(id),
 			manufacturerName,
-			formatNullString(country),
 			formatNullString(brands),
 		})
 	}
@@ -524,12 +518,11 @@ func exportBrands() ([]byte, error) {
 
 	query := `
 		SELECT
-			b.id,
+			b.brandid,
 			b.name,
-			m.name as manufacturer_name,
-			b.notes
+			m.name as manufacturer_name
 		FROM brands b
-		LEFT JOIN manufacturers m ON b.manufacturerID = m.id
+		LEFT JOIN manufacturer m ON b.manufacturerid = m.manufacturerid
 		ORDER BY b.name
 	`
 
@@ -540,7 +533,7 @@ func exportBrands() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Markenname", "Hersteller", "Notizen",
+		"ID", "Markenname", "Hersteller",
 	}
 
 	var csvRows [][]string
@@ -548,9 +541,9 @@ func exportBrands() ([]byte, error) {
 	for rows.Next() {
 		var id int
 		var name string
-		var manufacturerName, notes *string
+		var manufacturerName *string
 
-		err := rows.Scan(&id, &name, &manufacturerName, &notes)
+		err := rows.Scan(&id, &name, &manufacturerName)
 		if err != nil {
 			return nil, err
 		}
@@ -559,7 +552,6 @@ func exportBrands() ([]byte, error) {
 			strconv.Itoa(id),
 			name,
 			formatNullString(manufacturerName),
-			formatNullString(notes),
 		})
 	}
 
