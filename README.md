@@ -813,7 +813,7 @@ warehousecore/
 - Go 1.24+ (GORM compatibility)
 - gorilla/mux (routing)
 - GORM (ORM for auth models)
-- MySQL 9.2 (shared RentalCore database)
+- PostgreSQL 17 (shared RentalCore database)
 - Session-based authentication
 - CORS enabled
 
@@ -835,7 +835,7 @@ warehousecore/
 ### Prerequisites
 
 - Go 1.24+
-- MySQL 9.2+ (access to RentalCore database)
+- PostgreSQL 17+ (access to RentalCore database)
 - Docker (optional, for containerized deployment)
 - Node.js 18+ (for frontend development)
 
@@ -856,10 +856,10 @@ cp .env.example .env
 3. **Run database migrations**
 ```bash
 # Execute SQL files in migrations/ directory against RentalCore database
-mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/001_storage_zones.sql
-mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/002_device_movements.sql
-mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/003_scan_events.sql
-mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/004_defect_reports.sql
+psql -h db.example.com -U warehouse_user -d rentalcore < migrations/001_storage_zones.sql
+psql -h db.example.com -U warehouse_user -d rentalcore < migrations/002_device_movements.sql
+psql -h db.example.com -U warehouse_user -d rentalcore < migrations/003_scan_events.sql
+psql -h db.example.com -U warehouse_user -d rentalcore < migrations/004_defect_reports.sql
 ```
 
 4. **Install dependencies**
@@ -1181,7 +1181,7 @@ docker compose pull && docker compose up -d
 ### Running Migrations
 Apply new migrations to the shared RentalCore database:
 ```bash
-mysql -h db.example.com -u warehouse_user -p rentalcore < migrations/XXX_new_feature.sql
+psql -h db.example.com -U warehouse_user -d rentalcore < migrations/XXX_new_feature.sql
 ```
 
 ### Development Workflow
@@ -1301,7 +1301,8 @@ DB_HOST=db.example.com
 DB_USER=tsweb
 DB_PASS=<password>
 DB_NAME=RentalCore
-DB_PORT=3306
+DB_PORT=5432
+DB_SSLMODE=disable
 
 # Application
 APP_ENV=development|production
@@ -2658,7 +2659,7 @@ For issues or questions:
 ### Version 1.18 (2025-10-15)
 - **Feature: User Authentication and Single Sign-On (SSO)**
   - Complete user authentication system integrated with RentalCore
-  - Shared session-based authentication using MySQL sessions table
+  - Shared session-based authentication using PostgreSQL sessions table
   - Cookie-based SSO across both applications (.server-nt.de domain)
   - Login required to access WarehouseCore directly
   - Automatic authentication when navigating from RentalCore
@@ -2940,7 +2941,7 @@ For issues or questions:
 - **Feature: Recursive Device Count for Parent Zones**
   - Zone device counts now include all devices in subzones recursively
   - When viewing a parent zone (e.g., Lager or Regal), device count shows total across all child zones
-  - Implemented using MySQL recursive CTE (Common Table Expression) for efficient querying
+  - Implemented using PostgreSQL recursive CTE (Common Table Expression) for efficient querying
   - Example: Lager Weidelbach shows total of all devices in all Regale and all Fächer within
 - **Backend Enhancements:**
   - New function `getDeviceCountRecursive` in ZoneService
