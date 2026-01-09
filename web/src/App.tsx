@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 import { RoleGuard } from './components/RoleGuard';
 import { Login } from './pages/Login';
+import { ChangePassword } from './pages/ChangePassword';
 import { Dashboard } from './pages/Dashboard';
 import { ScanPage } from './pages/ScanPage';
 import { ZonesPage } from './pages/ZonesPage';
@@ -25,7 +26,8 @@ function App() {
           {/* Public route */}
           <Route path="/login" element={<Login />} />
 
-          {/* Protected routes */}
+          {/* Password change route (requires auth but bypasses force check) */}
+          <Route path="/change-password" element={<ProtectedRoute bypassForcePasswordChange><ChangePassword /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
           <Route path="/scan" element={<ProtectedRoute><Layout><ScanPage /></Layout></ProtectedRoute>} />
           <Route path="/labels" element={<ProtectedRoute><Layout><LabelDesignerPage /></Layout></ProtectedRoute>} />

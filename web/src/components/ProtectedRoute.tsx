@@ -3,10 +3,11 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  bypassForcePasswordChange?: boolean;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+export function ProtectedRoute({ children, bypassForcePasswordChange = false }: ProtectedRouteProps) {
+  const { isAuthenticated, loading, forcePasswordChange } = useAuth();
 
   // Show loading spinner while checking authentication
   if (loading) {
@@ -23,6 +24,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Redirect to password change if forced (unless bypassed)
+  if (forcePasswordChange && !bypassForcePasswordChange) {
+    return <Navigate to="/change-password" replace />;
   }
 
   // Render children if authenticated

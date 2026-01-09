@@ -17,6 +17,7 @@ export interface User {
   IsActive: boolean;
   Roles?: Role[];
   roles?: Role[];
+  force_password_change?: boolean;
 }
 
 export interface LoginRequest {
@@ -28,10 +29,21 @@ export interface LoginResponse {
   success: boolean;
   message: string;
   user?: User;
+  force_password_change?: boolean;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
 }
 
 class AuthService {
-  async login(username: string, password: string): Promise<User> {
+  async login(username: string, password: string): Promise<{ user: User; forcePasswordChange: boolean }> {
     const response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: {
@@ -51,7 +63,34 @@ class AuthService {
       throw new Error(data.message || 'Login failed');
     }
 
-    return data.user;
+    return {
+      user: data.user,
+      forcePasswordChange: data.force_password_change || false,
+    };
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const response = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Password change failed');
+    }
+
+    const data: ChangePasswordResponse = await response.json();
+    if (!data.success) {
+      throw new Error(data.message || 'Password change failed');
+    }
   }
 
   async logout(): Promise<void> {

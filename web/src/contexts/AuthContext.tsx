@@ -6,8 +6,11 @@ import type { User } from '../services/auth';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  forcePasswordChange: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  clearForcePasswordChange: () => void;
   isAuthenticated: boolean;
 }
 
@@ -16,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -26,6 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const currentUser = await authService.getCurrentUser();
       setUser(currentUser);
+      // Check if user needs to change password
+      if (currentUser?.force_password_change) {
+        setForcePasswordChange(true);
+      }
     } catch (error) {
       console.error('Auth check failed:', error);
       setUser(null);
@@ -35,20 +43,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (username: string, password: string) => {
-    const user = await authService.login(username, password);
-    setUser(user);
+    const result = await authService.login(username, password);
+    setUser(result.user);
+    setForcePasswordChange(result.forcePasswordChange);
   };
 
   const logout = async () => {
     await authService.logout();
     setUser(null);
+    setForcePasswordChange(false);
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    await authService.changePassword(currentPassword, newPassword);
+    setForcePasswordChange(false);
+  };
+
+  const clearForcePasswordChange = () => {
+    setForcePasswordChange(false);
   };
 
   const value: AuthContextType = {
     user,
     loading,
+    forcePasswordChange,
     login,
     logout,
+    changePassword,
+    clearForcePasswordChange,
     isAuthenticated: user !== null,
   };
 
