@@ -2540,12 +2540,12 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			dm.movement_id,
 			dm.device_id,
-			dm.action,
+			dm.movement_type as action,
 			dm.from_zone_id,
 			dm.to_zone_id,
 			dm.from_job_id,
 			dm.to_job_id,
-			dm.timestamp,
+			dm.created_at as timestamp,
 			d.barcode,
 			d.serialnumber,
 			p.name,
@@ -2561,8 +2561,8 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN storage_zones tz ON dm.to_zone_id = tz.zone_id
 		LEFT JOIN jobs fj ON dm.from_job_id = fj.jobID
 		LEFT JOIN jobs tj ON dm.to_job_id = tj.jobID
-		LEFT JOIN users u ON dm.user_id = u.userID
-		ORDER BY dm.timestamp DESC
+		LEFT JOIN users u ON dm.moved_by = u.userID
+		ORDER BY dm.created_at DESC
 		LIMIT $1
 	`, limit)
 	if err != nil {

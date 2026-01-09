@@ -156,7 +156,7 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, from_job_id, to_zone_id, timestamp)
+		INSERT INTO device_movements (device_id, movement_type, from_job_id, to_zone_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING movement_id
 	`, movement.DeviceID, movement.Action, movement.FromJobID, movement.ToZoneID, movement.Timestamp).Scan(&movement.MovementID)
@@ -215,7 +215,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, from_zone_id, to_job_id, timestamp)
+		INSERT INTO device_movements (device_id, movement_type, from_zone_id, to_job_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING movement_id
 	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToJobID, movement.Timestamp).Scan(&movement.MovementID)
@@ -325,7 +325,7 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, from_zone_id, to_zone_id, timestamp)
+		INSERT INTO device_movements (device_id, movement_type, from_zone_id, to_zone_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING movement_id
 	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToZoneID, movement.Timestamp).Scan(&movement.MovementID)

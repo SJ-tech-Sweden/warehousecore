@@ -7,12 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"warehousecore/internal/led"
 	"warehousecore/internal/middleware"
 	"warehousecore/internal/models"
 	"warehousecore/internal/services"
 	"warehousecore/internal/validation"
+
+	"github.com/gorilla/mux"
 )
 
 // ===========================
@@ -520,7 +521,10 @@ func GetMyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Add user roles to response
-	roles, _ := rbacService.GetUserRoles(user.UserID)
+	roles, err := rbacService.GetUserRoles(user.UserID)
+	if err != nil {
+		log.Printf("GetMyProfile: Error getting user roles for user %d: %v", user.UserID, err)
+	}
 
 	// Build DTO matching frontend expectations
 	type RoleDTO struct {

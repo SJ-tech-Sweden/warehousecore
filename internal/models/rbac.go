@@ -8,15 +8,15 @@ import (
 
 // Role represents a system role for RBAC (uses RentalCore schema)
 type Role struct {
-	ID          int       `json:"id" gorm:"column:roleid;primaryKey"`
-	Name        string    `json:"name" gorm:"column:name;not null"`
-	DisplayName string    `json:"display_name" gorm:"column:display_name"`
-	Description string    `json:"description" gorm:"column:description"`
-	IsSystem    bool      `json:"is_system" gorm:"column:is_system;default:false"`
-	IsActive    bool      `json:"is_active" gorm:"column:is_active;default:true"`
-	Permissions string    `json:"permissions" gorm:"column:permissions"`
-	CreatedAt   time.Time `json:"created_at" gorm:"column:created_at"`
-	UpdatedAt   time.Time `json:"updated_at" gorm:"column:updated_at"`
+	ID           int             `json:"id" gorm:"column:roleid;primaryKey"`
+	Name         string          `json:"name" gorm:"column:name;not null"`
+	DisplayName  string          `json:"display_name" gorm:"column:display_name"`
+	Description  string          `json:"description" gorm:"column:description"`
+	IsSystemRole bool            `json:"is_system_role" gorm:"column:is_system_role;default:false"`
+	IsActive     bool            `json:"is_active" gorm:"column:is_active;default:true"`
+	Permissions  json.RawMessage `json:"permissions" gorm:"column:permissions;type:jsonb"`
+	CreatedAt    time.Time       `json:"created_at" gorm:"column:created_at"`
+	UpdatedAt    time.Time       `json:"updated_at" gorm:"column:updated_at"`
 }
 
 // TableName specifies the table name for Role model
@@ -26,11 +26,12 @@ func (Role) TableName() string {
 
 // UserRole represents a user-to-role assignment (RentalCore schema)
 type UserRole struct {
-	UserID     uint      `json:"user_id" gorm:"column:userid;primaryKey"`
-	RoleID     int       `json:"role_id" gorm:"column:roleid;primaryKey"`
-	AssignedBy *int      `json:"assigned_by" gorm:"column:assigned_by"`
-	AssignedAt time.Time `json:"assigned_at" gorm:"column:assigned_at;autoCreateTime"`
-	IsActive   bool      `json:"is_active" gorm:"column:is_active;default:true"`
+	UserID     uint       `json:"user_id" gorm:"column:userid;primaryKey"`
+	RoleID     int        `json:"role_id" gorm:"column:roleid;primaryKey"`
+	AssignedBy *int       `json:"assigned_by" gorm:"column:assigned_by"`
+	ExpiresAt  *time.Time `json:"expires_at" gorm:"column:expires_at"`
+	AssignedAt time.Time  `json:"assigned_at" gorm:"column:assigned_at;autoCreateTime"`
+	IsActive   bool       `json:"is_active" gorm:"column:is_active;default:true"`
 
 	// Relationships
 	User User `json:"user,omitempty" gorm:"foreignKey:UserID;references:UserID"`
