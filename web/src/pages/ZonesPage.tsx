@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { zonesApi } from '../lib/api';
 import { useZoneTypes } from '../lib/useZoneTypes';
 import type { Zone } from '../lib/api';
 
 export function ZonesPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [zones, setZones] = useState<Zone[]>([]);
@@ -113,7 +115,7 @@ export function ZonesPage() {
   const handleDeleteZone = async (e: React.MouseEvent, zone: Zone) => {
     e.stopPropagation(); // Prevent navigation when clicking delete
 
-    if (!confirm(`Zone "${zone.name}" (${zone.code}) wirklich löschen?`)) {
+    if (!confirm(t('zonesPage.deleteConfirm', { name: zone.name, code: zone.code }))) {
       return;
     }
 
@@ -122,7 +124,7 @@ export function ZonesPage() {
       loadZones();
     } catch (error) {
       console.error('Failed to delete zone:', error);
-      alert('Fehler beim Löschen der Zone. Prüfe ob die Zone Unterzonen oder Geräte enthält.');
+      alert(t('zonesPage.deleteError'));
     }
   };
 
@@ -146,15 +148,15 @@ export function ZonesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white mb-2">Lager</h2>
-          <p className="text-gray-400">{rootZones.length} Hauptzonen • {zones.length} gesamt</p>
+          <h2 className="text-3xl font-bold text-white mb-2">{t('zonesPage.title')}</h2>
+          <p className="text-gray-400">{t('zonesPage.summary', { rootCount: rootZones.length, totalCount: zones.length })}</p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all transform hover:scale-105"
         >
           <Plus className="w-5 h-5" />
-          {parentZone ? 'Unterzone erstellen' : 'Zone erstellen'}
+          {parentZone ? t('zonesPage.createSubzone') : t('zonesPage.createZone')}
         </button>
       </div>
 
@@ -162,12 +164,12 @@ export function ZonesPage() {
       {showForm && (
         <div className="glass-dark rounded-2xl p-6 border-2 border-accent-red/30">
           <h3 className="text-xl font-bold text-white mb-4">
-            {parentZone ? `Unterzone in ${parentZone.name} erstellen` : 'Neue Zone erstellen'}
+            {parentZone ? t('zonesPage.createSubzoneIn', { name: parentZone.name }) : t('zonesPage.newZone')}
           </h3>
           {parentZone && (
             <div className="mb-4 p-3 bg-white/5 rounded-lg">
               <p className="text-sm text-gray-400">
-                Übergeordnete Zone: <span className="text-white font-semibold">{parentZone.name}</span> ({parentZone.code})
+                {t('zonesPage.parentZone')} <span className="text-white font-semibold">{parentZone.name}</span> ({parentZone.code})
               </p>
             </div>
           )}
@@ -175,7 +177,7 @@ export function ZonesPage() {
             {formData.type === 'shelf' && (
               <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                 <p className="text-sm text-blue-300">
-                  ℹ️ Name und Barcode werden automatisch generiert (Fach 01, Fach 02, etc.)
+                  {t('zonesPage.shelfAutoInfo')}
                 </p>
               </div>
             )}
@@ -184,7 +186,7 @@ export function ZonesPage() {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Name (z.B. Lager Weidelbach, Regal A1)"
+                placeholder={t('zonesPage.namePlaceholder')}
                 required
                 className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
               />
@@ -205,13 +207,13 @@ export function ZonesPage() {
               type="number"
               value={formData.capacity}
               onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-              placeholder="Kapazität (optional)"
+              placeholder={t('zonesPage.capacityPlaceholder')}
               className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
             />
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Beschreibung (optional)"
+              placeholder={t('zonesPage.descriptionPlaceholder')}
               rows={3}
               className="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors resize-none"
             />
@@ -220,14 +222,14 @@ export function ZonesPage() {
                 type="submit"
                 className="flex-1 py-3 bg-accent-red text-white font-semibold rounded-xl hover:bg-red-700 transition-colors"
               >
-                Erstellen
+                {t('common.create')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
                 className="px-6 py-3 glass text-gray-400 hover:text-white font-semibold rounded-xl transition-colors"
               >
-                Abbrechen
+                {t('common.cancel')}
               </button>
             </div>
           </form>
@@ -248,7 +250,7 @@ export function ZonesPage() {
               <button
                 onClick={(e) => handleDeleteZone(e, zone)}
                 className="absolute top-3 right-3 p-2 glass-dark rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-10"
-                title="Zone löschen"
+                title={t('zonesPage.deleteZone')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -262,7 +264,7 @@ export function ZonesPage() {
                   <div className="flex items-center gap-3 text-xs">
                     <span className="text-gray-500">{typeInfo?.label || zone.type}</span>
                     {zone.capacity && (
-                      <span className="text-gray-500">Kapazität: {zone.capacity}</span>
+                      <span className="text-gray-500">{t('zonesPage.capacityLabel', { capacity: zone.capacity })}</span>
                     )}
                   </div>
                 </div>
@@ -275,12 +277,12 @@ export function ZonesPage() {
       {rootZones.length === 0 && !showForm && (
         <div className="text-center py-12">
           <MapPin className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">Noch keine Lagerorte vorhanden</p>
+          <p className="text-gray-400 mb-4">{t('zonesPage.empty')}</p>
           <button
             onClick={() => setShowForm(true)}
             className="text-accent-red hover:text-red-500 font-semibold"
           >
-            Erste Zone erstellen
+            {t('zonesPage.firstZone')}
           </button>
         </div>
       )}

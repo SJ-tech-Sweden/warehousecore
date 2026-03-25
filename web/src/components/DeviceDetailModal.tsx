@@ -1,4 +1,5 @@
 import { X, Package, MapPin, Barcode, Hash, Activity, Wrench, Lightbulb, LightbulbOff, Tag, Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ledApi } from '../lib/api';
 import type { Device } from '../lib/api';
 import { useState, useEffect, useMemo } from 'react';
@@ -12,6 +13,7 @@ interface DeviceDetailModalProps {
 }
 
 export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModalProps) {
+  const { t } = useTranslation();
   const [locating, setLocating] = useState(false);
   const [locateMessage, setLocateMessage] = useState<string | null>(null);
   const [ledActive, setLedActive] = useState(false);
@@ -49,7 +51,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
 
   const handleLocate = async () => {
     if (!device.zone_code) {
-      setLocateMessage('Gerät hat keinen Lagerort');
+      setLocateMessage(t('modals.deviceDetail.noStorageLocation'));
       setTimeout(() => setLocateMessage(null), 3000);
       return;
     }
@@ -60,11 +62,11 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
     try {
       await ledApi.locateBin(device.zone_code);
       setLedActive(true);
-      setLocateMessage(`✓ Fach ${device.zone_code} leuchtet jetzt orange`);
+      setLocateMessage(t('modals.deviceDetail.locateSuccess', { code: device.zone_code }));
       setTimeout(() => setLocateMessage(null), 5000);
     } catch (error: any) {
       console.error('Failed to locate bin:', error);
-      setLocateMessage('Fehler beim Beleuchten des Fachs');
+      setLocateMessage(t('modals.deviceDetail.locateError'));
       setTimeout(() => setLocateMessage(null), 3000);
     } finally {
       setLocating(false);
@@ -78,11 +80,11 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
     try {
       await ledApi.clear();
       setLedActive(false);
-      setLocateMessage('✓ LEDs ausgeschaltet');
+      setLocateMessage(t('modals.deviceDetail.clearSuccess'));
       setTimeout(() => setLocateMessage(null), 3000);
     } catch (error: any) {
       console.error('Failed to clear LEDs:', error);
-      setLocateMessage('Fehler beim Ausschalten');
+      setLocateMessage(t('modals.deviceDetail.clearError'));
       setTimeout(() => setLocateMessage(null), 3000);
     } finally {
       setLocating(false);
@@ -107,11 +109,13 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Package className="w-6 h-6 text-accent-red" />
-            Geräte-Details
+            {t('modals.deviceDetail.title')}
           </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label={t('common.close')}
+            title={t('common.close')}
           >
             <X className="w-5 h-5 text-gray-400" />
           </button>
@@ -122,7 +126,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
           {/* Product Name */}
           <div>
             <h3 className="text-3xl font-bold text-white mb-2">
-              {device.product_name || 'Unbekanntes Gerät'}
+              {device.product_name || t('modals.deviceDetail.unknownDevice')}
             </h3>
             <div className="flex items-center gap-2">
               <span className={`px-3 py-1 rounded-full text-sm font-semibold ${statusColor.bg} ${statusColor.text}`}>
@@ -138,7 +142,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
               <div className="flex items-center gap-3">
                 <Hash className="w-5 h-5 text-gray-400" />
                 <div>
-                  <p className="text-xs text-gray-400">Geräte-ID</p>
+                  <p className="text-xs text-gray-400">{t('devices.deviceId')}</p>
                   <p className="text-white font-mono font-semibold">{device.device_id}</p>
                 </div>
               </div>
@@ -150,7 +154,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <Hash className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">Seriennummer</p>
+                    <p className="text-xs text-gray-400">{t('devices.serialNumber')}</p>
                     <p className="text-white font-mono font-semibold">{device.serial_number}</p>
                   </div>
                 </div>
@@ -163,7 +167,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <Barcode className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">Barcode</p>
+                    <p className="text-xs text-gray-400">{t('devices.barcode')}</p>
                     <p className="text-white font-mono font-semibold">{device.barcode}</p>
                   </div>
                 </div>
@@ -176,7 +180,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <Barcode className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">QR-Code</p>
+                    <p className="text-xs text-gray-400">{t('labels.qrCode')}</p>
                     <p className="text-white font-mono font-semibold">{device.qr_code}</p>
                   </div>
                 </div>
@@ -189,7 +193,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">Lagerort</p>
+                    <p className="text-xs text-gray-400">{t('devices.zone')}</p>
                     <p className="text-white font-semibold">{device.zone_name}</p>
                     {device.zone_code && (
                       <p className="text-xs text-gray-500 font-mono">{device.zone_code}</p>
@@ -205,7 +209,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <Package className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">Case</p>
+                    <p className="text-xs text-gray-400">{t('devices.case')}</p>
                     <p className="text-white font-semibold">{device.case_name}</p>
                   </div>
                 </div>
@@ -218,7 +222,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                 <div className="flex items-center gap-3">
                   <Activity className="w-5 h-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-400">Job</p>
+                    <p className="text-xs text-gray-400">{t('devices.job')}</p>
                     <p className="text-white font-semibold">#{device.job_number}</p>
                   </div>
                 </div>
@@ -230,7 +234,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
               <div className="flex items-center gap-3">
                 <Wrench className="w-5 h-5 text-gray-400" />
                 <div>
-                  <p className="text-xs text-gray-400">Zustand</p>
+                  <p className="text-xs text-gray-400">{t('devices.condition')}</p>
                   <p className="text-white font-semibold">{device.condition_rating}/10</p>
                 </div>
               </div>
@@ -241,7 +245,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
               <div className="flex items-center gap-3">
                 <Activity className="w-5 h-5 text-gray-400" />
                 <div>
-                  <p className="text-xs text-gray-400">Betriebsstunden</p>
+                  <p className="text-xs text-gray-400">{t('devices.usageHours')}</p>
                   <p className="text-white font-semibold">{device.usage_hours}h</p>
                 </div>
               </div>
@@ -263,7 +267,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                   }`}
                 >
                   <Lightbulb className="w-5 h-5" />
-                  <span>{locating ? 'Beleuchte...' : 'Fach beleuchten'}</span>
+                  <span>{locating ? t('modals.deviceDetail.locating') : t('modals.deviceDetail.highlightBin')}</span>
                 </button>
 
                 {/* Clear LEDs Button */}
@@ -278,7 +282,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                     }`}
                   >
                     <LightbulbOff className="w-5 h-5" />
-                    <span>Ausschalten</span>
+                    <span>{t('modals.deviceDetail.turnOff')}</span>
                   </button>
                 )}
               </div>
@@ -302,7 +306,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                   <Tag className="w-5 h-5 text-accent-red" />
-                  Geräte-Label
+                  {t('modals.deviceDetail.deviceLabel')}
                 </h3>
                 <a
                   href={labelUrl}
@@ -310,13 +314,13 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
                   className="px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg hover:shadow-blue-500/50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Herunterladen
+                  {t('modals.caseDetail.download')}
                 </a>
               </div>
               <div className="flex justify-center p-4 bg-black/20 rounded-xl">
                 <img
                   src={labelUrl}
-                  alt={`Label für ${device.device_id}`}
+                  alt={t('modals.deviceDetail.labelAlt', { id: device.device_id })}
                   className="max-w-sm h-auto border border-white/10 rounded shadow-lg"
                 />
               </div>
@@ -330,7 +334,7 @@ export function DeviceDetailModal({ device, isOpen, onClose }: DeviceDetailModal
             onClick={onClose}
             className="px-6 py-2.5 glass hover:bg-white/10 text-white font-semibold rounded-xl transition-all"
           >
-            Schließen
+            {t('common.close')}
           </button>
         </div>
         </div>

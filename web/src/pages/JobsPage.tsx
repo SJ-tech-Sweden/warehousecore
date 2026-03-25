@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Package, CheckCircle, XCircle, Calendar, User, ArrowRight, Lightbulb, LightbulbOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { jobsApi, scansApi, ledApi } from '../lib/api';
 import type { Job, JobSummary, JobDevice, LEDStatus } from '../lib/api';
 
 const JOB_CODE_PATTERN = /^JOB\d+$/i;
 
 export function JobsPage() {
+  const { t } = useTranslation();
   const { id: urlJobId } = useParams<{ id: string }>();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSummary | null>(null);
@@ -152,16 +154,16 @@ export function JobsPage() {
       try {
         const numericPart = parseInt(normalizedCode.replace(/\D/g, ''), 10);
         if (Number.isNaN(numericPart)) {
-          throw new Error('Ungültige Job-ID');
+          throw new Error(t('jobsPage.invalidJobId'));
         }
 
         await loadJobDetails(numericPart, { highlight: true });
-        setScanResult({ success: true, message: `Job ${normalizedCode} geladen` });
+        setScanResult({ success: true, message: t('jobsPage.jobLoaded', { code: normalizedCode }) });
       } catch (error: any) {
         console.error('Job scan failed:', error);
         setScanResult({
           success: false,
-          message: error.response?.data?.error || error.message || 'Job nicht gefunden',
+          message: error.response?.data?.error || error.message || t('jobsPage.jobNotFoundGeneric'),
         });
       } finally {
         setScanCode('');
@@ -175,7 +177,7 @@ export function JobsPage() {
     if (!selectedJob) {
       setScanResult({
         success: false,
-        message: 'Bitte zuerst einen Job auswählen oder scannen.',
+        message: t('jobsPage.selectJobFirst'),
       });
       setScanLoading(false);
       setTimeout(() => setScanResult(null), 3000);
@@ -208,7 +210,7 @@ export function JobsPage() {
       console.error('Scan failed:', error);
       setScanResult({
         success: false,
-        message: error.response?.data?.error || 'Scan fehlgeschlagen',
+        message: error.response?.data?.error || t('scan.scanError'),
       });
     } finally {
       setScanLoading(false);
@@ -250,11 +252,14 @@ export function JobsPage() {
       }
     } catch (error: any) {
       console.error('LED toggle failed:', error);
-      alert(error.response?.data?.error || 'LED-Steuerung fehlgeschlagen');
+      alert(error.response?.data?.error || t('jobsPage.ledToggleError'));
     } finally {
       setLedLoading(false);
     }
   };
+
+  const formatJobStatus = (status: string) => t(`jobs.statuses.${status}`, status);
+  const formatDeviceStatus = (status: string) => t(`devices.statuses.${status}`, status);
 
   const getDeviceStats = (devices: JobDevice[]) => {
     const total = devices.length;
@@ -269,19 +274,19 @@ export function JobsPage() {
       <div className="min-h-screen p-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Offene Jobs</h1>
-            <p className="text-gray-400">Wähle einen Job zum Ausscannen aus dem Lager</p>
+            <h1 className="text-4xl font-bold text-white mb-2">{t('jobsPage.openJobsTitle')}</h1>
+            <p className="text-gray-400">{t('jobsPage.openJobsSubtitle')}</p>
           </div>
 
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-accent-red"></div>
-              <p className="text-gray-400 mt-4">Lade Jobs...</p>
+              <p className="text-gray-400 mt-4">{t('jobsPage.loadingJobs')}</p>
             </div>
           ) : jobs.length === 0 ? (
             <div className="glass-dark rounded-2xl p-12 text-center">
               <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400 text-lg">Keine offenen Jobs vorhanden</p>
+              <p className="text-gray-400 text-lg">{t('jobsPage.noOpenJobs')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -296,12 +301,12 @@ export function JobsPage() {
                       <Package className="w-6 h-6 text-white" />
                     </div>
                     <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm font-semibold">
-                      {job.status}
+                      {formatJobStatus(job.status)}
                     </span>
                   </div>
 
                   <h3 className="text-xl font-bold text-white mb-2">
-                    Job {job.job_code}
+                    {t('jobsPage.jobTitle', { code: job.job_code })}
                   </h3>
 
                   {job.description && (
@@ -325,12 +330,12 @@ export function JobsPage() {
 
                     <div className="flex items-center gap-2 text-accent-red font-semibold">
                       <Package className="w-4 h-4" />
-                      <span>{job.device_count} Geräte</span>
+                      <span>{t('jobsPage.deviceCount', { count: job.device_count })}</span>
                     </div>
                   </div>
 
                   <div className="mt-4 flex items-center gap-2 text-accent-red group-hover:gap-3 transition-all">
-                    <span className="font-semibold">Auswählen</span>
+                    <span className="font-semibold">{t('jobsPage.select')}</span>
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </button>
@@ -356,19 +361,19 @@ export function JobsPage() {
             className="text-gray-400 hover:text-white mb-4 flex items-center gap-2"
           >
             <ArrowRight className="w-4 h-4 rotate-180" />
-            Zurück zur Job-Liste
+            {t('jobsPage.backToList')}
           </button>
 
           <div className="glass-dark rounded-2xl p-6 border-2 border-white/10">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-white mb-2">Job {selectedJob.job_code}</h1>
+                <h1 className="text-3xl font-bold text-white mb-2">{t('jobsPage.jobTitle', { code: selectedJob.job_code })}</h1>
                 {selectedJob.description && (
                   <p className="text-gray-400">{selectedJob.description}</p>
                 )}
               </div>
               <span className="px-4 py-2 rounded-full bg-green-500/20 text-green-400 font-semibold">
-                {selectedJob.status}
+                {formatJobStatus(selectedJob.status)}
               </span>
             </div>
 
@@ -377,7 +382,7 @@ export function JobsPage() {
                 <div className="flex items-center gap-3">
                   <User className="w-5 h-5 text-gray-500" />
                   <div>
-                    <p className="text-xs text-gray-500">Kunde</p>
+                    <p className="text-xs text-gray-500">{t('jobs.customer')}</p>
                     <p className="text-white font-semibold">
                       {selectedJob.customer_first_name} {selectedJob.customer_last_name}
                     </p>
@@ -389,7 +394,7 @@ export function JobsPage() {
                 <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-gray-500" />
                   <div>
-                    <p className="text-xs text-gray-500">Datum</p>
+                    <p className="text-xs text-gray-500">{t('jobsPage.date')}</p>
                     <p className="text-white font-semibold">
                       {new Date(selectedJob.start_date).toLocaleDateString('de-DE')}
                     </p>
@@ -400,9 +405,9 @@ export function JobsPage() {
               <div className="flex items-center gap-3">
                 <Package className="w-5 h-5 text-gray-500" />
                 <div>
-                  <p className="text-xs text-gray-500">Fortschritt</p>
+                  <p className="text-xs text-gray-500">{t('jobsPage.progress')}</p>
                   <p className="text-white font-semibold">
-                    {stats.scanned} / {stats.total} Geräte
+                    {t('jobsPage.progressValue', { scanned: stats.scanned, total: stats.total })}
                   </p>
                 </div>
               </div>
@@ -416,8 +421,8 @@ export function JobsPage() {
               />
             </div>
             <div className="flex justify-between mt-2 text-sm">
-              <span className="text-gray-400">{progress.toFixed(0)}% ausgescannt</span>
-              <span className="text-gray-400">{stats.remaining} verbleibend</span>
+              <span className="text-gray-400">{t('jobsPage.scannedPercent', { percent: progress.toFixed(0) })}</span>
+              <span className="text-gray-400">{t('jobsPage.remaining', { count: stats.remaining })}</span>
             </div>
           </div>
         </div>
@@ -426,7 +431,7 @@ export function JobsPage() {
           {/* Scan Interface */}
           <div className="glass-dark rounded-2xl p-6 border-2 border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white">Gerät Ausscannen</h2>
+              <h2 className="text-2xl font-bold text-white">{t('jobsPage.outtakeDevice')}</h2>
             </div>
 
             {/* LED Highlight Toggle */}
@@ -443,13 +448,13 @@ export function JobsPage() {
                 {ledActive ? (
                   <>
                     <Lightbulb className="w-5 h-5" />
-                    <span>Fächer hervorgehoben</span>
+                    <span>{t('jobsPage.ledHighlighted')}</span>
                     <LightbulbOff className="w-5 h-5 ml-auto" />
                   </>
                 ) : (
                   <>
                     <LightbulbOff className="w-5 h-5" />
-                    <span>Fächer hervorheben</span>
+                    <span>{t('jobsPage.highlightBins')}</span>
                     <Lightbulb className="w-5 h-5 ml-auto" />
                   </>
                 )}
@@ -460,11 +465,11 @@ export function JobsPage() {
                 <div className="mt-2 flex items-center justify-between text-xs">
                   <span className={`flex items-center gap-1 ${ledStatus.mqtt_connected ? 'text-green-400' : 'text-gray-500'}`}>
                     <span className={`w-2 h-2 rounded-full ${ledStatus.mqtt_connected ? 'bg-green-400' : 'bg-gray-500'}`}></span>
-                    {ledStatus.mqtt_connected ? 'MQTT verbunden' : ledStatus.mqtt_dry_run ? 'Dry-Run Modus' : 'MQTT nicht konfiguriert'}
+                    {ledStatus.mqtt_connected ? t('jobsPage.mqttConnected') : ledStatus.mqtt_dry_run ? t('jobsPage.dryRunMode') : t('jobsPage.mqttNotConfigured')}
                   </span>
                   {ledStatus.mapping_loaded && (
                     <span className="text-gray-400">
-                      {ledStatus.total_bins} Fächer verfügbar
+                      {t('jobsPage.binsAvailable', { count: ledStatus.total_bins })}
                     </span>
                   )}
                 </div>
@@ -476,7 +481,7 @@ export function JobsPage() {
                 type="text"
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
-                placeholder="Barcode / QR-Code scannen"
+                placeholder={t('jobsPage.scanPlaceholder')}
                 autoFocus
                 className="w-full px-6 py-4 bg-white/10 backdrop-blur-md border-2 border-white/20 rounded-xl text-white text-xl placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
               />
@@ -486,7 +491,7 @@ export function JobsPage() {
                 disabled={scanLoading || !scanCode.trim()}
                 className="w-full py-4 bg-gradient-to-r from-accent-red to-red-700 text-white font-bold text-lg rounded-xl hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
               >
-                {scanLoading ? 'Scanne...' : 'Gerät Ausscannen'}
+                {scanLoading ? t('jobsPage.scanning') : t('jobsPage.outtakeDevice')}
               </button>
             </form>
 
@@ -517,10 +522,10 @@ export function JobsPage() {
 
           {/* Device List */}
           <div className="glass-dark rounded-2xl p-6 border-2 border-white/10 max-h-[600px] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-white mb-4">Geräte-Liste</h2>
+            <h2 className="text-2xl font-bold text-white mb-4">{t('jobsPage.deviceList')}</h2>
 
             {selectedJob.devices.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">Keine Geräte in diesem Job</p>
+              <p className="text-gray-400 text-center py-8">{t('jobsPage.noDevicesInJob')}</p>
             ) : (
               <div className="space-y-2">
                 {selectedJob.devices.map((device) => (
@@ -535,9 +540,9 @@ export function JobsPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <p className="font-semibold text-white">{device.product_name}</p>
-                        <p className="text-sm text-gray-400">ID: {device.device_id}</p>
+                        <p className="text-sm text-gray-400">{t('jobsPage.deviceId', { id: device.device_id })}</p>
                         {device.zone_name && (
-                          <p className="text-sm text-gray-500">Lager: {device.zone_name}</p>
+                          <p className="text-sm text-gray-500">{t('jobsPage.zone', { zone: device.zone_name })}</p>
                         )}
                       </div>
 
@@ -552,7 +557,7 @@ export function JobsPage() {
                                 : 'bg-gray-500/20 text-gray-400'
                             }`}
                           >
-                            {device.status}
+                            {formatDeviceStatus(device.status)}
                           </span>
                         </div>
 

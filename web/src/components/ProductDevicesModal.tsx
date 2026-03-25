@@ -1,4 +1,5 @@
 import { Package, MapPin, Lightbulb } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Device } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 import { ModalPortal } from './ModalPortal';
@@ -25,6 +26,7 @@ export function ProductDevicesModal({
   onOpenDevice,
   loading = false,
 }: ProductDevicesModalProps) {
+  const { t } = useTranslation();
   // Block body scroll when modal is open
   useBlockBodyScroll(isOpen);
 
@@ -41,20 +43,22 @@ export function ProductDevicesModal({
               {productName}
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              {devices.length} Gerät{devices.length === 1 ? '' : 'e'}
+              {t('modals.caseDetail.deviceCount', { count: devices.length })}
             </p>
           </div>
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+            aria-label={t('common.close')}
+            title={t('common.close')}
           >
-            Schließen
+            {t('common.close')}
           </button>
         </div>
         <div className="overflow-y-auto">
           {devices.length === 0 ? (
             <div className="p-6 text-center text-gray-400 text-sm">
-              Keine Geräte in diesem Produkt.
+              {t('modals.productDevices.empty')}
             </div>
           ) : (
             <div className="p-6 space-y-3">
@@ -91,19 +95,19 @@ export function ProductDevicesModal({
                         <span className="text-gray-400">📦 {device.case_name}</span>
                       )}
                       {device.job_number && (
-                        <span className="text-gray-400">🔧 Job #{device.job_number}</span>
+                        <span className="text-gray-400">🔧 {t('devices.job')} #{device.job_number}</span>
                       )}
                       {device.serial_number && (
-                        <span className="text-gray-500">SN: {device.serial_number}</span>
+                        <span className="text-gray-500">{t('modals.productDevices.sn', { value: device.serial_number })}</span>
                       )}
                       {device.barcode && (
-                        <span className="text-gray-500">Barcode: {device.barcode}</span>
+                        <span className="text-gray-500">{t('modals.productDevices.barcode', { value: device.barcode })}</span>
                       )}
                       {device.condition_rating !== undefined && device.condition_rating > 0 && (
-                        <span className="text-gray-400">Zustand: {device.condition_rating}/10</span>
+                        <span className="text-gray-400">{t('modals.productDevices.condition', { value: device.condition_rating })}</span>
                       )}
                       {device.usage_hours !== undefined && device.usage_hours > 0 && (
-                        <span className="text-gray-400">{device.usage_hours}h Betrieb</span>
+                        <span className="text-gray-400">{t('modals.productDevices.usageHours', { value: device.usage_hours })}</span>
                       )}
                     </div>
                   </div>
@@ -116,7 +120,7 @@ export function ProductDevicesModal({
                       disabled={loading}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
                     >
-                      <Lightbulb className="w-4 h-4 text-yellow-300" /> Fach aufleuchten
+                      <Lightbulb className="w-4 h-4 text-yellow-300" /> {t('modals.deviceDetail.highlightBin')}
                     </button>
                     <button
                       onClick={(e) => {
@@ -126,7 +130,7 @@ export function ProductDevicesModal({
                       disabled={loading}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white disabled:opacity-50"
                     >
-                      <MapPin className="w-4 h-4" /> Zone öffnen
+                      <MapPin className="w-4 h-4" /> {t('modals.productDevices.openZone')}
                     </button>
                   </div>
                 </div>

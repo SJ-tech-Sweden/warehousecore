@@ -25,7 +25,9 @@ WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum* ./
-RUN go mod download
+# Ensure module checksums are populated inside the builder (creates go.sum if missing)
+RUN go mod download || true
+RUN go mod tidy || true
 
 # Copy source code
 COPY . .

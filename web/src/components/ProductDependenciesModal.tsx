@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Package, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
 import { ModalPortal } from './ModalPortal';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export function ProductDependenciesModal({ productId, productName, onClose }: Props) {
+  const { t } = useTranslation();
   const [dependencies, setDependencies] = useState<ProductDependency[]>([]);
   const [availableProducts, setAvailableProducts] = useState<AvailableProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,19 +101,19 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
       setSearchTerm('');
     } catch (err) {
       console.error('Failed to add dependency:', err);
-      alert('Failed to add dependency');
+      alert(t('modals.productDependencies.addFailed'));
     }
   };
 
   const handleDeleteDependency = async (depId: number) => {
-    if (!confirm('Remove this dependency?')) return;
+    if (!confirm(t('modals.productDependencies.confirmRemove'))) return;
 
     try {
       await api.delete(`/admin/products/${productId}/dependencies/${depId}`);
       setDependencies(dependencies.filter(d => d.id !== depId));
     } catch (err) {
       console.error('Failed to delete dependency:', err);
-      alert('Failed to delete dependency');
+      alert(t('modals.productDependencies.deleteFailed'));
     }
   };
 
@@ -130,7 +132,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div>
-            <h2 className="text-xl font-bold text-white">Product Dependencies</h2>
+            <h2 className="text-xl font-bold text-white">{t('modals.productDependencies.title')}</h2>
             <p className="text-sm text-gray-400 mt-1">{productName}</p>
           </div>
           <button
@@ -144,7 +146,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
-            <p className="text-center text-gray-400">Loading...</p>
+            <p className="text-center text-gray-400">{t('common.loading')}</p>
           ) : (
             <>
               {/* Add Button */}
@@ -154,19 +156,19 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                   className="w-full mb-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Dependency
+                  {t('modals.productDependencies.addDependency')}
                 </button>
               )}
 
               {/* Add Form */}
               {showAddForm && (
                 <div className="bg-white/5 rounded-lg p-4 mb-4 border border-blue-500/30">
-                  <h3 className="text-sm font-semibold text-white mb-3">Add New Dependency</h3>
+                  <h3 className="text-sm font-semibold text-white mb-3">{t('modals.productDependencies.addNew')}</h3>
 
                   {/* Search */}
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder={t('modals.productDependencies.searchPlaceholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full mb-3 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 text-sm"
@@ -178,7 +180,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                     onChange={(e) => setSelectedProductId(Number(e.target.value))}
                     className="w-full mb-3 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
                   >
-                    <option value="">Select product...</option>
+                    <option value="">{t('modals.productDependencies.selectProduct')}</option>
                     {availableToAdd.map((p) => (
                       <option key={p.product_id} value={p.product_id}>
                         {p.name} ({p.generic_barcode || `ID: ${p.product_id}`}) - Stock: {p.stock_quantity?.toFixed(1) || 0} {p.count_type_abbr || ''}
@@ -188,7 +190,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
 
                   {/* Quantity */}
                   <div className="mb-3">
-                    <label className="block text-xs text-gray-400 mb-1">Default Quantity</label>
+                    <label className="block text-xs text-gray-400 mb-1">{t('modals.productDependencies.defaultQuantity')}</label>
                     <input
                       type="number"
                       min="0.1"
@@ -209,19 +211,19 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                       className="rounded"
                     />
                     <label htmlFor="is-optional" className="text-sm text-gray-300">
-                      Optional (show as suggestion)
+                      {t('modals.productDependencies.optional')}
                     </label>
                   </div>
 
                   {/* Notes */}
                   <div className="mb-3">
-                    <label className="block text-xs text-gray-400 mb-1">Notes (optional)</label>
+                    <label className="block text-xs text-gray-400 mb-1">{t('modals.productDependencies.notes')}</label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
                       className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm resize-none"
-                      placeholder="Why is this dependency needed?"
+                      placeholder={t('modals.productDependencies.notesPlaceholder')}
                     />
                   </div>
 
@@ -232,7 +234,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                       disabled={!selectedProductId}
                       className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
                     >
-                      Add
+                      {t('common.add')}
                     </button>
                     <button
                       onClick={() => {
@@ -243,7 +245,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                       }}
                       className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm transition-colors"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -253,8 +255,8 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
               {dependencies.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No dependencies configured</p>
-                  <p className="text-xs mt-1">Add accessories or consumables that are commonly needed with this product</p>
+                  <p>{t('modals.productDependencies.emptyTitle')}</p>
+                  <p className="text-xs mt-1">{t('modals.productDependencies.emptySubtitle')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -274,30 +276,30 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
                                 ? 'bg-blue-500/20 text-blue-300'
                                 : 'bg-purple-500/20 text-purple-300'
                             }`}>
-                              {dep.is_accessory ? 'Accessory' : 'Consumable'}
+                              {dep.is_accessory ? t('widgets.lowStock.accessory') : t('widgets.lowStock.consumable')}
                             </span>
                             {dep.is_optional && (
                               <span className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-300">
-                                Optional
+                                {t('modals.productDependencies.optionalBadge')}
                               </span>
                             )}
                           </div>
 
                           {dep.generic_barcode && (
                             <p className="text-xs text-gray-400 mb-1">
-                              Barcode: {dep.generic_barcode}
+                              {t('widgets.lowStock.barcode')} {dep.generic_barcode}
                             </p>
                           )}
 
                           <div className="flex items-center gap-3 text-xs text-gray-400">
                             <span>
-                              Default: {dep.default_quantity} {dep.count_type_abbr || 'pcs'}
+                              {t('modals.productDependencies.default')} {dep.default_quantity} {dep.count_type_abbr || 'pcs'}
                             </span>
                             {dep.stock_quantity !== undefined && (
                               <>
                                 <span className="text-gray-600">•</span>
                                 <span>
-                                  Stock: {dep.stock_quantity.toFixed(1)} {dep.count_type_abbr || ''}
+                                  {t('modals.productDependencies.stock')} {dep.stock_quantity.toFixed(1)} {dep.count_type_abbr || ''}
                                 </span>
                               </>
                             )}
@@ -332,7 +334,7 @@ export function ProductDependenciesModal({ productId, productName, onClose }: Pr
             onClick={onClose}
             className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
         </div>

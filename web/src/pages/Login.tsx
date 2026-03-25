@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
 
 export function Login() {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +24,7 @@ export function Login() {
       await login(username, password);
       navigate('/'); // Redirect to dashboard after login
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(err instanceof Error ? err.message : t('auth.loginError'));
     } finally {
       setLoading(false);
     }
@@ -44,7 +46,7 @@ export function Login() {
         <div className="glass-dark p-8 rounded-xl border border-white/10">
           <div className="flex items-center gap-3 mb-6">
             <LogIn className="w-6 h-6 text-accent-red" />
-            <h2 className="text-2xl font-bold text-white">Anmelden</h2>
+            <h2 className="text-2xl font-bold text-white">{t('auth.login')}</h2>
           </div>
 
           {error && (
@@ -56,7 +58,7 @@ export function Login() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-2">
-                Benutzername
+                {t('auth.username')}
               </label>
               <input
                 id="username"
@@ -66,14 +68,14 @@ export function Login() {
                 required
                 disabled={loading}
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent disabled:opacity-50"
-                placeholder="admin"
+                placeholder={t('login.usernamePlaceholder')}
                 autoComplete="username"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                Passwort
+                {t('auth.password')}
               </label>
               <input
                 id="password"
@@ -83,7 +85,7 @@ export function Login() {
                 required
                 disabled={loading}
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent disabled:opacity-50"
-                placeholder="••••••••"
+                placeholder={t('login.passwordPlaceholder')}
                 autoComplete="current-password"
               />
             </div>
@@ -96,12 +98,12 @@ export function Login() {
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  Anmelden...
+                  {t('login.signing_in')}
                 </>
               ) : (
                 <>
                   <LogIn className="w-5 h-5" />
-                  Anmelden
+                  {t('auth.login')}
                 </>
               )}
             </button>
@@ -109,7 +111,7 @@ export function Login() {
 
           <div className="mt-6 pt-6 border-t border-white/10">
             <p className="text-sm text-gray-400 text-center">
-              Verwenden Sie Ihre RentalCore-Zugangsdaten
+              {t('login.credentialsHint')}
             </p>
           </div>
         </div>

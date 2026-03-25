@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Eye,
   GitBranch,
@@ -163,6 +164,7 @@ function useDebouncedValue<T>(value: T, delay: number) {
 }
 
 export function ProductsTab() {
+  const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -400,7 +402,7 @@ export function ProductsTab() {
       await loadProductDevices(productId);
     } catch (error) {
       console.error('Failed to load product details:', error);
-      window.alert('Produkt konnte nicht geladen werden.');
+      window.alert(t('admin.products.errors.loadProduct'));
     }
   };
 
@@ -409,7 +411,7 @@ export function ProductsTab() {
 
     const quantity = formData.device_quantity;
     if (!quantity || quantity <= 0) {
-      window.alert('Bitte eine gültige Anzahl eingeben.');
+      window.alert(t('admin.products.errors.invalidDeviceCount'));
       return;
     }
 
@@ -427,7 +429,7 @@ export function ProductsTab() {
       setFormData({ ...formData, device_quantity: undefined, device_prefix: '' });
     } catch (error) {
       console.error('Failed to add devices:', error);
-      window.alert('Fehler beim Hinzufügen der Geräte.');
+      window.alert(t('admin.products.errors.addDevices'));
     }
   };
 
@@ -444,7 +446,7 @@ export function ProductsTab() {
   };
 
   const handleDelete = async (productId: number, name: string) => {
-    if (!window.confirm(`Produkt "${name}" wirklich löschen?`)) {
+    if (!window.confirm(t('admin.products.confirmDelete', { name }))) {
       return;
     }
 
@@ -453,7 +455,7 @@ export function ProductsTab() {
       await fetchProducts(searchTerm, categoryFilter);
     } catch (error) {
       console.error('Failed to delete product:', error);
-      window.alert('Fehler beim Löschen des Produkts.');
+      window.alert(t('admin.products.errors.delete'));
     }
   };
 
@@ -461,7 +463,7 @@ export function ProductsTab() {
     event.preventDefault();
 
     if (!formData.name.trim()) {
-      window.alert('Der Produktname ist erforderlich.');
+      window.alert(t('admin.products.errors.nameRequired'));
       return;
     }
 
@@ -508,7 +510,7 @@ export function ProductsTab() {
             await Promise.all(deletePromises);
           } catch (deviceError) {
             console.error('Failed to delete some devices:', deviceError);
-            window.alert('Produkt gespeichert, aber einige Geräte konnten nicht gelöscht werden.');
+            window.alert(t('admin.products.errors.partialDeviceDelete'));
           }
         }
       } else {
@@ -524,7 +526,7 @@ export function ProductsTab() {
             });
           } catch (deviceError) {
             console.error('Failed to create devices:', deviceError);
-            window.alert('Produkt erstellt, aber Geräte konnten nicht angelegt werden.');
+            window.alert(t('admin.products.errors.deviceCreate'));
           }
         }
       }
@@ -533,7 +535,7 @@ export function ProductsTab() {
       closeModal();
     } catch (error) {
       console.error('Failed to save product:', error);
-      window.alert('Fehler beim Speichern des Produkts.');
+      window.alert(t('admin.products.errors.save'));
     } finally {
       setSubmitting(false);
     }
@@ -545,7 +547,7 @@ export function ProductsTab() {
       setViewProduct(data);
     } catch (error) {
       console.error('Failed to load product details:', error);
-      window.alert('Produkt konnte nicht geladen werden.');
+      window.alert(t('admin.products.errors.loadProduct'));
     }
   };
 
@@ -560,10 +562,10 @@ export function ProductsTab() {
   const categoryPath = (product: Product) =>
     [product.category_name, product.subcategory_name, product.subbiercategory_name]
       .filter(Boolean)
-      .join(' · ') || 'Keiner Kategorie zugeordnet';
+      .join(' · ') || t('admin.products.noCategoryAssigned');
 
   const formatCurrency = (value?: number | null) =>
-    value != null ? `${value.toFixed(2)} €` : '—';
+    value != null ? `${value.toFixed(2)} €` : t('admin.products.dash');
 
   const averageDailyPrice =
     sortedProducts.length === 0
@@ -575,10 +577,10 @@ export function ProductsTab() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Produkte verwalten</h2>
+          <h2 className="text-xl font-bold text-white">{t('admin.products.title')}</h2>
           <p className="text-sm text-gray-400">
-            {sortedProducts.length} Produkte geladen
-            {hasActiveFilters ? ' • Filter aktiv' : ''}
+            {t('admin.products.loadedCount', { count: sortedProducts.length })}
+            {hasActiveFilters ? ` • ${t('admin.products.filtersActive')}` : ''}
           </p>
         </div>
 
@@ -589,8 +591,9 @@ export function ProductsTab() {
               <input
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Suchen (Name, Beschreibung …)"
+                placeholder={t('admin.products.searchPlaceholder')}
                 className="w-full rounded-lg bg-white/10 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 outline-none transition focus:bg-white/15 focus:ring-1 focus:ring-accent-red"
+                title={t('common.search')}
               />
             </div>
 
@@ -598,8 +601,9 @@ export function ProductsTab() {
               value={categoryFilter}
               onChange={event => handleCategoryFilterChange(event.target.value)}
               className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:bg-white/15 focus:ring-1 focus:ring-accent-red"
+              title={t('products.category')}
             >
-              <option value="">Alle Kategorien</option>
+              <option value="">{t('admin.products.allCategories')}</option>
               {categories.map(category => (
                 <option key={category.category_id} value={category.category_id}>
                   {category.name}
@@ -613,7 +617,7 @@ export function ProductsTab() {
                 onClick={clearFilters}
                 className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 whitespace-nowrap"
               >
-                Filter zurücksetzen
+                {t('admin.products.resetFilters')}
               </button>
             )}
           </div>
@@ -628,7 +632,7 @@ export function ProductsTab() {
                 }`}
             >
               <List className="h-4 w-4" />
-              <span className="hidden sm:inline">Tabelle</span>
+              <span className="hidden sm:inline">{t('admin.devices.tableView')}</span>
             </button>
             <button
               type="button"
@@ -639,7 +643,7 @@ export function ProductsTab() {
                 }`}
             >
               <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Karten</span>
+              <span className="hidden sm:inline">{t('admin.devices.cardView')}</span>
             </button>
             <button
               type="button"
@@ -650,7 +654,7 @@ export function ProductsTab() {
                 }`}
             >
               <GitBranch className="h-4 w-4" />
-              <span className="hidden sm:inline">Gerätebaum</span>
+              <span className="hidden sm:inline">{t('admin.products.deviceTree')}</span>
             </button>
             <button
               type="button"
@@ -659,15 +663,15 @@ export function ProductsTab() {
               className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
             >
               <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Aktualisieren</span>
+              <span className="hidden sm:inline">{t('common.update')}</span>
             </button>
             <button
               onClick={handleOpenCreateModal}
               className="flex items-center gap-2 rounded-xl bg-accent-red px-4 py-2 font-semibold text-white hover:shadow-lg"
             >
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Neues Produkt</span>
-              <span className="sm:hidden">Neu</span>
+              <span className="hidden sm:inline">{t('admin.devices.newDevice')}</span>
+              <span className="sm:hidden">{t('common.create')}</span>
             </button>
           </div>
         </div>
@@ -676,17 +680,17 @@ export function ProductsTab() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300 backdrop-blur">
         <div className="flex flex-wrap items-center gap-6">
           <span>
-            <strong className="text-white">{sortedProducts.length}</strong> Produkte
+            <strong className="text-white">{sortedProducts.length}</strong> {t('products.title')}
           </span>
           <span>
-            Durchschnittlicher Tagespreis:{' '}
+            {t('admin.products.avgDailyPrice')}:{' '}
             <strong className="text-white">
-              {averageDailyPrice != null ? `${averageDailyPrice.toFixed(2)} €` : '—'}
+              {averageDailyPrice != null ? `${averageDailyPrice.toFixed(2)} €` : t('admin.products.dash')}
             </strong>
           </span>
           {categoryFilter !== '' && (
             <span>
-              Gefiltert nach Kategorie:{' '}
+              {t('admin.products.filteredByCategory')}:{' '}
               <strong className="text-white">
                 {
                   categories.find(category => category.category_id === categoryFilter)
@@ -697,7 +701,7 @@ export function ProductsTab() {
           )}
           {debouncedSearch.trim() && (
             <span>
-              Suchbegriff: <strong className="text-white">"{debouncedSearch}"</strong>
+              {t('admin.products.searchTerm')}: <strong className="text-white">"{debouncedSearch}"</strong>
             </span>
           )}
         </div>
@@ -705,13 +709,13 @@ export function ProductsTab() {
 
       {loadingProducts ? (
         <div className="glass rounded-xl p-8 text-center text-gray-400">
-          Lade Produkte …
+          {t('admin.products.loading')}
         </div>
       ) : sortedProducts.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-gray-400">
           <Package className="mx-auto mb-4 h-12 w-12 text-gray-600" />
-          Keine Produkte gefunden
-          {hasActiveFilters ? ' – bitte Filter anpassen.' : '.'}
+          {t('admin.products.empty')}
+          {hasActiveFilters ? ` ${t('admin.products.adjustFilters')}` : '.'}
         </div>
       ) : viewMode === 'table' ? (
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -719,11 +723,11 @@ export function ProductsTab() {
             <table className="min-w-full divide-y divide-white/10 text-sm text-gray-200">
               <thead className="bg-white/5 text-xs uppercase tracking-wide text-gray-400">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold">Produkt</th>
-                  <th className="px-4 py-3 text-left font-semibold">Kategorie</th>
-                  <th className="px-4 py-3 text-left font-semibold">Brand / Hersteller</th>
-                  <th className="px-4 py-3 text-left font-semibold">Preis pro Tag</th>
-                  <th className="px-4 py-3 text-right font-semibold">Aktionen</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('products.title')}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('products.category')}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('admin.products.brandManufacturer')}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('admin.products.pricePerDay')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('labels.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -733,9 +737,9 @@ export function ProductsTab() {
                       <div className="flex flex-col">
                         <span className="text-white font-medium">{product.name}</span>
                         <span className="text-xs text-gray-500">
-                          ID: {product.product_id}
+                          {t('admin.ledControllers.id')}: {product.product_id}
                           {product.pos_in_category != null
-                            ? ` • Position ${product.pos_in_category}`
+                            ? ` • ${t('admin.products.position')} ${product.pos_in_category}`
                             : ''}
                         </span>
                         {product.description && (
@@ -750,9 +754,9 @@ export function ProductsTab() {
                     </td>
                     <td className="px-4 py-3 align-top text-sm text-gray-300">
                       <div className="flex flex-col">
-                        <span>{product.brand_name || '—'}</span>
+                        <span>{product.brand_name || t('admin.products.dash')}</span>
                         <span className="text-xs text-gray-500">
-                          {product.manufacturer_name || 'Kein Hersteller hinterlegt'}
+                          {product.manufacturer_name || t('admin.products.noManufacturer')}
                         </span>
                       </div>
                     </td>
@@ -764,28 +768,28 @@ export function ProductsTab() {
                         <button
                           onClick={() => handleViewProduct(product.product_id)}
                           className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                          title="Details anzeigen"
+                          title={t('casesPage.details')}
                         >
                           <Eye className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleEditProduct(product.product_id)}
                           className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                          title="Bearbeiten"
+                          title={t('common.edit')}
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
                           className="rounded-lg bg-purple-600/80 p-2 text-white transition hover:bg-purple-600"
-                          title="Dependencies verwalten"
+                          title={t('admin.products.manageDependencies')}
                         >
                           <GitBranch className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(product.product_id, product.name)}
                           className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
-                          title="Löschen"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -812,7 +816,7 @@ export function ProductsTab() {
                   <p className="text-sm text-gray-400 break-words">{categoryPath(product)}</p>
                   {(product.brand_name || product.manufacturer_name) && (
                     <p className="text-xs text-gray-500 break-words">
-                      {product.brand_name || 'Unbekannte Marke'}
+                      {product.brand_name || t('admin.products.unknownBrand')}
                       {product.manufacturer_name ? ` • ${product.manufacturer_name}` : ''}
                     </p>
                   )}
@@ -824,28 +828,28 @@ export function ProductsTab() {
                   <button
                     onClick={() => handleViewProduct(product.product_id)}
                     className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                    title="Details anzeigen"
+                    title={t('casesPage.details')}
                   >
                     <Eye className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleEditProduct(product.product_id)}
                     className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                    title="Bearbeiten"
+                    title={t('common.edit')}
                   >
                     <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
                     className="rounded-lg bg-purple-600/80 p-2 text-white transition hover:bg-purple-600"
-                    title="Dependencies verwalten"
+                    title={t('admin.products.manageDependencies')}
                   >
                     <GitBranch className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(product.product_id, product.name)}
                     className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
-                    title="Löschen"
+                    title={t('common.delete')}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -866,11 +870,13 @@ export function ProductsTab() {
             <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-white">
-                  {editingProduct ? 'Produkt bearbeiten' : 'Neues Produkt'}
+                  {editingProduct ? t('admin.products.editProduct') : t('admin.products.newProduct')}
                 </h3>
                 <button
                   onClick={closeModal}
                   className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title={t('common.close')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -879,30 +885,34 @@ export function ProductsTab() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">
-                    Name <span className="text-accent-red">*</span>
+                    {t('common.name')} <span className="text-accent-red">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={event => setFormData({ ...formData, name: event.target.value })}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    placeholder={t('common.name')}
+                    title={t('common.name')}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">Beschreibung</label>
+                  <label className="mb-2 block text-sm font-semibold text-white">{t('common.description')}</label>
                   <textarea
                     value={formData.description}
                     onChange={event => setFormData({ ...formData, description: event.target.value })}
                     rows={3}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    placeholder={t('common.description')}
+                    title={t('common.description')}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">Kategorie</label>
+                    <label className="mb-2 block text-sm font-semibold text-white">{t('products.category')}</label>
                     <select
                       value={formData.category_id ?? ''}
                       onChange={event => {
@@ -915,8 +925,9 @@ export function ProductsTab() {
                         });
                       }}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      title={t('products.category')}
                     >
-                      <option value="">Keine</option>
+                      <option value="">{t('admin.products.none')}</option>
                       {categories.map(category => (
                         <option key={category.category_id} value={category.category_id}>
                           {category.name}
@@ -926,7 +937,7 @@ export function ProductsTab() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">Unterkategorie</label>
+                    <label className="mb-2 block text-sm font-semibold text-white">{t('admin.categories.levels.subcategories')}</label>
                     <select
                       value={formData.subcategory_id ?? ''}
                       onChange={event => {
@@ -939,8 +950,9 @@ export function ProductsTab() {
                       }}
                       disabled={!formData.category_id}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red disabled:opacity-50"
+                      title={t('admin.categories.levels.subcategories')}
                     >
-                      <option value="">Keine</option>
+                      <option value="">{t('admin.products.none')}</option>
                       {filteredSubcategories.map(sub => (
                         <option key={sub.subcategory_id} value={sub.subcategory_id}>
                           {sub.name}
@@ -951,7 +963,7 @@ export function ProductsTab() {
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Sub-Unterkategorie
+                      {t('admin.categories.levels.subSubcategories')}
                     </label>
                     <select
                       value={formData.subbiercategory_id ?? ''}
@@ -964,8 +976,9 @@ export function ProductsTab() {
                       }}
                       disabled={!formData.subcategory_id}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red disabled:opacity-50"
+                      title={t('admin.categories.levels.subSubcategories')}
                     >
-                      <option value="">Keine</option>
+                      <option value="">{t('admin.products.none')}</option>
                       {filteredSubbiercategories.map(subbier => (
                         <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
                           {subbier.name}
@@ -977,7 +990,7 @@ export function ProductsTab() {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">Brand</label>
+                    <label className="mb-2 block text-sm font-semibold text-white">{t('products.brand')}</label>
                     <select
                       value={formData.brand_id ?? ''}
                       onChange={event => {
@@ -996,8 +1009,9 @@ export function ProductsTab() {
                         });
                       }}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      title={t('products.brand')}
                     >
-                      <option value="">Keine</option>
+                      <option value="">{t('admin.products.none')}</option>
                       {brandsByName.map(brand => (
                         <option key={brand.brand_id} value={brand.brand_id}>
                           {brand.name}
@@ -1008,7 +1022,7 @@ export function ProductsTab() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">Manufacturer</label>
+                    <label className="mb-2 block text-sm font-semibold text-white">{t('products.manufacturer')}</label>
                     <select
                       value={formData.manufacturer_id ?? ''}
                       onChange={event => {
@@ -1019,8 +1033,9 @@ export function ProductsTab() {
                         });
                       }}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      title={t('products.manufacturer')}
                     >
-                      <option value="">Keine</option>
+                      <option value="">{t('admin.products.none')}</option>
                       {manufacturerOptions.map(manufacturer => (
                         <option key={manufacturer.manufacturer_id} value={manufacturer.manufacturer_id}>
                           {manufacturer.name}
@@ -1033,7 +1048,7 @@ export function ProductsTab() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Preis pro Tag (€)
+                      {t('admin.products.pricePerDay')} (€)
                     </label>
                     <input
                       type="number"
@@ -1047,11 +1062,12 @@ export function ProductsTab() {
                         })
                       }
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                      title={t('admin.products.pricePerDay')}
                     />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Position in Kategorie
+                      {t('admin.products.positionInCategory')}
                     </label>
                     <input
                       type="number"
@@ -1063,18 +1079,19 @@ export function ProductsTab() {
                         })
                       }
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                      title={t('admin.products.positionInCategory')}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-white/10 p-4">
-                  <h3 className="text-sm font-semibold text-white">Physische Eigenschaften</h3>
+                  <h3 className="text-sm font-semibold text-white">{t('modals.productDetail.physicalProperties')}</h3>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                     {[
-                      { label: 'Gewicht (kg)', key: 'weight' as const },
-                      { label: 'Höhe (cm)', key: 'height' as const },
-                      { label: 'Breite (cm)', key: 'width' as const },
-                      { label: 'Tiefe (cm)', key: 'depth' as const },
+                      { label: t('cases.weight'), key: 'weight' as const },
+                      { label: t('casesPage.height'), key: 'height' as const },
+                      { label: t('casesPage.width'), key: 'width' as const },
+                      { label: t('casesPage.depth'), key: 'depth' as const },
                     ].map(field => (
                       <div key={field.key}>
                         <label className="mb-2 block text-sm font-semibold text-white">
@@ -1092,6 +1109,7 @@ export function ProductsTab() {
                             })
                           }
                           className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                          title={field.label}
                         />
                       </div>
                     ))}
@@ -1099,11 +1117,11 @@ export function ProductsTab() {
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-white/10 p-4">
-                  <h3 className="text-sm font-semibold text-white">Technische Angaben</h3>
+                  <h3 className="text-sm font-semibold text-white">{t('modals.productDetail.technicalDetails')}</h3>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-white">
-                        Wartungsintervall (Tage)
+                        {t('modals.productDetail.maintenanceInterval')} ({t('modals.productDetail.days', { count: 1 })})
                       </label>
                       <input
                         type="number"
@@ -1116,11 +1134,12 @@ export function ProductsTab() {
                           })
                         }
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                        title={t('modals.productDetail.maintenanceInterval')}
                       />
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-white">
-                        Leistungsaufnahme (W)
+                        {t('modals.productDetail.powerConsumption')} (W)
                       </label>
                       <input
                         type="number"
@@ -1134,13 +1153,14 @@ export function ProductsTab() {
                           })
                         }
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                        title={t('modals.productDetail.powerConsumption')}
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-white/10 p-4">
-                  <h3 className="text-sm font-semibold text-white">Product Type & Inventory</h3>
+                  <h3 className="text-sm font-semibold text-white">{t('admin.products.typeInventory')}</h3>
 
                   <div className="flex gap-4 mb-4">
                     <label className="flex items-center gap-2 text-white cursor-pointer">
@@ -1150,7 +1170,7 @@ export function ProductsTab() {
                         onChange={e => setFormData({ ...formData, is_accessory: e.target.checked })}
                         className="w-5 h-5 rounded border-white/20 bg-white/10 text-accent-red focus:ring-accent-red"
                       />
-                      <span>This is an Accessory</span>
+                      <span>{t('admin.products.isAccessory')}</span>
                     </label>
 
                     <label className="flex items-center gap-2 text-white cursor-pointer">
@@ -1160,19 +1180,17 @@ export function ProductsTab() {
                         onChange={e => setFormData({ ...formData, is_consumable: e.target.checked })}
                         className="w-5 h-5 rounded border-white/20 bg-white/10 text-accent-red focus:ring-accent-red"
                       />
-                      <span>This is a Consumable</span>
+                      <span>{t('admin.products.isConsumable')}</span>
                     </label>
                   </div>
 
-                  <p className="text-xs text-gray-400 mb-4">
-                    Accessories are optional items (cables, clamps). Consumables are used items (fog fluid, tape).
-                  </p>
+                  <p className="text-xs text-gray-400 mb-4">{t('admin.products.typeInventoryHelp')}</p>
 
                   {(formData.is_accessory || formData.is_consumable) && (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-white">
-                          Measurement Unit <span className="text-accent-red">*</span>
+                          {t('admin.products.measurementUnit')} <span className="text-accent-red">*</span>
                         </label>
                         <select
                           value={formData.count_type_id || ''}
@@ -1182,8 +1200,9 @@ export function ProductsTab() {
                           })}
                           required={formData.is_accessory || formData.is_consumable}
                           className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                          title={t('admin.products.measurementUnit')}
                         >
-                          <option value="">Select unit...</option>
+                          <option value="">{t('admin.products.selectUnit')}</option>
                           {countTypes.map(ct => (
                             <option key={ct.count_type_id} value={ct.count_type_id}>
                               {ct.name} ({ct.abbreviation})
@@ -1194,21 +1213,21 @@ export function ProductsTab() {
 
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-white">
-                          Generic Barcode
+                          {t('admin.products.genericBarcode')}
                         </label>
                         <input
                           type="text"
                           value={formData.generic_barcode || ''}
                           onChange={e => setFormData({ ...formData, generic_barcode: e.target.value })}
-                          placeholder="e.g., ACC-SAFE40, CONS-FOG"
+                          placeholder={t('admin.products.genericBarcodePlaceholder')}
                           className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                         />
-                        <p className="text-xs text-gray-400 mt-1">Single barcode for all units of this type</p>
+                        <p className="text-xs text-gray-400 mt-1">{t('admin.products.singleBarcodeHint')}</p>
                       </div>
 
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-white">
-                          Current Stock Quantity
+                          {t('admin.products.currentStockQuantity')}
                         </label>
                         <input
                           type="number"
@@ -1226,7 +1245,7 @@ export function ProductsTab() {
 
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-white">
-                          Minimum Stock Level
+                          {t('admin.products.minimumStockLevel')}
                         </label>
                         <input
                           type="number"
@@ -1237,14 +1256,14 @@ export function ProductsTab() {
                             ...formData,
                             min_stock_level: parseNumber(e.target.value)
                           })}
-                          placeholder="Low stock alert threshold"
+                          placeholder={t('admin.products.lowStockThreshold')}
                           className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                         />
                       </div>
 
                       <div>
                         <label className="mb-2 block text-sm font-semibold text-white">
-                          Price per Unit (€)
+                          {t('admin.products.pricePerUnit')} (€)
                         </label>
                         <input
                           type="number"
@@ -1265,17 +1284,17 @@ export function ProductsTab() {
 
                 <div className="space-y-4 rounded-xl border border-white/10 p-4">
                   <h3 className="text-sm font-semibold text-white">
-                    {editingProduct ? 'Geräte verwalten' : 'Geräte erstellen (optional)'}
+                    {editingProduct ? t('admin.products.manageDevices') : t('admin.products.createDevicesOptional')}
                   </h3>
 
                   {editingProduct && (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-300">
-                          {productDevices.length} Gerät(e) zugeordnet
+                          {t('admin.products.assignedDevices', { count: productDevices.length })}
                         </span>
                         {loadingDevices && (
-                          <span className="text-xs text-gray-400">Lade...</span>
+                          <span className="text-xs text-gray-400">{t('common.loading')}</span>
                         )}
                       </div>
 
@@ -1305,7 +1324,7 @@ export function ProductsTab() {
                                   : 'bg-red-600/80 text-white hover:bg-red-600'
                                   }`}
                               >
-                                {devicesToDelete.has(device.device_id) ? 'Behalten' : 'Entfernen'}
+                                {devicesToDelete.has(device.device_id) ? t('admin.products.keep') : t('common.remove')}
                               </button>
                             </div>
                           ))}
@@ -1314,7 +1333,7 @@ export function ProductsTab() {
 
                       {devicesToDelete.size > 0 && (
                         <p className="text-xs text-red-400">
-                          {devicesToDelete.size} Gerät(e) werden beim Speichern gelöscht
+                          {t('admin.products.markedDeleteOnSave', { count: devicesToDelete.size })}
                         </p>
                       )}
                     </div>
@@ -1323,7 +1342,7 @@ export function ProductsTab() {
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-white">
-                        Anzahl Geräte {editingProduct && 'hinzufügen'}
+                        {editingProduct ? t('admin.products.deviceCountAdd') : t('admin.products.deviceCount')}
                       </label>
                       <input
                         type="number"
@@ -1335,13 +1354,13 @@ export function ProductsTab() {
                             device_quantity: parseInteger(event.target.value),
                           })
                         }
-                        placeholder="z. B. 10"
+                        placeholder={t('admin.products.deviceCountPlaceholder')}
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                       />
                     </div>
                     <div>
                       <label className="mb-2 block text-sm font-semibold text-white">
-                        Geräte-Präfix
+                        {t('admin.products.devicePrefix')}
                       </label>
                       <input
                         type="text"
@@ -1352,7 +1371,7 @@ export function ProductsTab() {
                             device_prefix: event.target.value,
                           })
                         }
-                        placeholder="z. B. LED"
+                        placeholder={t('admin.products.devicePrefixPlaceholder')}
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                       />
                     </div>
@@ -1365,12 +1384,12 @@ export function ProductsTab() {
                       disabled={!formData.device_quantity || formData.device_quantity <= 0}
                       className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Geräte jetzt hinzufügen
+                      {t('admin.products.addDevicesNow')}
                     </button>
                   )}
 
                   <p className="text-xs text-gray-400">
-                    Geräte werden automatisch mit aufsteigender Nummerierung erstellt (z. B. {formData.device_prefix || 'XXX'}0001).
+                    {t('admin.products.autoNumberingHint', { prefix: formData.device_prefix || 'XXX' })}
                   </p>
                 </div>
 
@@ -1381,10 +1400,10 @@ export function ProductsTab() {
                     className="flex-1 btn-secondary"
                     disabled={submitting}
                   >
-                    Abbrechen
+                    {t('common.cancel')}
                   </button>
                   <button type="submit" className="flex-1 btn-primary" disabled={submitting}>
-                    {submitting ? 'Speichert...' : editingProduct ? 'Speichern' : 'Erstellen'}
+                    {submitting ? t('common.saving') : editingProduct ? t('common.save') : t('common.create')}
                   </button>
                 </div>
               </form>

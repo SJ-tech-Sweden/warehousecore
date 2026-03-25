@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Package, Warehouse, AlertTriangle, TrendingUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { dashboardApi } from '../lib/api';
 import type { DashboardStats, Movement } from '../lib/api';
 import { LowStockAlertsWidget } from '../components/LowStockAlertsWidget';
 
 export function Dashboard() {
+  const { t } = useTranslation();
   const [stats, setStats] = useState<DashboardStats>({
     in_storage: 0,
     on_job: 0,
@@ -50,41 +52,41 @@ export function Dashboard() {
 
     const diffMs = Date.now() - date.getTime();
     if (diffMs <= 0) {
-      return 'gerade eben';
+      return t('dashboard.relative.now');
     }
 
     const diffSeconds = Math.floor(diffMs / 1000);
     if (diffSeconds < 60) {
-      return 'vor wenigen Sekunden';
+      return t('dashboard.relative.seconds');
     }
 
     const diffMinutes = Math.floor(diffSeconds / 60);
     if (diffMinutes < 60) {
-      return `vor ${diffMinutes} ${diffMinutes === 1 ? 'Minute' : 'Minuten'}`;
+      return t(diffMinutes === 1 ? 'dashboard.relative.minute' : 'dashboard.relative.minutes', { count: diffMinutes });
     }
 
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) {
-      return `vor ${diffHours} ${diffHours === 1 ? 'Stunde' : 'Stunden'}`;
+      return t(diffHours === 1 ? 'dashboard.relative.hour' : 'dashboard.relative.hours', { count: diffHours });
     }
 
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) {
-      return `vor ${diffDays} ${diffDays === 1 ? 'Tag' : 'Tagen'}`;
+      return t(diffDays === 1 ? 'dashboard.relative.day' : 'dashboard.relative.days', { count: diffDays });
     }
 
     const diffWeeks = Math.floor(diffDays / 7);
     if (diffWeeks < 5) {
-      return `vor ${diffWeeks} ${diffWeeks === 1 ? 'Woche' : 'Wochen'}`;
+      return t(diffWeeks === 1 ? 'dashboard.relative.week' : 'dashboard.relative.weeks', { count: diffWeeks });
     }
 
     const diffMonths = Math.floor(diffDays / 30);
     if (diffMonths < 12) {
-      return `vor ${diffMonths} ${diffMonths === 1 ? 'Monat' : 'Monaten'}`;
+      return t(diffMonths === 1 ? 'dashboard.relative.month' : 'dashboard.relative.months', { count: diffMonths });
     }
 
     const diffYears = Math.floor(diffDays / 365);
-    return `vor ${diffYears} ${diffYears === 1 ? 'Jahr' : 'Jahren'}`;
+    return t(diffYears === 1 ? 'dashboard.relative.year' : 'dashboard.relative.years', { count: diffYears });
   };
 
   const describeMovement = (movement: Movement): string => {
@@ -96,29 +98,33 @@ export function Dashboard() {
     switch (movement.action) {
       case 'intake':
         return movement.to_zone_name
-          ? `${deviceLabel} in ${movement.to_zone_name} eingecheckt`
-          : `${deviceLabel} ins Lager eingecheckt`;
+          ? t('dashboard.movements.intakeToZone', { device: deviceLabel, zone: movement.to_zone_name })
+          : t('dashboard.movements.intakeToWarehouse', { device: deviceLabel });
       case 'outtake':
         return movement.to_job_description
-          ? `${deviceLabel} für ${movement.to_job_description} ausgebucht`
-          : `${deviceLabel} aus dem Lager ausgebucht`;
+          ? t('dashboard.movements.outtakeForJob', { device: deviceLabel, job: movement.to_job_description })
+          : t('dashboard.movements.outtakeFromWarehouse', { device: deviceLabel });
       case 'transfer':
         if (movement.from_zone_name && movement.to_zone_name) {
-          return `${deviceLabel} von ${movement.from_zone_name} nach ${movement.to_zone_name} verschoben`;
+          return t('dashboard.movements.transferBetweenZones', {
+            device: deviceLabel,
+            fromZone: movement.from_zone_name,
+            toZone: movement.to_zone_name,
+          });
         }
         if (movement.to_zone_name) {
-          return `${deviceLabel} nach ${movement.to_zone_name} verschoben`;
+          return t('dashboard.movements.transferToZone', { device: deviceLabel, zone: movement.to_zone_name });
         }
         if (movement.from_zone_name) {
-          return `${deviceLabel} aus ${movement.from_zone_name} entnommen`;
+          return t('dashboard.movements.transferFromZone', { device: deviceLabel, zone: movement.from_zone_name });
         }
-        return `${deviceLabel} verschoben`;
+        return t('dashboard.movements.transferGeneric', { device: deviceLabel });
       case 'return':
-        return `${deviceLabel} zurückgebucht`;
+        return t('dashboard.movements.return', { device: deviceLabel });
       case 'move':
-        return `${deviceLabel} bewegt`;
+        return t('dashboard.movements.move', { device: deviceLabel });
       default:
-        return `${deviceLabel} (${movement.action})`;
+        return t('dashboard.movements.unknown', { device: deviceLabel, action: movement.action });
     }
   };
 
@@ -126,28 +132,28 @@ export function Dashboard() {
 
   const statCards = [
     {
-      title: 'Im Lager',
+      title: t('dashboard.stats.inStorage'),
       value: stats.in_storage,
       icon: Warehouse,
       color: 'from-gray-600 to-gray-800',
       textColor: 'text-gray-300',
     },
     {
-      title: 'Auf Job',
+      title: t('dashboard.stats.onJob'),
       value: stats.on_job,
       icon: Package,
       color: 'from-accent-red to-red-700',
       textColor: 'text-accent-red',
     },
     {
-      title: 'Defekt',
+      title: t('dashboard.stats.defective'),
       value: stats.defective,
       icon: AlertTriangle,
       color: 'from-yellow-600 to-yellow-800',
       textColor: 'text-yellow-500',
     },
     {
-      title: 'Gesamt',
+      title: t('dashboard.stats.total'),
       value: stats.total,
       icon: TrendingUp,
       color: 'from-blue-600 to-blue-800',
@@ -166,8 +172,8 @@ export function Dashboard() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Dashboard</h2>
-        <p className="text-sm sm:text-base text-gray-400">Lagerübersicht und Statistiken</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">{t('dashboard.title')}</h2>
+        <p className="text-sm sm:text-base text-gray-400">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Stats Grid */}
@@ -184,7 +190,7 @@ export function Dashboard() {
                   <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${card.textColor}`} />
                 </div>
                 <div className="text-xs sm:text-sm text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Live
+                  {t('dashboard.live')}
                 </div>
               </div>
               <div className="space-y-1">
@@ -201,9 +207,9 @@ export function Dashboard() {
 
       {/* Recent Activity */}
       <div className="glass-dark rounded-xl sm:rounded-2xl p-4 sm:p-6">
-        <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">Letzte Aktivität</h3>
+        <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">{t('dashboard.recentActivity')}</h3>
         {activityItems.length === 0 ? (
-          <div className="text-sm sm:text-base text-gray-400">Noch keine Aktivitäten erfasst.</div>
+          <div className="text-sm sm:text-base text-gray-400">{t('dashboard.noActivity')}</div>
         ) : (
           <div className="space-y-2 sm:space-y-3">
             {activityItems.map((activity) => (
@@ -217,7 +223,7 @@ export function Dashboard() {
                     {describeMovement(activity)}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-400">
-                    <span>{formatRelativeTime(activity.timestamp) || 'gerade eben'}</span>
+                    <span>{formatRelativeTime(activity.timestamp) || t('dashboard.relative.now')}</span>
                     {activity.performed_by && (
                       <>
                         <span className="hidden sm:inline text-gray-600">•</span>

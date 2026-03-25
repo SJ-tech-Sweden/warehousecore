@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { scansApi, zonesApi, jobsApi, ledApi } from '../lib/api';
 import type { ScanResponse } from '../lib/api';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
@@ -8,6 +9,7 @@ import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 type ScanStep = 'device' | 'zone';
 
 export function ScanPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [scanCode, setScanCode] = useState('');
   const [action, setAction] = useState<'intake' | 'outtake' | 'check'>('check');
@@ -52,12 +54,12 @@ export function ScanPage() {
           // Check if this is an accessory/consumable (has product info with unit)
           if (data.product && data.product.unit) {
             // This is an accessory/consumable - ask for quantity
-            const quantityStr = window.prompt(`Menge zum Einlagern (${data.product.unit}):`);
+            const quantityStr = window.prompt(t('scan.prompts.intakeQuantity', { unit: data.product.unit }));
 
             if (!quantityStr || isNaN(Number(quantityStr)) || Number(quantityStr) <= 0) {
               setResult({
                 success: false,
-                message: 'Ungültige Menge eingegeben',
+                message: t('scan.invalidQuantity'),
                 action,
                 duplicate: false,
               });
@@ -117,14 +119,14 @@ export function ScanPage() {
           // If the response includes product info with a unit, it's an accessory/consumable
           if (checkResponse.data.product && checkResponse.data.product.unit) {
             const promptText = action === 'intake'
-              ? `Menge zum Einlagern (${checkResponse.data.product.unit}):`
-              : `Menge zum Auslagern (${checkResponse.data.product.unit}):`;
+              ? t('scan.prompts.intakeQuantity', { unit: checkResponse.data.product.unit })
+              : t('scan.prompts.outtakeQuantity', { unit: checkResponse.data.product.unit });
             const quantityStr = window.prompt(promptText);
 
             if (!quantityStr || isNaN(Number(quantityStr)) || Number(quantityStr) <= 0) {
               setResult({
                 success: false,
-                message: 'Ungültige Menge eingegeben',
+                message: t('scan.invalidQuantity'),
                 action,
                 duplicate: false,
               });
@@ -148,7 +150,7 @@ export function ScanPage() {
       console.error('Scan failed:', error);
       setResult({
         success: false,
-        message: error.response?.data?.error || 'Scan fehlgeschlagen',
+        message: error.response?.data?.error || t('scan.scanError'),
         action,
         duplicate: false,
       });
@@ -198,7 +200,7 @@ export function ScanPage() {
       console.error('Job scan failed:', error);
       setResult({
         success: false,
-        message: error.response?.data?.error || `Job ${jobId} nicht gefunden`,
+        message: error.response?.data?.error || t('jobsPage.jobNotFound', { id: jobId }),
         action: 'check',
         duplicate: false,
       });
@@ -244,12 +246,12 @@ export function ScanPage() {
               )}
             </div>
             <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">
-              {step === 'zone' ? 'Lagerplatz Scannen' : 'Barcode Scanner'}
+              {step === 'zone' ? t('scan.zoneTitle') : t('scan.scannerTitle')}
             </h1>
             <p className="text-sm sm:text-base text-gray-400">
               {step === 'zone'
-                ? 'Scanne den Barcode des Lagerplatzes'
-                : 'Gerät scannen oder Code eingeben'}
+                ? t('scan.zoneSubtitle')
+                : t('scan.scannerSubtitle')}
             </p>
           </div>
 
@@ -262,7 +264,7 @@ export function ScanPage() {
                 }`}>
                   {step === 'zone' ? '✓' : '1'}
                 </div>
-                <span className="text-sm sm:text-base font-semibold">Gerät</span>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.steps.device')}</span>
               </div>
               <div className="w-8 sm:w-12 h-0.5 bg-white/20"></div>
               <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'zone' ? 'text-accent-red' : 'text-gray-500'}`}>
@@ -271,7 +273,7 @@ export function ScanPage() {
                 }`}>
                   2
                 </div>
-                <span className="text-sm sm:text-base font-semibold">Lagerplatz</span>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.steps.zone')}</span>
               </div>
             </div>
           )}
@@ -283,7 +285,7 @@ export function ScanPage() {
                 type="text"
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
-                placeholder={step === 'zone' ? 'Lagerplatz-Barcode / Code' : 'Barcode / QR-Code / Geräte-ID'}
+                placeholder={step === 'zone' ? t('scan.placeholders.zone') : t('scan.placeholders.device')}
                 autoFocus
                 className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-white/10 backdrop-blur-md border-2 border-white/20 rounded-xl text-white text-base sm:text-xl placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
               />
@@ -293,9 +295,9 @@ export function ScanPage() {
             {step === 'device' && (
               <div className="grid grid-cols-3 gap-2 sm:gap-4">
                 {[
-                  { value: 'check', label: 'Prüfen', color: 'blue' },
-                  { value: 'intake', label: 'Einlagern', color: 'green' },
-                  { value: 'outtake', label: 'Auslagern', color: 'red' },
+                  { value: 'check', label: t('scan.actions.check'), color: 'blue' },
+                  { value: 'intake', label: t('scan.actions.intake'), color: 'green' },
+                  { value: 'outtake', label: t('scan.actions.outtake'), color: 'red' },
                 ].map((btn) => (
                   <button
                     key={btn.value}
@@ -319,7 +321,7 @@ export function ScanPage() {
               disabled={loading || !scanCode.trim()}
               className="w-full py-3 sm:py-4 bg-gradient-to-r from-accent-red to-red-700 text-white font-bold text-base sm:text-lg rounded-xl hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
             >
-              {loading ? 'Scannen...' : step === 'zone' ? 'Lagerplatz Scannen' : 'Gerät Scannen'}
+              {loading ? t('scan.scanning') : step === 'zone' ? t('scan.scanZone') : t('scan.scanDevice')}
             </button>
           </form>
         </div>
@@ -344,13 +346,13 @@ export function ScanPage() {
                 {result.device && (
                   <div className="mt-2 sm:mt-3 space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <p className="text-gray-300 truncate">
-                      <span className="text-gray-500">Gerät:</span> {result.device.product_name}
+                      <span className="text-gray-500">{t('scan.result.device')}</span> {result.device.product_name}
                     </p>
                     <p className="text-gray-300 truncate">
-                      <span className="text-gray-500">ID:</span> {result.device.device_id}
+                      <span className="text-gray-500">{t('scan.result.id')}</span> {result.device.device_id}
                     </p>
                     <p className="text-gray-300">
-                      <span className="text-gray-500">Status:</span>{' '}
+                      <span className="text-gray-500">{t('scan.result.status')}</span>{' '}
                       <span className={result.success ? 'text-green-400' : 'text-yellow-400'}>
                         {result.new_status || result.device.status}
                       </span>
@@ -371,9 +373,9 @@ export function ScanPage() {
                 <div className="inline-block p-4 rounded-xl bg-yellow-500/20 mb-4">
                   <Lightbulb className="w-12 h-12 text-yellow-300" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">LED-Licht aktivieren?</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">{t('scan.ledModal.title')}</h2>
                 <p className="text-gray-400 text-sm sm:text-base">
-                  Das LED-Licht ist aktuell ausgeschaltet. Möchtest du es aktivieren, um die Job-Geräte zu markieren?
+                  {t('scan.ledModal.description')}
                 </p>
               </div>
 
@@ -382,14 +384,14 @@ export function ScanPage() {
                   onClick={handleLEDModalCancel}
                   className="flex-1 px-4 py-3 rounded-lg font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
                 >
-                  Nein, direkt zum Job
+                  {t('scan.ledModal.cancel')}
                 </button>
                 <button
                   onClick={handleLEDModalConfirm}
                   disabled={loading}
                   className="flex-1 px-4 py-3 rounded-lg font-semibold bg-gradient-to-r from-accent-red to-red-700 text-white hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 transition-all"
                 >
-                  Ja, LED aktivieren
+                  {t('scan.ledModal.confirm')}
                 </button>
               </div>
               </div>

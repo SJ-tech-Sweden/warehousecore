@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Save, Database, AlertCircle } from 'lucide-react';
 import { adminSettingsApi, type APILimits } from '../../lib/api';
+import { useTranslation } from 'react-i18next';
 
 export function APISettingsTab() {
+  const { t } = useTranslation();
   const [limits, setLimits] = useState<APILimits>({ device_limit: 50000, case_limit: 50000 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -18,7 +20,7 @@ export function APISettingsTab() {
       setLimits(data);
     } catch (error) {
       console.error('Failed to load API limits:', error);
-      setMessage({ type: 'error', text: 'Fehler beim Laden der Einstellungen' });
+      setMessage({ type: 'error', text: t('admin.apiSettings.loadError') });
     } finally {
       setLoading(false);
     }
@@ -27,12 +29,12 @@ export function APISettingsTab() {
   const handleSave = async () => {
     // Validation
     if (limits.device_limit < 1 || limits.case_limit < 1) {
-      setMessage({ type: 'error', text: 'Limits müssen mindestens 1 sein' });
+      setMessage({ type: 'error', text: t('admin.apiSettings.limitMin') });
       return;
     }
 
     if (limits.device_limit > 1000000 || limits.case_limit > 1000000) {
-      setMessage({ type: 'error', text: 'Limits dürfen nicht größer als 1.000.000 sein' });
+      setMessage({ type: 'error', text: t('admin.apiSettings.limitMax') });
       return;
     }
 
@@ -42,10 +44,10 @@ export function APISettingsTab() {
     try {
       const { data } = await adminSettingsApi.updateAPILimits(limits);
       setLimits({ device_limit: data.device_limit, case_limit: data.case_limit });
-      setMessage({ type: 'success', text: 'Einstellungen erfolgreich gespeichert!' });
+      setMessage({ type: 'success', text: t('admin.apiSettings.settingsSaved') });
     } catch (error) {
       console.error('Failed to update API limits:', error);
-      setMessage({ type: 'error', text: 'Fehler beim Speichern der Einstellungen' });
+      setMessage({ type: 'error', text: t('admin.apiSettings.saveError') });
     } finally {
       setSaving(false);
     }
@@ -64,9 +66,9 @@ export function APISettingsTab() {
       <div className="flex items-center gap-3 mb-6">
         <Database className="w-6 h-6 text-accent-red" />
         <div>
-          <h2 className="text-2xl font-bold text-white">API-Limits</h2>
+          <h2 className="text-2xl font-bold text-white">{t('admin.apiSettings.title')}</h2>
           <p className="text-gray-400 text-sm">
-            Konfiguriere die maximale Anzahl von Devices und Cases, die von der API geladen werden
+            {t('admin.apiSettings.subtitle')}
           </p>
         </div>
       </div>
@@ -91,9 +93,9 @@ export function APISettingsTab() {
       <div className="space-y-6">
         {/* Device Limit */}
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <label className="block text-sm font-medium text-gray-300 mb-3">Device API Limit</label>
+          <label className="block text-sm font-medium text-gray-300 mb-3">{t('admin.apiSettings.deviceLimit')}</label>
           <p className="text-sm text-gray-400 mb-4">
-            Maximale Anzahl von Devices, die beim Laden der Label-Seite und anderen Anfragen geladen werden.
+            {t('admin.apiSettings.deviceLimitDesc')}
           </p>
           <input
             type="number"
@@ -104,18 +106,19 @@ export function APISettingsTab() {
               setLimits({ ...limits, device_limit: parseInt(e.target.value) || 1 })
             }
             className="w-full sm:w-64 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
-            placeholder="z.B. 50000"
+            placeholder={t('admin.apiSettings.examplePlaceholder')}
+            title={t('admin.apiSettings.deviceLimit')}
           />
           <div className="mt-2 text-xs text-gray-500">
-            Empfohlen: 50000 für normale Nutzung, höher für sehr große Bestände
+            {t('admin.apiSettings.recommended')}
           </div>
         </div>
 
         {/* Case Limit */}
         <div className="bg-white/5 rounded-xl p-6 border border-white/10">
-          <label className="block text-sm font-medium text-gray-300 mb-3">Case API Limit</label>
+          <label className="block text-sm font-medium text-gray-300 mb-3">{t('admin.apiSettings.caseLimit')}</label>
           <p className="text-sm text-gray-400 mb-4">
-            Maximale Anzahl von Cases, die beim Laden der Label-Seite und anderen Anfragen geladen werden.
+            {t('admin.apiSettings.caseLimitDesc')}
           </p>
           <input
             type="number"
@@ -126,10 +129,11 @@ export function APISettingsTab() {
               setLimits({ ...limits, case_limit: parseInt(e.target.value) || 1 })
             }
             className="w-full sm:w-64 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
-            placeholder="z.B. 50000"
+            placeholder={t('admin.apiSettings.examplePlaceholder')}
+            title={t('admin.apiSettings.caseLimit')}
           />
           <div className="mt-2 text-xs text-gray-500">
-            Empfohlen: 50000 für normale Nutzung, höher für sehr viele Cases
+            {t('admin.apiSettings.recommendedCases')}
           </div>
         </div>
 
@@ -138,12 +142,12 @@ export function APISettingsTab() {
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <h3 className="text-blue-400 font-semibold">Wichtige Hinweise</h3>
+              <h3 className="text-blue-400 font-semibold">{t('admin.apiSettings.importantNotes')}</h3>
               <ul className="text-sm text-blue-300 space-y-1 list-disc list-inside">
-                <li>Sehr hohe Limits können die Performance beeinträchtigen</li>
-                <li>Die Limits gelten nur für die API-Anfragen, nicht für die Datenbank</li>
-                <li>Änderungen werden sofort wirksam, kein Neustart erforderlich</li>
-                <li>Bei sehr großen Datenbeständen kann das Laden länger dauern</li>
+                <li>{t('admin.apiSettings.note1')}</li>
+                <li>{t('admin.apiSettings.note2')}</li>
+                <li>{t('admin.apiSettings.note3')}</li>
+                <li>{t('admin.apiSettings.note4')}</li>
               </ul>
             </div>
           </div>
@@ -158,7 +162,7 @@ export function APISettingsTab() {
           className="flex items-center gap-2 px-6 py-3 bg-accent-red hover:bg-accent-red/80 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
         >
           <Save className="w-5 h-5" />
-          {saving ? 'Speichert...' : 'Einstellungen speichern'}
+          {saving ? t('admin.apiSettings.saving') : t('admin.apiSettings.saveSettings')}
         </button>
       </div>
     </div>

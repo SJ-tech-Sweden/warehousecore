@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cablesAdminApi } from '../../lib/api';
 import type { Cable as CableType, CableConnector, CableType as CableTypeData, CableCreateInput, CableUpdateInput } from '../../lib/api';
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
@@ -44,6 +45,7 @@ function useDebouncedValue<T>(value: T, delay: number) {
 }
 
 export function CablesTab() {
+  const { t } = useTranslation();
   const [cables, setCables] = useState<CableType[]>([]);
   const [connectors, setConnectors] = useState<CableConnector[]>([]);
   const [cableTypes, setCableTypes] = useState<CableTypeData[]>([]);
@@ -217,7 +219,7 @@ export function CablesTab() {
   };
 
   const handleDelete = async (cableId: number) => {
-    if (!window.confirm('Möchten Sie dieses Kabel wirklich löschen?')) {
+    if (!window.confirm(t('admin.cables.confirmDelete'))) {
       return;
     }
 
@@ -226,7 +228,7 @@ export function CablesTab() {
       await fetchCables();
     } catch (error: unknown) {
       console.error('Failed to delete cable:', error);
-      alert('Fehler beim Löschen des Kabels');
+      alert(t('admin.cables.errors.delete'));
     }
   };
 
@@ -235,12 +237,12 @@ export function CablesTab() {
 
     // Validation
     if (!formData.connector1 || !formData.connector2 || !formData.typ) {
-      alert('Bitte füllen Sie alle Pflichtfelder aus.');
+      alert(t('admin.cables.errors.requiredFields'));
       return;
     }
 
     if (formData.length <= 0) {
-      alert('Die Länge muss größer als 0 sein.');
+      alert(t('admin.cables.errors.lengthPositive'));
       return;
     }
 
@@ -278,7 +280,7 @@ export function CablesTab() {
       await fetchCables();
     } catch (error: unknown) {
       console.error('Failed to save cable:', error);
-      alert('Fehler beim Speichern des Kabels');
+      alert(t('admin.cables.errors.save'));
     } finally {
       setSubmitting(false);
     }
@@ -290,7 +292,7 @@ export function CablesTab() {
 
   const formatGenderText = (gender?: string | null) => {
     if (!gender) return '';
-    return gender === 'male' ? 'male' : 'female';
+    return gender === 'male' ? t('admin.cables.gender.male') : t('admin.cables.gender.female');
   };
 
   const formatConnectorLabel = (connector: CableConnector, overrideGender?: string | null) => {
@@ -376,20 +378,20 @@ export function CablesTab() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Cable className="w-6 h-6 text-accent-red" />
-          <h2 className="text-2xl font-bold text-white">Kabel-Verwaltung</h2>
+          <h2 className="text-2xl font-bold text-white">{t('admin.cables.title')}</h2>
         </div>
         <button
           onClick={openCreateModal}
           className="btn-primary flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          Neues Kabel
+          {t('admin.cables.newCable')}
         </button>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-gray-400">
-        <span>{cableCombinationSummary.length} Kombinationen</span>
-        <span>Gesamtbestand: <span className="text-white font-semibold">{totalCableCount}</span></span>
+        <span>{t('admin.cables.combinationsCount', { count: cableCombinationSummary.length })}</span>
+        <span>{t('admin.cables.totalStock')}: <span className="text-white font-semibold">{totalCableCount}</span></span>
       </div>
 
       {/* Filters */}
@@ -400,10 +402,11 @@ export function CablesTab() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Suchen (Name)..."
+              placeholder={t('admin.cables.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="input-field pl-10 w-full"
+              title={t('common.search')}
             />
           </div>
 
@@ -412,8 +415,9 @@ export function CablesTab() {
             value={connector1Filter}
             onChange={(e) => setConnector1Filter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('admin.cables.connector1')}
           >
-            <option value="">Alle Stecker 1</option>
+            <option value="">{t('admin.cables.filters.allConnector1')}</option>
             {connectors.map((connector) => (
               <option key={connector.connector_id} value={connector.connector_id}>
                 {formatConnectorLabel(connector)}
@@ -426,8 +430,9 @@ export function CablesTab() {
             value={connector2Filter}
             onChange={(e) => setConnector2Filter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('admin.cables.connector2')}
           >
-            <option value="">Alle Stecker 2</option>
+            <option value="">{t('admin.cables.filters.allConnector2')}</option>
             {connector2FilterOptions.map((connector) => (
               <option key={connector.connector_id} value={connector.connector_id}>
                 {formatConnectorLabel(connector)}
@@ -440,8 +445,9 @@ export function CablesTab() {
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('admin.cables.type')}
           >
-            <option value="">Alle Typen</option>
+            <option value="">{t('admin.cables.filters.allTypes')}</option>
             {cableTypes.map((type) => (
               <option key={type.cable_type_id} value={type.cable_type_id}>
                 {type.name}
@@ -452,23 +458,25 @@ export function CablesTab() {
           {/* Length Min */}
           <input
             type="number"
-            placeholder="Min Länge (m)"
+            placeholder={t('admin.cables.filters.minLength')}
             min="0"
             step="0.1"
             value={lengthMinFilter}
             onChange={(e) => setLengthMinFilter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('admin.cables.filters.minLength')}
           />
 
           {/* Length Max */}
           <input
             type="number"
-            placeholder="Max Länge (m)"
+            placeholder={t('admin.cables.filters.maxLength')}
             min="0"
             step="0.1"
             value={lengthMaxFilter}
             onChange={(e) => setLengthMaxFilter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('admin.cables.filters.maxLength')}
           />
         </div>
 
@@ -480,8 +488,8 @@ export function CablesTab() {
               className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors flex items-center gap-1"
             >
               <X className="w-4 h-4" />
-              <span className="hidden sm:inline">Filter löschen</span>
-              <span className="sm:hidden">Löschen</span>
+              <span className="hidden sm:inline">{t('admin.devices.clearFilters')}</span>
+              <span className="sm:hidden">{t('common.delete')}</span>
             </button>
             <button
               onClick={handleRefresh}
@@ -489,7 +497,7 @@ export function CablesTab() {
               className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors disabled:opacity-50 flex items-center gap-1"
             >
               <RefreshCcw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Aktualisieren</span>
+              <span className="hidden sm:inline">{t('common.update')}</span>
             </button>
           </div>
 
@@ -500,7 +508,8 @@ export function CablesTab() {
               className={`p-2 rounded-lg transition-colors ${
                 viewMode === 'table' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'
               }`}
-              title="Tabellenansicht"
+              title={t('admin.devices.tableView')}
+              aria-label={t('admin.devices.tableView')}
             >
               <List className="w-5 h-5" />
             </button>
@@ -509,7 +518,8 @@ export function CablesTab() {
               className={`p-2 rounded-lg transition-colors ${
                 viewMode === 'cards' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'
               }`}
-              title="Kartenansicht"
+              title={t('admin.devices.cardView')}
+              aria-label={t('admin.devices.cardView')}
             >
               <LayoutGrid className="w-5 h-5" />
             </button>
@@ -519,12 +529,12 @@ export function CablesTab() {
 
       {/* Cable List */}
       {loadingCables ? (
-        <div className="text-center py-12 text-gray-400">Lädt Kabel...</div>
+        <div className="text-center py-12 text-gray-400">{t('admin.cables.loading')}</div>
       ) : cableCombinationSummary.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           {debouncedSearch || connector1Filter || connector2Filter || typeFilter || lengthMinFilter || lengthMaxFilter
-            ? 'Keine Kabel gefunden mit den aktuellen Filtern'
-            : 'Noch keine Kabel vorhanden'}
+            ? t('admin.cables.emptyFiltered')
+            : t('admin.cables.empty')}
         </div>
       ) : viewMode === 'table' ? (
         <div className="glass-dark rounded-xl overflow-hidden">
@@ -532,9 +542,9 @@ export function CablesTab() {
             <table className="w-full">
               <thead className="bg-white/5">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Kombination</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Anzahl</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Aktionen</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('admin.cables.combination')}</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">{t('admin.devices.quantity')}</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">{t('labels.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -554,7 +564,7 @@ export function CablesTab() {
                               <ChevronRight className="w-4 h-4 text-gray-400" />
                             )}
                             <span>
-                              {combo.typeName || 'Unbekannt'} ({combo.connector1Label} - {combo.connector2Label}) • {combo.lengthLabel}
+                              {combo.typeName || t('admin.cables.unknown')} ({combo.connector1Label} - {combo.connector2Label}) • {combo.lengthLabel}
                             </span>
                           </button>
                         </td>
@@ -564,7 +574,7 @@ export function CablesTab() {
                             onClick={() => toggleComboExpanded(combo.key)}
                             className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors"
                           >
-                            {isExpanded ? 'Schließen' : 'Details'}
+                            {isExpanded ? t('common.close') : t('casesPage.details')}
                           </button>
                         </td>
                       </tr>
@@ -576,13 +586,13 @@ export function CablesTab() {
                                 <thead>
                                   <tr className="text-left text-gray-400">
                                     <th className="py-2 pr-2">ID</th>
-                                    <th className="py-2 pr-2">Name</th>
-                                    <th className="py-2 pr-2">Stecker 1</th>
-                                    <th className="py-2 pr-2">Stecker 2</th>
-                                    <th className="py-2 pr-2">Typ</th>
-                                    <th className="py-2 pr-2">Länge</th>
+                                    <th className="py-2 pr-2">{t('common.name')}</th>
+                                    <th className="py-2 pr-2">{t('admin.cables.connector1')}</th>
+                                    <th className="py-2 pr-2">{t('admin.cables.connector2')}</th>
+                                    <th className="py-2 pr-2">{t('admin.cables.type')}</th>
+                                    <th className="py-2 pr-2">{t('admin.cables.length')}</th>
                                     <th className="py-2 pr-2">mm²</th>
-                                    <th className="py-2 text-right">Aktionen</th>
+                                    <th className="py-2 text-right">{t('labels.actions')}</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/10">
@@ -604,18 +614,24 @@ export function CablesTab() {
                                           <button
                                             onClick={() => handleViewCable(cable)}
                                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                                            title={t('casesPage.details')}
+                                            aria-label={t('casesPage.details')}
                                           >
                                             <Eye className="w-4 h-4" />
                                           </button>
                                           <button
                                             onClick={() => openEditModal(cable)}
                                             className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                                            title={t('common.edit')}
+                                            aria-label={t('common.edit')}
                                           >
                                             <Pencil className="w-4 h-4" />
                                           </button>
                                           <button
                                             onClick={() => handleDelete(cable.cable_id)}
                                             className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                                            title={t('common.delete')}
+                                            aria-label={t('common.delete')}
                                           >
                                             <Trash2 className="w-4 h-4" />
                                           </button>
@@ -656,23 +672,29 @@ export function CablesTab() {
                 {combo.cables.map((cable) => (
                   <div key={cable.cable_id} className="rounded-xl border border-white/10 p-3 space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-white font-semibold">{cable.name || `Kabel #${cable.cable_id}`}</p>
+                      <p className="text-sm text-white font-semibold">{cable.name || t('admin.cables.cableWithId', { id: cable.cable_id })}</p>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleViewCable(cable)}
                           className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                          title={t('casesPage.details')}
+                          aria-label={t('casesPage.details')}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEditModal(cable)}
                           className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors"
+                          title={t('common.edit')}
+                          aria-label={t('common.edit')}
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(cable.cable_id)}
                           className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                          title={t('common.delete')}
+                          aria-label={t('common.delete')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -680,7 +702,7 @@ export function CablesTab() {
                     </div>
                     <div className="text-xs text-gray-400 flex flex-wrap gap-3">
                       <span>#{cable.cable_id}</span>
-                      <span>{cable.mm2 ? `${cable.mm2} mm²` : 'mm² n/a'}</span>
+                      <span>{cable.mm2 ? `${cable.mm2} mm²` : t('admin.cables.mm2na')}</span>
                     </div>
                   </div>
                 ))}
@@ -695,11 +717,13 @@ export function CablesTab() {
           <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-white">
-                {editingCable ? 'Kabel bearbeiten' : 'Neues Kabel erstellen'}
+                {editingCable ? t('admin.cables.editCable') : t('admin.cables.createCable')}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title={t('common.close')}
+                aria-label={t('common.close')}
               >
                 <X className="w-6 h-6 text-gray-400" />
               </button>
@@ -709,14 +733,15 @@ export function CablesTab() {
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Name (optional)
+                  {t('common.name')} ({t('modals.productDependencies.optional')})
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="input-field w-full"
-                  placeholder="z.B. Haupt-Stromkabel"
+                  placeholder={t('admin.cables.namePlaceholder')}
+                  title={t('common.name')}
                 />
               </div>
 
@@ -724,7 +749,7 @@ export function CablesTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Stecker 1 *
+                    {t('admin.cables.connector1')} *
                   </label>
                   <select
                     value={formData.connector1 || ''}
@@ -733,8 +758,9 @@ export function CablesTab() {
                     }
                     className="input-field w-full"
                     required
+                    title={t('admin.cables.connector1')}
                   >
-                    <option value="">Stecker auswählen...</option>
+                    <option value="">{t('admin.cables.selectConnector')}</option>
                     {connectors.map((connector) => (
                       <option key={connector.connector_id} value={connector.connector_id}>
                         {formatConnectorLabel(connector)}
@@ -745,7 +771,7 @@ export function CablesTab() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Stecker 2 *
+                    {t('admin.cables.connector2')} *
                   </label>
                   <select
                     value={formData.connector2 || ''}
@@ -754,8 +780,9 @@ export function CablesTab() {
                     }
                     className="input-field w-full"
                     required
+                    title={t('admin.cables.connector2')}
                   >
-                    <option value="">Stecker auswählen...</option>
+                    <option value="">{t('admin.cables.selectConnector')}</option>
                     {connectors.map((connector) => (
                       <option key={connector.connector_id} value={connector.connector_id}>
                         {formatConnectorLabel(connector)}
@@ -768,7 +795,7 @@ export function CablesTab() {
               {/* Cable Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Kabeltyp *
+                  {t('admin.cables.type')} *
                 </label>
                 <select
                   value={formData.typ || ''}
@@ -777,8 +804,9 @@ export function CablesTab() {
                   }
                   className="input-field w-full"
                   required
+                  title={t('admin.cables.type')}
                 >
-                  <option value="">Typ auswählen...</option>
+                  <option value="">{t('admin.cables.selectType')}</option>
                   {cableTypes.map((type) => (
                     <option key={type.cable_type_id} value={type.cable_type_id}>
                       {type.name}
@@ -791,7 +819,7 @@ export function CablesTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Länge (Meter) *
+                    {t('admin.cables.lengthMeters')} *
                   </label>
                   <input
                     type="number"
@@ -803,12 +831,13 @@ export function CablesTab() {
                     }
                     className="input-field w-full"
                     required
+                    title={t('admin.cables.lengthMeters')}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Querschnitt (mm²)
+                    {t('admin.cables.crossSection')}
                   </label>
                   <input
                     type="number"
@@ -819,6 +848,7 @@ export function CablesTab() {
                       setFormData({ ...formData, mm2: Number(e.target.value) || 0 })
                     }
                     className="input-field w-full"
+                    title={t('admin.cables.crossSection')}
                   />
                 </div>
               </div>
@@ -830,7 +860,7 @@ export function CablesTab() {
                   onClick={() => setModalOpen(false)}
                   className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors"
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -838,10 +868,10 @@ export function CablesTab() {
                   className="flex-1 btn-primary disabled:opacity-50"
                 >
                   {submitting
-                    ? 'Speichert...'
+                    ? t('common.saving')
                     : editingCable
-                    ? 'Aktualisieren'
-                    : 'Erstellen'}
+                    ? t('common.update')
+                    : t('common.create')}
                 </button>
               </div>
             </form>
@@ -854,10 +884,12 @@ export function CablesTab() {
         <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
           <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-white">Kabel-Details</h3>
+              <h3 className="text-2xl font-bold text-white">{t('admin.cables.detailsTitle')}</h3>
               <button
                 onClick={() => setViewCable(null)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                title={t('common.close')}
+                aria-label={t('common.close')}
               >
                 <X className="w-6 h-6 text-gray-400" />
               </button>
@@ -866,35 +898,35 @@ export function CablesTab() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-400">Kabel-ID</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.cableId')}</p>
                   <p className="text-white font-semibold">{viewCable.cable_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Name</p>
+                  <p className="text-sm text-gray-400">{t('common.name')}</p>
                   <p className="text-white font-semibold">{viewCable.name || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Stecker 1</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.connector1')}</p>
                   <p className="text-white font-semibold">
                     {getConnectorDisplay(viewCable.connector1, viewCable.connector1_gender)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Stecker 2</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.connector2')}</p>
                   <p className="text-white font-semibold">
                     {getConnectorDisplay(viewCable.connector2, viewCable.connector2_gender)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Kabeltyp</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.type')}</p>
                   <p className="text-white font-semibold">{getCableTypeName(viewCable.typ)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Länge</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.length')}</p>
                   <p className="text-white font-semibold">{viewCable.length}m</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Querschnitt</p>
+                  <p className="text-sm text-gray-400">{t('admin.cables.crossSectionShort')}</p>
                   <p className="text-white font-semibold">{viewCable.mm2 ? `${viewCable.mm2}mm²` : '-'}</p>
                 </div>
               </div>
@@ -908,7 +940,7 @@ export function CablesTab() {
                   className="flex-1 btn-primary flex items-center justify-center gap-2"
                 >
                   <Pencil className="w-5 h-5" />
-                  Bearbeiten
+                  {t('common.edit')}
                 </button>
                 <button
                   onClick={() => {
@@ -918,7 +950,7 @@ export function CablesTab() {
                   className="px-4 py-3 bg-red-500/20 hover:bg-red-500/30 rounded-lg font-semibold text-red-400 transition-colors flex items-center justify-center gap-2"
                 >
                   <Trash2 className="w-5 h-5" />
-                  Löschen
+                  {t('common.delete')}
                 </button>
               </div>
             </div>

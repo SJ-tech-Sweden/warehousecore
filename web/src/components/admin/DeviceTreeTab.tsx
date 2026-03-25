@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ChevronDown,
   ChevronRight,
@@ -28,6 +29,7 @@ interface ActionMessage {
 }
 
 export function DeviceTreeTab() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [devices, setDevices] = useState<Device[]>([]);
   const [treeData, setTreeData] = useState<DeviceTreeCategory[]>([]);
@@ -113,7 +115,7 @@ export function DeviceTreeTab() {
       setTreeData(sortedTree);
     } catch (error: any) {
       console.error('Failed to load device tree:', error);
-      setTreeError(error?.response?.data?.error || 'Gerätebaum konnte nicht geladen werden.');
+      setTreeError(error?.response?.data?.error || t('admin.deviceTree.errors.loadTree'));
     } finally {
       setTreeLoading(false);
     }
@@ -135,7 +137,7 @@ export function DeviceTreeTab() {
     if (!device.zone_code) {
       setActionMessage({
         type: 'error',
-        text: 'Kein Fachcode vorhanden – Gerät nicht im Lager.',
+        text: t('casesPage.messages.noBinCode'),
       });
       clearActionMessage();
       return;
@@ -145,12 +147,12 @@ export function DeviceTreeTab() {
       await ledApi.locateBin(device.zone_code);
       setActionMessage({
         type: 'success',
-        text: `Fach ${device.zone_code} wird hervorgehoben.`,
+        text: t('casesPage.messages.binHighlighted', { code: device.zone_code }),
       });
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: 'LED-Befehl fehlgeschlagen: ' + (error.response?.data?.error || error.message || error.toString()),
+        text: t('casesPage.messages.ledFailed', { error: error.response?.data?.error || error.message || error.toString() }),
       });
     } finally {
       clearActionMessage();
@@ -176,7 +178,7 @@ export function DeviceTreeTab() {
         console.error('Failed to load device:', error);
         setActionMessage({
           type: 'error',
-          text: 'Gerätedetails konnten nicht geladen werden.',
+          text: t('casesPage.messages.deviceDetailsFailed'),
         });
         clearActionMessage();
         return;
@@ -217,10 +219,13 @@ export function DeviceTreeTab() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Geräteverwaltung</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">{t('admin.deviceTree.title')}</h2>
           <p className="text-sm sm:text-base text-gray-400">
-            {filteredTree.length} Kategorien • {totalProducts} Produktgruppen • {totalDevices}{' '}
-            Geräte
+            {t('admin.deviceTree.summary', {
+              categories: filteredTree.length,
+              groups: totalProducts,
+              devices: totalDevices,
+            })}
           </p>
         </div>
         <button
@@ -230,7 +235,7 @@ export function DeviceTreeTab() {
           }}
           className="self-start sm:self-auto px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white"
         >
-          Aktualisieren
+          {t('common.update')}
         </button>
       </div>
 
@@ -241,8 +246,9 @@ export function DeviceTreeTab() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Geräte, Produkte oder Lagerorte suchen..."
+            placeholder={t('admin.deviceTree.searchPlaceholder')}
             className="w-full pl-10 sm:pl-12 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+            title={t('common.search')}
           />
         </div>
       </div>
@@ -269,7 +275,7 @@ export function DeviceTreeTab() {
         {treeLoading ? (
           <div className="flex flex-col items-center justify-center h-64 gap-3 text-gray-400">
             <Loader2 className="h-10 w-10 animate-spin text-accent-red" />
-            <p className="text-sm">Gerätebaum wird geladen...</p>
+            <p className="text-sm">{t('admin.deviceTree.loadingTree')}</p>
           </div>
         ) : (
           <DeviceTreeList
@@ -324,10 +330,11 @@ function DeviceTreeList({
   isLoading,
   isFiltered,
 }: DeviceTreeListProps) {
+  const { t } = useTranslation();
   if (categories.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-center text-sm text-gray-400">
-        {isFiltered ? 'Keine Geräte für diese Suche gefunden.' : 'Es sind keine Geräte im Lager hinterlegt.'}
+        {isFiltered ? t('admin.deviceTree.emptyFiltered') : t('admin.deviceTree.empty')}
       </div>
     );
   }
@@ -336,7 +343,7 @@ function DeviceTreeList({
     return (
       <div className="flex items-center gap-2 text-sm text-gray-400">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Geräte werden aktualisiert...
+        {t('admin.deviceTree.loadingDevices')}
       </div>
     );
   }
@@ -378,6 +385,7 @@ function CategoryNode({
   onLocateDevice,
   onOpenZone,
 }: CategoryNodeProps) {
+  const { t } = useTranslation();
   const nodeId = categoryNodeKey(category.id);
   const isExpanded = expandedNodes.has(nodeId);
 
@@ -396,7 +404,7 @@ function CategoryNode({
           )}
           <span className="text-sm sm:text-base font-semibold text-white">{category.name}</span>
         </div>
-        <span className="text-xs font-semibold text-gray-400">{category.device_count} Geräte</span>
+        <span className="text-xs font-semibold text-gray-400">{t('admin.deviceTree.devicesCount', { count: category.device_count })}</span>
       </button>
       {isExpanded && (
         <div className="space-y-3 border-t border-white/5 p-4">
@@ -416,7 +424,7 @@ function CategoryNode({
           {category.direct_devices.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-gray-500">
-                Geräte ohne Unterkategorie
+                {t('admin.deviceTree.withoutSubcategory')}
               </p>
               {category.direct_devices.map((device) => (
                 <DeviceTreeItem
@@ -454,6 +462,7 @@ function SubcategoryNode({
   onLocateDevice,
   onOpenZone,
 }: SubcategoryNodeProps) {
+  const { t } = useTranslation();
   const nodeId = subcategoryNodeKey(subcategory.id);
   const isExpanded = expandedNodes.has(nodeId);
 
@@ -472,7 +481,7 @@ function SubcategoryNode({
           )}
           <span className="text-sm font-semibold text-white">{subcategory.name}</span>
         </div>
-        <span className="text-xs font-semibold text-gray-400">{subcategory.device_count} Geräte</span>
+        <span className="text-xs font-semibold text-gray-400">{t('admin.deviceTree.devicesCount', { count: subcategory.device_count })}</span>
       </button>
 
       {isExpanded && (
@@ -493,7 +502,7 @@ function SubcategoryNode({
           {subcategory.direct_devices.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-gray-500">
-                Geräte ohne Produktgruppe
+                {t('admin.deviceTree.withoutProductGroup')}
               </p>
               {subcategory.direct_devices.map((device) => (
                 <DeviceTreeItem
@@ -531,6 +540,7 @@ function SubbiercategoryNode({
   onLocateDevice,
   onOpenZone,
 }: SubbiercategoryNodeProps) {
+  const { t } = useTranslation();
   const nodeId = subbierNodeKey(group.id);
   const isExpanded = expandedNodes.has(nodeId);
 
@@ -549,7 +559,7 @@ function SubbiercategoryNode({
           )}
           <span className="text-sm font-semibold text-white">{group.name}</span>
           <span className="text-xs font-semibold text-gray-400">
-            {group.device_count} Gerät{group.device_count === 1 ? '' : 'e'}
+            {t('admin.deviceTree.deviceCount', { count: group.device_count })}
           </span>
         </button>
 
@@ -558,8 +568,9 @@ function SubbiercategoryNode({
             type="button"
             onClick={() => onOpenProduct(group.name, group.devices)}
             className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+            title={t('admin.deviceTree.openProduct')}
           >
-            <Package className="h-4 w-4" /> Produkt öffnen
+            <Package className="h-4 w-4" /> {t('admin.deviceTree.openProduct')}
           </button>
         </div>
       </div>
@@ -589,6 +600,7 @@ interface DeviceTreeItemProps {
 }
 
 function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: DeviceTreeItemProps) {
+  const { t } = useTranslation();
   const isConsumable = (device as any).is_consumable === true;
   const isAccessory = (device as any).is_accessory === true;
   const stockQuantity = (device as any).stock_quantity;
@@ -605,12 +617,12 @@ function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: De
           )}
           {isConsumable && (
             <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-blue-500/20 text-blue-400">
-              Verbrauchsmaterial
+              {t('widgets.lowStock.consumable')}
             </span>
           )}
           {isAccessory && (
             <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-purple-500/20 text-purple-400">
-              Zubehör
+              {t('widgets.lowStock.accessory')}
             </span>
           )}
           {!isConsumable && !isAccessory && (
@@ -625,7 +637,7 @@ function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: De
           {!isConsumable && !isAccessory && device.product_name && <span>{device.product_name}</span>}
           {(isConsumable || isAccessory) && stockQuantity !== undefined && (
             <span className="font-semibold text-white">
-              Lagerbestand: {stockQuantity} {unit || ''}
+              {t('products.currentStock')}: {stockQuantity} {unit || ''}
             </span>
           )}
           {!isConsumable && !isAccessory && device.zone_name && (
@@ -647,10 +659,10 @@ function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: De
             <span className="text-gray-500">Barcode: {device.barcode}</span>
           )}
           {!isConsumable && !isAccessory && device.condition_rating !== undefined && device.condition_rating > 0 && (
-            <span className="text-gray-400">Zustand: {device.condition_rating}/10</span>
+            <span className="text-gray-400">{t('admin.devices.conditionScale')}: {device.condition_rating}/10</span>
           )}
           {!isConsumable && !isAccessory && device.usage_hours !== undefined && device.usage_hours > 0 && (
-            <span className="text-gray-400">Betriebsstunden: {device.usage_hours}h</span>
+            <span className="text-gray-400">{t('admin.deviceTree.usageHours')}: {device.usage_hours}h</span>
           )}
         </div>
       </div>
@@ -661,29 +673,32 @@ function DeviceTreeItem({ device, onOpenDevice, onLocateDevice, onOpenZone }: De
               type="button"
               onClick={() => onOpenDevice(device.device_id)}
               className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20"
+              title={t('casesPage.details')}
             >
-              Details
+              {t('casesPage.details')}
             </button>
             <button
               type="button"
               onClick={() => onLocateDevice(device)}
               disabled={!device.zone_code}
               className="flex items-center gap-1 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('modals.caseDetail.light')}
             >
-              <Lightbulb className="h-4 w-4 text-yellow-300" /> Licht
+              <Lightbulb className="h-4 w-4 text-yellow-300" /> {t('modals.caseDetail.light')}
             </button>
             <button
               type="button"
               onClick={() => onOpenZone(device)}
               disabled={!device.zone_id && !device.zone_code}
               className="flex items-center gap-1 rounded-lg bg-accent-red/80 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-red disabled:cursor-not-allowed disabled:opacity-50"
+              title={t('devices.zone')}
             >
-              <MapPin className="h-4 w-4" /> Zone
+              <MapPin className="h-4 w-4" /> {t('devices.zone')}
             </button>
           </>
         )}
         {(isConsumable || isAccessory) && (
-          <span className="text-xs text-gray-500 italic">Im Lager verfügbar</span>
+          <span className="text-xs text-gray-500 italic">{t('admin.deviceTree.availableInStock')}</span>
         )}
       </div>
     </div>

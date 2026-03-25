@@ -1,4 +1,5 @@
 import { MapPin, Package, Ruler, Weight, X, Lightbulb, Layers, Tag, Download, Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { CaseDetail, CaseDevice } from '../lib/api';
 import { formatStatus, getStatusColor } from '../lib/utils';
 import { useMemo } from 'react';
@@ -31,6 +32,7 @@ export function CaseDetailModal({
   onAddDevices,
   onRemoveDevice,
 }: CaseDetailModalProps) {
+  const { t } = useTranslation();
   // Block body scroll when modal is open
   useBlockBodyScroll(isOpen);
 
@@ -64,16 +66,16 @@ export function CaseDetailModal({
           <div>
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
               <Package className="w-6 h-6 text-accent-red" />
-              {caseInfo?.name ?? 'Case'}
+              {caseInfo?.name ?? t('nav.cases')}
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              Case #{caseInfo?.case_id ?? '—'} • {devices.length} Gerät{devices.length === 1 ? '' : 'e'}
+              {t('modals.caseDetail.caseId', { id: caseInfo?.case_id ?? '—' })} • {t('modals.caseDetail.deviceCount', { count: devices.length })}
             </p>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-            aria-label="Close case details"
+            aria-label={t('modals.caseDetail.closeAria')}
           >
             <X className="w-5 h-5 text-gray-400" />
           </button>
@@ -82,7 +84,7 @@ export function CaseDetailModal({
         {caseInfo && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 border-b border-white/10 bg-white/[0.02]">
             <div className="glass rounded-xl p-4 border border-white/10">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Status</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">{t('devices.status')}</p>
               <p className={`inline-flex items-center gap-2 text-sm font-semibold ${getStatusColor(caseInfo.status)}`}>
                 <span className="px-2 py-1 rounded-full bg-white/10 uppercase tracking-wide text-xs">
                   {formatStatus(caseInfo.status)}
@@ -94,7 +96,7 @@ export function CaseDetailModal({
             </div>
 
             <div className="glass rounded-xl p-4 border border-white/10">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Abmessungen</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('cases.dimensions')}</p>
               <div className="flex items-center gap-2 text-sm text-white">
                 <Ruler className="w-4 h-4 text-gray-400" />
                 <span>{formatDimension(caseInfo.width)}</span>
@@ -110,15 +112,15 @@ export function CaseDetailModal({
             </div>
 
             <div className="glass rounded-xl p-4 border border-white/10">
-              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">Zuordnung</p>
+              <p className="text-xs text-gray-400 uppercase tracking-wide mb-2">{t('modals.caseDetail.assignment')}</p>
               <div className="flex flex-col gap-2 text-sm text-white">
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4 text-gray-400" />
-                  <span>{caseInfo.device_count} Gerät{caseInfo.device_count === 1 ? '' : 'e'}</span>
+                  <span>{t('modals.caseDetail.deviceCount', { count: caseInfo.device_count })}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-gray-400" />
-                  <span>{caseInfo.zone_name ?? 'Keine Zone'}</span>
+                  <span>{caseInfo.zone_name ?? t('casesPage.noZone')}</span>
                   {caseInfo.zone_code && (
                     <span className="font-mono text-xs text-gray-500">{caseInfo.zone_code}</span>
                   )}
@@ -135,7 +137,7 @@ export function CaseDetailModal({
                 <div className="flex flex-col gap-2">
                   <img
                     src={labelUrl}
-                    alt={`Label für Case ${caseInfo.case_id}`}
+                    alt={t('modals.caseDetail.labelAlt', { id: caseInfo.case_id })}
                     className="w-full h-auto rounded border border-white/10 shadow-sm"
                   />
                   <a
@@ -144,11 +146,11 @@ export function CaseDetailModal({
                     className="flex items-center justify-center gap-1 px-2 py-1 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
                   >
                     <Download className="w-3 h-3" />
-                    Download
+                    {t('modals.caseDetail.download')}
                   </a>
                 </div>
               ) : (
-                <p className="text-sm text-gray-500 italic">Kein Label vorhanden</p>
+                <p className="text-sm text-gray-500 italic">{t('modals.caseDetail.noLabel')}</p>
               )}
             </div>
           </div>
@@ -162,18 +164,18 @@ export function CaseDetailModal({
               className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-white bg-gradient-to-r from-accent-red to-red-700 hover:shadow-lg hover:shadow-accent-red/50 hover:scale-105 active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
-              Geräte hinzufügen
+              {t('zoneDetail.addDevices')}
             </button>
           </div>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center h-60 gap-3 text-gray-400">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent-red" />
-              <p className="text-sm">Case-Daten werden geladen…</p>
+              <p className="text-sm">{t('modals.caseDetail.loading')}</p>
             </div>
           ) : devices.length === 0 ? (
             <div className="text-center text-gray-400 text-sm py-12">
-              Keine Geräte in diesem Case.
+              {t('casesPage.noDevicesInCase')}
             </div>
           ) : (
             <div className="space-y-3">
@@ -219,30 +221,30 @@ export function CaseDetailModal({
                       onClick={() => onOpenDevice(device.device_id)}
                       className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white"
                     >
-                      Details
+                      {t('casesPage.details')}
                     </button>
                     <button
                       onClick={() => onLocateDevice(device)}
                       disabled={!device.zone_code}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
                     >
-                      <Lightbulb className="w-4 h-4 text-yellow-300" /> Licht
+                      <Lightbulb className="w-4 h-4 text-yellow-300" /> {t('modals.caseDetail.light')}
                     </button>
                     <button
                       onClick={() => onOpenZone({ zone_id: device.zone_id, zone_code: device.zone_code })}
                       disabled={!device.zone_id && !device.zone_code}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white disabled:opacity-50"
                     >
-                      <MapPin className="w-4 h-4" /> Zone
+                      <MapPin className="w-4 h-4" /> {t('devices.zone')}
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm(`Gerät ${device.device_id} aus diesem Case entfernen?`)) {
+                        if (confirm(t('casesPage.messages.removeDeviceConfirm', { id: device.device_id }))) {
                           onRemoveDevice(device.device_id);
                         }
                       }}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-red-600/80 hover:bg-red-600 transition-colors text-white"
-                      title="Aus Case entfernen"
+                      title={t('modals.caseDetail.removeFromCase')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

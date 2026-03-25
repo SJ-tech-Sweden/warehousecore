@@ -1,75 +1,55 @@
 import { useState } from 'react';
 import { Download, Package, Building2, Tag, Layers, Cable, Briefcase, FileText, TrendingUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type ExportType = {
   id: string;
-  label: string;
-  description: string;
   icon: typeof Download;
 };
 
 export function ExportTab() {
   const [loading, setLoading] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const exportTypes: ExportType[] = [
     {
       id: 'products',
-      label: 'Alle Produkte',
-      description: 'Exportiert alle Produkte mit Basisdaten (ID, Name, Beschreibung, Kategorie, etc.)',
       icon: Package,
     },
     {
       id: 'products-with-count',
-      label: 'Produkte mit Geräteanzahl',
-      description: 'Alle Produkte mit Anzahl verfügbarer, im Einsatz und defekter Geräte',
       icon: TrendingUp,
     },
     {
       id: 'products-with-brand',
-      label: 'Produkte mit Marke & Hersteller',
-      description: 'Alle Produkte inklusive Hersteller- und Markeninformationen',
       icon: Tag,
     },
     {
       id: 'devices',
-      label: 'Alle Geräte',
-      description: 'Vollständige Geräteliste mit Status, Seriennummer, Kaufdatum und Standort',
       icon: FileText,
     },
     {
       id: 'manufacturers',
-      label: 'Alle Hersteller',
-      description: 'Liste aller Hersteller mit Land, Webseite und Notizen',
       icon: Building2,
     },
     {
       id: 'manufacturers-with-brands',
-      label: 'Hersteller mit Marken',
-      description: 'Hersteller mit zugeordneten Markennamen',
       icon: Building2,
     },
     {
       id: 'brands',
-      label: 'Alle Marken',
-      description: 'Liste aller Marken mit Hersteller-Zuordnung',
       icon: Tag,
     },
     {
       id: 'zones',
-      label: 'Alle Lagerbereiche',
-      description: 'Lagerzonen mit Typ, Barcode, Kapazität und Geräteanzahl',
       icon: Layers,
     },
     {
       id: 'cables',
-      label: 'Alle Kabel',
-      description: 'Kabel mit Typ, Steckern, Länge und Spezifikationen',
       icon: Cable,
     },
     {
       id: 'jobs',
-      label: 'Alle Jobs',
-      description: 'Jobs mit Datum, Kunde, Status und Geräteanzahl',
       icon: Briefcase,
     },
   ];
@@ -84,7 +64,7 @@ export function ExportTab() {
       });
 
       if (!response.ok) {
-        throw new Error('Export failed');
+        throw new Error(t('admin.export.messages.exportFailed'));
       }
 
       // Get the blob from response
@@ -116,7 +96,7 @@ export function ExportTab() {
       const event = new CustomEvent('toast', {
         detail: {
           type: 'success',
-          message: `${label} erfolgreich exportiert`,
+          message: t('admin.export.messages.exportSuccess', { label }),
         },
       });
       window.dispatchEvent(event);
@@ -125,7 +105,7 @@ export function ExportTab() {
       const event = new CustomEvent('toast', {
         detail: {
           type: 'error',
-          message: 'Fehler beim Exportieren',
+          message: t('admin.export.messages.exportError'),
         },
       });
       window.dispatchEvent(event);
@@ -138,10 +118,9 @@ export function ExportTab() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">CSV-Export</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">{t('admin.export.title')}</h2>
         <p className="text-gray-400">
-          Exportieren Sie verschiedene Datensätze als CSV-Dateien für Excel oder andere Anwendungen.
-          Alle Exporte verwenden UTF-8 Encoding und deutsches CSV-Format (Semikolon-getrennt).
+          {t('admin.export.subtitle')}
         </p>
       </div>
 
@@ -154,7 +133,7 @@ export function ExportTab() {
           return (
             <button
               key={exportType.id}
-              onClick={() => handleExport(exportType.id, exportType.label)}
+              onClick={() => handleExport(exportType.id, t(`admin.export.types.${exportType.id}.label`))}
               disabled={isLoading}
               className="glass-dark p-6 rounded-xl text-left hover:bg-white/10 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -164,10 +143,10 @@ export function ExportTab() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-accent-red transition-colors">
-                    {exportType.label}
+                    {t(`admin.export.types.${exportType.id}.label`)}
                   </h3>
                   <p className="text-sm text-gray-400 leading-relaxed">
-                    {exportType.description}
+                    {t(`admin.export.types.${exportType.id}.description`)}
                   </p>
                 </div>
               </div>
@@ -177,12 +156,12 @@ export function ExportTab() {
                 {isLoading ? (
                   <div className="flex items-center gap-2 text-accent-red">
                     <div className="w-4 h-4 border-2 border-accent-red border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm font-medium">Exportiere...</span>
+                    <span className="text-sm font-medium">{t('admin.export.exporting')}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-gray-400 group-hover:text-accent-red transition-colors">
                     <Download className="w-4 h-4" />
-                    <span className="text-sm font-medium">CSV herunterladen</span>
+                    <span className="text-sm font-medium">{t('admin.export.downloadCsv')}</span>
                   </div>
                 )}
               </div>
@@ -195,40 +174,37 @@ export function ExportTab() {
       <div className="glass-dark p-6 rounded-xl border border-white/10">
         <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
           <FileText className="w-5 h-5 text-accent-red" />
-          Wichtige Hinweise zum CSV-Export
+          {t('admin.export.notes.title')}
         </h3>
         <ul className="space-y-2 text-gray-400 text-sm">
           <li className="flex items-start gap-2">
             <span className="text-accent-red mt-1">•</span>
             <span>
-              <strong className="text-white">Encoding:</strong> Alle CSV-Dateien verwenden UTF-8 mit BOM für optimale
-              Excel-Kompatibilität
+              <strong className="text-white">{t('admin.export.notes.encodingLabel')}</strong> {t('admin.export.notes.encodingText')}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-accent-red mt-1">•</span>
             <span>
-              <strong className="text-white">Trennzeichen:</strong> Semikolon (;) als Spalten-Trennzeichen (deutsches
-              CSV-Format)
+              <strong className="text-white">{t('admin.export.notes.delimiterLabel')}</strong> {t('admin.export.notes.delimiterText')}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-accent-red mt-1">•</span>
             <span>
-              <strong className="text-white">Zahlenformat:</strong> Komma (,) als Dezimaltrennzeichen
+              <strong className="text-white">{t('admin.export.notes.numberFormatLabel')}</strong> {t('admin.export.notes.numberFormatText')}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-accent-red mt-1">•</span>
             <span>
-              <strong className="text-white">Datumsformat:</strong> DD.MM.YYYY HH:MM (deutsches Format)
+              <strong className="text-white">{t('admin.export.notes.dateFormatLabel')}</strong> {t('admin.export.notes.dateFormatText')}
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-accent-red mt-1">•</span>
             <span>
-              <strong className="text-white">Excel-Import:</strong> Dateien können direkt in Excel geöffnet werden. Bei
-              Problemen nutzen Sie "Daten → Aus Text/CSV"
+              <strong className="text-white">{t('admin.export.notes.excelImportLabel')}</strong> {t('admin.export.notes.excelImportText')}
             </span>
           </li>
         </ul>

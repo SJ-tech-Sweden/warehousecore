@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface LowStockAlert {
   product_id: number;
@@ -18,6 +19,7 @@ interface LowStockResponse {
 }
 
 export function LowStockAlertsWidget() {
+  const { t } = useTranslation();
   const [alerts, setAlerts] = useState<LowStockAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export function LowStockAlertsWidget() {
       setError(null);
     } catch (err) {
       console.error('Failed to load low stock alerts:', err);
-      setError('Failed to load alerts');
+      setError(t('widgets.lowStock.loadError'));
     } finally {
       setLoading(false);
     }
@@ -52,9 +54,9 @@ export function LowStockAlertsWidget() {
       <div className="glass rounded-xl p-4">
         <div className="flex items-center gap-3 mb-3">
           <AlertTriangle className="w-5 h-5 text-yellow-500" />
-          <h3 className="text-lg font-semibold text-white">Low Stock Alerts</h3>
+          <h3 className="text-lg font-semibold text-white">{t('widgets.lowStock.title')}</h3>
         </div>
-        <p className="text-sm text-gray-400">Loading...</p>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
       </div>
     );
   }
@@ -64,7 +66,7 @@ export function LowStockAlertsWidget() {
       <div className="glass rounded-xl p-4 border border-red-500/30">
         <div className="flex items-center gap-3 mb-3">
           <AlertTriangle className="w-5 h-5 text-red-500" />
-          <h3 className="text-lg font-semibold text-white">Low Stock Alerts</h3>
+          <h3 className="text-lg font-semibold text-white">{t('widgets.lowStock.title')}</h3>
         </div>
         <p className="text-sm text-red-400">{error}</p>
       </div>
@@ -76,9 +78,9 @@ export function LowStockAlertsWidget() {
       <div className="glass rounded-xl p-4">
         <div className="flex items-center gap-3 mb-3">
           <Package className="w-5 h-5 text-green-500" />
-          <h3 className="text-lg font-semibold text-white">Low Stock Alerts</h3>
+          <h3 className="text-lg font-semibold text-white">{t('widgets.lowStock.title')}</h3>
         </div>
-        <p className="text-sm text-gray-400">All items are adequately stocked ✓</p>
+        <p className="text-sm text-gray-400">{t('widgets.lowStock.allGood')}</p>
       </div>
     );
   }
@@ -88,7 +90,7 @@ export function LowStockAlertsWidget() {
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-yellow-500" />
-          <h3 className="text-lg font-semibold text-white">Low Stock Alerts</h3>
+          <h3 className="text-lg font-semibold text-white">{t('widgets.lowStock.title')}</h3>
         </div>
         <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs font-semibold rounded-full">
           {alerts.length}
@@ -112,11 +114,11 @@ export function LowStockAlertsWidget() {
                       ? 'bg-blue-500/20 text-blue-300'
                       : 'bg-purple-500/20 text-purple-300'
                   }`}>
-                    {alert.is_accessory ? 'Accessory' : 'Consumable'}
+                    {alert.is_accessory ? t('widgets.lowStock.accessory') : t('widgets.lowStock.consumable')}
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mb-1">
-                  Barcode: {alert.generic_barcode}
+                  {t('widgets.lowStock.barcode')} {alert.generic_barcode}
                 </p>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-yellow-400 font-semibold">
@@ -124,7 +126,7 @@ export function LowStockAlertsWidget() {
                   </span>
                   <span className="text-gray-500">•</span>
                   <span className="text-gray-400">
-                    Min: {alert.min_stock_level.toFixed(2)} {alert.count_type_abbr}
+                    {t('widgets.lowStock.min')} {alert.min_stock_level.toFixed(2)} {alert.count_type_abbr}
                   </span>
                 </div>
               </div>
@@ -133,7 +135,7 @@ export function LowStockAlertsWidget() {
                   <div className="text-xs font-semibold text-yellow-500">
                     {Math.round((alert.stock_quantity / alert.min_stock_level) * 100)}%
                   </div>
-                  <div className="text-xs text-gray-500">of min</div>
+                  <div className="text-xs text-gray-500">{t('widgets.lowStock.ofMin')}</div>
                 </div>
               </div>
             </div>
@@ -145,7 +147,7 @@ export function LowStockAlertsWidget() {
         onClick={loadLowStockAlerts}
         className="mt-3 w-full py-2 text-xs font-semibold text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
       >
-        Refresh
+        {t('widgets.lowStock.refresh')}
       </button>
     </div>
   );

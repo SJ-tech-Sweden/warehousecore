@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Mail, Shield, Save } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
 
 interface UserProfile {
@@ -25,6 +26,7 @@ interface UserProfile {
 }
 
 export function ProfilePage() {
+  const { t } = useTranslation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [avatarURL, setAvatarURL] = useState('');
@@ -60,18 +62,18 @@ export function ProfilePage() {
         prefs: profile?.profile.prefs || {},
       });
 
-      setMessage('✓ Profil erfolgreich gespeichert');
+      setMessage(t('profilePage.saveSuccess'));
       setTimeout(() => setMessage(''), 3000);
       loadProfile();
     } catch (error: any) {
-      setMessage('Fehler beim Speichern: ' + (error.response?.data?.error || error.message));
+      setMessage(t('profilePage.saveError', { error: error.response?.data?.error || error.message }));
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div className="text-white">Lädt...</div>;
+    return <div className="text-white">{t('common.loading')}</div>;
   }
 
   return (
@@ -80,8 +82,8 @@ export function ProfilePage() {
       <div className="flex items-center gap-3">
         <User className="w-8 h-8 text-accent-red" />
         <div>
-          <h1 className="text-3xl font-bold text-white">Mein Profil</h1>
-          <p className="text-gray-400">Persönliche Einstellungen</p>
+          <h1 className="text-3xl font-bold text-white">{t('profilePage.title')}</h1>
+          <p className="text-gray-400">{t('profilePage.subtitle')}</p>
         </div>
       </div>
 
@@ -107,7 +109,7 @@ export function ProfilePage() {
         <div>
           <label className="block text-sm font-semibold text-gray-400 mb-2 flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Rollen
+            {t('profilePage.roles')}
           </label>
           <div className="flex flex-wrap gap-2">
             {profile?.roles.map(role => (
@@ -124,13 +126,13 @@ export function ProfilePage() {
         {/* Display Name */}
         <div>
           <label className="block text-sm font-semibold text-gray-400 mb-2">
-            Anzeigename (optional)
+            {t('profilePage.displayName')}
           </label>
           <input
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="z.B. Max M."
+            placeholder={t('profilePage.displayNamePlaceholder')}
             className="w-full px-4 py-3 rounded-xl glass text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-red outline-none"
           />
         </div>
@@ -138,13 +140,13 @@ export function ProfilePage() {
         {/* Avatar URL */}
         <div>
           <label className="block text-sm font-semibold text-gray-400 mb-2">
-            Avatar URL (optional)
+            {t('profilePage.avatarUrl')}
           </label>
           <input
             type="url"
             value={avatarURL}
             onChange={(e) => setAvatarURL(e.target.value)}
-            placeholder="https://example.com/avatar.jpg"
+            placeholder={t('profilePage.avatarUrlPlaceholder')}
             className="w-full px-4 py-3 rounded-xl glass text-white placeholder-gray-500 focus:ring-2 focus:ring-accent-red outline-none"
           />
         </div>
@@ -161,12 +163,12 @@ export function ProfilePage() {
             }`}
           >
             <Save className="w-5 h-5" />
-            <span>{saving ? 'Speichert...' : 'Speichern'}</span>
+            <span>{saving ? t('common.saving') : t('common.save')}</span>
           </button>
 
           {message && (
             <div className={`mt-3 p-3 rounded-lg text-center text-sm font-semibold ${
-              message.includes('✓')
+              message === t('profilePage.saveSuccess')
                 ? 'bg-green-500/20 text-green-400'
                 : 'bg-red-500/20 text-red-400'
             }`}>

@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api, devicesAdminApi, labelsApi } from '../../lib/api';
 import type { Device, DeviceCreateInput, DeviceUpdateInput, LabelTemplate } from '../../lib/api';
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
@@ -83,6 +84,7 @@ function useDebouncedValue<T>(value: T, delay: number) {
 }
 
 export function DevicesTab() {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -170,6 +172,11 @@ export function DevicesTab() {
     return matchesSearch && matchesStatus && matchesProduct && matchesZone;
   });
 
+  const statusLabel = (status?: string) => {
+    if (!status) return '-';
+    return t(`admin.devices.statuses.${status}`, status);
+  };
+
   const openCreateModal = () => {
     setEditingDevice(null);
     setFormData({ ...initialFormData, label_template_id: undefined });
@@ -204,7 +211,7 @@ export function DevicesTab() {
   };
 
   const handleDelete = async (deviceId: string) => {
-    if (!window.confirm('Möchten Sie dieses Gerät wirklich löschen?')) {
+    if (!window.confirm(t('admin.devices.confirmDelete'))) {
       return;
     }
 
@@ -213,7 +220,7 @@ export function DevicesTab() {
       await fetchDevices();
     } catch (error: unknown) {
       console.error('Failed to delete device:', error);
-      alert('Fehler beim Löschen des Geräts');
+      alert(t('admin.devices.errors.delete'));
     }
   };
 
@@ -288,7 +295,7 @@ export function DevicesTab() {
       await fetchDevices();
     } catch (error: unknown) {
       console.error('Failed to save device:', error);
-      alert('Fehler beim Speichern des Geräts');
+      alert(t('admin.devices.errors.save'));
     } finally {
       setSubmitting(false);
     }
@@ -325,14 +332,14 @@ export function DevicesTab() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Package className="w-6 h-6 text-accent-red" />
-          <h2 className="text-2xl font-bold text-white">Geräte-Verwaltung</h2>
+          <h2 className="text-2xl font-bold text-white">{t('admin.devices.title')}</h2>
         </div>
         <button
           onClick={openCreateModal}
           className="btn-primary flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          Neues Gerät
+          {t('admin.devices.newDevice')}
         </button>
       </div>
 
@@ -344,7 +351,7 @@ export function DevicesTab() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Suchen (ID, Produkt, Serial, Barcode)..."
+              placeholder={t('admin.devices.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="input-field pl-10 w-full"
@@ -356,13 +363,14 @@ export function DevicesTab() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="input-field"
+            title={t('devices.status')}
           >
-            <option value="">Alle Status</option>
-            <option value="free">Frei</option>
-            <option value="on_job">Im Einsatz</option>
-            <option value="defective">Defekt</option>
-            <option value="maintenance">Wartung</option>
-            <option value="retired">Ausgemustert</option>
+            <option value="">{t('admin.devices.filters.allStatuses')}</option>
+            <option value="free">{t('admin.devices.statuses.free')}</option>
+            <option value="on_job">{t('admin.devices.statuses.on_job')}</option>
+            <option value="defective">{t('admin.devices.statuses.defective')}</option>
+            <option value="maintenance">{t('admin.devices.statuses.maintenance')}</option>
+            <option value="retired">{t('admin.devices.statuses.retired')}</option>
           </select>
 
           {/* Product Filter */}
@@ -370,8 +378,9 @@ export function DevicesTab() {
             value={productFilter}
             onChange={(e) => setProductFilter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('zoneDetail.columns.product')}
           >
-            <option value="">Alle Produkte</option>
+            <option value="">{t('admin.devices.filters.allProducts')}</option>
             {products.map((product) => (
               <option key={product.product_id} value={product.product_id}>
                 {product.name}
@@ -384,8 +393,9 @@ export function DevicesTab() {
             value={zoneFilter}
             onChange={(e) => setZoneFilter(e.target.value ? Number(e.target.value) : '')}
             className="input-field"
+            title={t('devices.zone')}
           >
-            <option value="">Alle Zonen</option>
+            <option value="">{t('admin.devices.filters.allZones')}</option>
             {zones.map((zone) => (
               <option key={zone.zone_id} value={zone.zone_id}>
                 {zone.code} - {zone.name}
@@ -402,7 +412,7 @@ export function DevicesTab() {
               className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors"
             >
               <X className="w-4 h-4 inline mr-1" />
-              Filter löschen
+              {t('admin.devices.clearFilters')}
             </button>
             <button
               onClick={handleRefresh}
@@ -410,7 +420,7 @@ export function DevicesTab() {
               className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors disabled:opacity-50"
             >
               <RefreshCcw className={`w-4 h-4 inline mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-              Aktualisieren
+              {t('common.update')}
             </button>
           </div>
 
@@ -421,6 +431,8 @@ export function DevicesTab() {
               className={`p-2 rounded-lg transition-colors ${
                 viewMode === 'table' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'
               }`}
+              title={t('admin.devices.tableView')}
+              aria-label={t('admin.devices.tableView')}
             >
               <List className="w-5 h-5" />
             </button>
@@ -429,6 +441,8 @@ export function DevicesTab() {
               className={`p-2 rounded-lg transition-colors ${
                 viewMode === 'cards' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'
               }`}
+              title={t('admin.devices.cardView')}
+              aria-label={t('admin.devices.cardView')}
             >
               <LayoutGrid className="w-5 h-5" />
             </button>
@@ -438,12 +452,12 @@ export function DevicesTab() {
 
       {/* Device List */}
       {loadingDevices ? (
-        <div className="text-center py-12 text-gray-400">Lädt Geräte...</div>
+        <div className="text-center py-12 text-gray-400">{t('admin.devices.loading')}</div>
       ) : filteredDevices.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           {debouncedSearch || statusFilter || productFilter || zoneFilter
-            ? 'Keine Geräte gefunden mit den aktuellen Filtern'
-            : 'Noch keine Geräte vorhanden'}
+            ? t('admin.devices.emptyFiltered')
+            : t('admin.devices.empty')}
         </div>
       ) : viewMode === 'table' ? (
         <div className="glass-dark rounded-xl overflow-hidden">
@@ -452,12 +466,12 @@ export function DevicesTab() {
               <thead className="bg-white/5">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">ID</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Produkt</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Serial</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Zone</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">Zustand</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Aktionen</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('zoneDetail.columns.product')}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('admin.devices.serialShort')}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('devices.status')}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('devices.zone')}</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">{t('devices.condition')}</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">{t('labels.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -485,7 +499,7 @@ export function DevicesTab() {
                             : 'bg-yellow-500/20 text-yellow-400'
                         }`}
                       >
-                        {device.status}
+                        {statusLabel(device.status)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-300">
@@ -499,35 +513,35 @@ export function DevicesTab() {
                         <button
                           onClick={() => handleViewDevice(device)}
                           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="Details anzeigen"
+                          title={t('casesPage.details')}
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => downloadQR(device.device_id)}
                           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="QR-Code herunterladen"
+                          title={t('admin.devices.downloadQr')}
                         >
                           <QrCode className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => downloadBarcode(device.device_id)}
                           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
-                          title="Barcode herunterladen"
+                          title={t('admin.devices.downloadBarcode')}
                         >
                           <Download className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEditModal(device)}
                           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-blue-400 hover:text-blue-300"
-                          title="Bearbeiten"
+                          title={t('common.edit')}
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(device.device_id)}
                           className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-red-400 hover:text-red-300"
-                          title="Löschen"
+                          title={t('common.delete')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -546,7 +560,7 @@ export function DevicesTab() {
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-bold text-white">{device.device_id}</h3>
-                <p className="text-sm text-gray-400">{device.product_name || 'Unbekanntes Produkt'}</p>
+                <p className="text-sm text-gray-400">{device.product_name || t('admin.devices.unknownProduct')}</p>
                 {device.product_category && (
                   <p className="text-xs text-gray-500">{device.product_category}</p>
                 )}
@@ -562,34 +576,34 @@ export function DevicesTab() {
                       : 'bg-yellow-500/20 text-yellow-400'
                   }`}
                 >
-                  {device.status}
+                  {statusLabel(device.status)}
                 </span>
               </div>
 
               <div className="space-y-1 text-sm">
                 {device.serial_number && (
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Serial:</span> {device.serial_number}
+                    <span className="text-gray-500">{t('admin.devices.serialShort')}:</span> {device.serial_number}
                   </p>
                 )}
                 {device.zone_code && (
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Zone:</span> {device.zone_code} - {device.zone_name}
+                    <span className="text-gray-500">{t('devices.zone')}:</span> {device.zone_code} - {device.zone_name}
                   </p>
                 )}
                 {device.condition_rating && (
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Zustand:</span> {device.condition_rating}/10
+                    <span className="text-gray-500">{t('devices.condition')}:</span> {device.condition_rating}/10
                   </p>
                 )}
                 {device.purchase_date && (
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Kauf:</span> {device.purchase_date}
+                    <span className="text-gray-500">{t('admin.devices.purchaseShort')}:</span> {device.purchase_date}
                   </p>
                 )}
                 {device.usage_hours && (
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Stunden:</span> {device.usage_hours}h
+                    <span className="text-gray-500">{t('admin.devices.hoursShort')}:</span> {device.usage_hours}h
                   </p>
                 )}
               </div>
@@ -600,18 +614,20 @@ export function DevicesTab() {
                   className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center gap-2"
                 >
                   <Eye className="w-4 h-4" />
-                  Details
+                  {t('casesPage.details')}
                 </button>
                 <button
                   onClick={() => openEditModal(device)}
                   className="flex-1 px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg text-sm text-blue-400 transition-colors flex items-center justify-center gap-2"
                 >
                   <Pencil className="w-4 h-4" />
-                  Bearbeiten
+                  {t('common.edit')}
                 </button>
                 <button
                   onClick={() => handleDelete(device.device_id)}
                   className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+                  title={t('common.delete')}
+                  aria-label={t('common.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -627,11 +643,13 @@ export function DevicesTab() {
           <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-white">
-                {editingDevice ? 'Gerät bearbeiten' : 'Neues Gerät erstellen'}
+                {editingDevice ? t('admin.devices.editDevice') : t('admin.devices.createDevice')}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label={t('common.close')}
+                title={t('common.close')}
               >
                 <X className="w-6 h-6 text-gray-400" />
               </button>
@@ -641,7 +659,7 @@ export function DevicesTab() {
               {/* Product Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Produkt *
+                  {t('zoneDetail.columns.product')} *
                 </label>
                 <select
                   value={formData.product_id || ''}
@@ -651,8 +669,9 @@ export function DevicesTab() {
                   className="input-field w-full"
                   required
                   disabled={!!editingDevice}
+                  title={t('zoneDetail.columns.product')}
                 >
-                  <option value="">Produkt auswählen...</option>
+                  <option value="">{t('admin.devices.selectProduct')}</option>
                   {products.map((product) => (
                     <option key={product.product_id} value={product.product_id}>
                       {product.name}
@@ -667,7 +686,7 @@ export function DevicesTab() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Anzahl
+                      {t('admin.devices.quantity')}
                     </label>
                     <input
                       type="number"
@@ -678,11 +697,12 @@ export function DevicesTab() {
                         setFormData({ ...formData, quantity: Number(e.target.value) || 1 })
                       }
                       className="input-field w-full"
+                      title={t('admin.devices.quantity')}
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Präfix (optional)
+                      {t('admin.devices.prefixOptional')}
                     </label>
                     <input
                       type="text"
@@ -691,7 +711,8 @@ export function DevicesTab() {
                         setFormData({ ...formData, device_prefix: e.target.value })
                       }
                       className="input-field w-full"
-                      placeholder="z.B. LED-"
+                      placeholder={t('admin.devices.prefixPlaceholder')}
+                      title={t('admin.devices.prefixOptional')}
                     />
                   </div>
                 </div>
@@ -709,7 +730,7 @@ export function DevicesTab() {
                     className="w-4 h-4"
                   />
                   <label htmlFor="increment_serial" className="text-sm text-gray-300">
-                    Seriennummern automatisch durchnummerieren
+                    {t('admin.devices.incrementSerial')}
                   </label>
                 </div>
               )}
@@ -718,25 +739,26 @@ export function DevicesTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Status *
+                    {t('devices.status')} *
                   </label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                     className="input-field w-full"
                     required
+                    title={t('devices.status')}
                   >
-                    <option value="free">Frei</option>
-                    <option value="on_job">Im Einsatz</option>
-                    <option value="defective">Defekt</option>
-                    <option value="maintenance">Wartung</option>
-                    <option value="retired">Ausgemustert</option>
+                    <option value="free">{t('admin.devices.statuses.free')}</option>
+                    <option value="on_job">{t('admin.devices.statuses.on_job')}</option>
+                    <option value="defective">{t('admin.devices.statuses.defective')}</option>
+                    <option value="maintenance">{t('admin.devices.statuses.maintenance')}</option>
+                    <option value="retired">{t('admin.devices.statuses.retired')}</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Zone
+                    {t('devices.zone')}
                   </label>
                   <select
                     value={formData.zone_id || ''}
@@ -744,8 +766,9 @@ export function DevicesTab() {
                       setFormData({ ...formData, zone_id: e.target.value ? Number(e.target.value) : undefined })
                     }
                     className="input-field w-full"
+                    title={t('devices.zone')}
                   >
-                    <option value="">Keine Zone</option>
+                    <option value="">{t('casesPage.noZone')}</option>
                     {zones.map((zone) => (
                       <option key={zone.zone_id} value={zone.zone_id}>
                         {zone.code} - {zone.name}
@@ -759,35 +782,38 @@ export function DevicesTab() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Seriennummer
+                    {t('devices.serialNumber')}
                   </label>
                   <input
                     type="text"
                     value={formData.serial_number}
                     onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
                     className="input-field w-full"
+                    title={t('devices.serialNumber')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Barcode
+                    {t('devices.barcode')}
                   </label>
                   <input
                     type="text"
                     value={formData.barcode}
                     onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                     className="input-field w-full"
+                    title={t('devices.barcode')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    QR-Code
+                    {t('labels.qrCode')}
                   </label>
                   <input
                     type="text"
                     value={formData.qr_code}
                     onChange={(e) => setFormData({ ...formData, qr_code: e.target.value })}
                     className="input-field w-full"
+                    title={t('labels.qrCode')}
                   />
                 </div>
               </div>
@@ -796,18 +822,19 @@ export function DevicesTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Aktueller Standort
+                    {t('admin.devices.currentLocation')}
                   </label>
                   <input
                     type="text"
                     value={formData.current_location}
                     onChange={(e) => setFormData({ ...formData, current_location: e.target.value })}
                     className="input-field w-full"
+                    title={t('admin.devices.currentLocation')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Zustand (1-10)
+                    {t('admin.devices.conditionScale')}
                   </label>
                   <input
                     type="number"
@@ -822,6 +849,7 @@ export function DevicesTab() {
                       })
                     }
                     className="input-field w-full"
+                    title={t('admin.devices.conditionScale')}
                   />
               </div>
               </div>
@@ -830,35 +858,38 @@ export function DevicesTab() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Kaufdatum
+                    {t('admin.devices.purchaseDate')}
                   </label>
                   <input
                     type="date"
                     value={formData.purchase_date}
                     onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                     className="input-field w-full"
+                    title={t('admin.devices.purchaseDate')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Letzte Wartung
+                    {t('admin.devices.lastMaintenance')}
                   </label>
                   <input
                     type="date"
                     value={formData.last_maintenance}
                     onChange={(e) => setFormData({ ...formData, last_maintenance: e.target.value })}
                     className="input-field w-full"
+                    title={t('admin.devices.lastMaintenance')}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Nächste Wartung
+                    {t('admin.devices.nextMaintenance')}
                   </label>
                   <input
                     type="date"
                     value={formData.next_maintenance}
                     onChange={(e) => setFormData({ ...formData, next_maintenance: e.target.value })}
                     className="input-field w-full"
+                    title={t('admin.devices.nextMaintenance')}
                   />
                 </div>
               </div>
@@ -866,7 +897,7 @@ export function DevicesTab() {
               {/* Usage Hours */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Betriebsstunden
+                  {t('devices.usageHours')}
                 </label>
                 <input
                   type="number"
@@ -880,19 +911,21 @@ export function DevicesTab() {
                     })
                   }
                   className="input-field w-full"
+                  title={t('devices.usageHours')}
                 />
               </div>
 
               {/* Notes */}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Notizen
+                  {t('modals.productDependencies.notes')}
                 </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   className="input-field w-full"
                   rows={3}
+                  title={t('modals.productDependencies.notes')}
                 />
               </div>
 
@@ -907,7 +940,7 @@ export function DevicesTab() {
                         onChange={(e) => setFormData({ ...formData, regenerate_codes: e.target.checked })}
                         className="w-4 h-4"
                       />
-                      Barcodes/QR-Codes neu generieren
+                      {t('admin.devices.regenerateCodes')}
                     </label>
                     <label className="flex items-center gap-2 text-sm text-gray-300">
                       <input
@@ -916,7 +949,7 @@ export function DevicesTab() {
                         onChange={(e) => setFormData({ ...formData, regenerate_label: e.target.checked })}
                         className="w-4 h-4"
                       />
-                      Label mit aktueller Vorlage neu rendern
+                      {t('admin.devices.regenerateLabel')}
                     </label>
                   </>
                 ) : (
@@ -927,13 +960,13 @@ export function DevicesTab() {
                       onChange={(e) => setFormData({ ...formData, auto_generate_label: e.target.checked })}
                       className="w-4 h-4"
                     />
-                    Label nach Erstellung automatisch speichern
+                    {t('admin.devices.autoGenerateLabel')}
                   </label>
                 )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Label-Vorlage
+                    {t('labels.template')}
                   </label>
                   <select
                     value={formData.label_template_id ?? ''}
@@ -944,8 +977,9 @@ export function DevicesTab() {
                       })
                     }
                     className="input-field w-full"
+                    title={t('labels.template')}
                   >
-                    <option value="">Standard (Default)</option>
+                    <option value="">{t('admin.devices.defaultTemplate')}</option>
                     {labelTemplates.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.name} {template.is_default ? '(Standard)' : ''}
@@ -953,7 +987,7 @@ export function DevicesTab() {
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Wird eine Vorlage gewählt, wird das Label mit dieser Vorlage erzeugt bzw. neu gerendert.
+                    {t('admin.devices.templateHint')}
                   </p>
                 </div>
               </div>
@@ -965,7 +999,7 @@ export function DevicesTab() {
                   onClick={() => setModalOpen(false)}
                   className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors"
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
@@ -973,10 +1007,10 @@ export function DevicesTab() {
                   className="flex-1 btn-primary disabled:opacity-50"
                 >
                   {submitting
-                    ? 'Speichert...'
+                    ? t('common.saving')
                     : editingDevice
-                    ? 'Aktualisieren'
-                    : 'Erstellen'}
+                    ? t('common.update')
+                    : t('common.create')}
                 </button>
               </div>
             </form>
@@ -989,10 +1023,12 @@ export function DevicesTab() {
         <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
           <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-white">Geräte-Details</h3>
+              <h3 className="text-2xl font-bold text-white">{t('modals.deviceDetail.title')}</h3>
               <button
                 onClick={() => setViewDevice(null)}
                 className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label={t('common.close')}
+                title={t('common.close')}
               >
                 <X className="w-6 h-6 text-gray-400" />
               </button>
@@ -1001,60 +1037,60 @@ export function DevicesTab() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-400">Geräte-ID</p>
+                  <p className="text-sm text-gray-400">{t('devices.deviceId')}</p>
                   <p className="text-white font-semibold">{viewDevice.device_id}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Produkt</p>
+                  <p className="text-sm text-gray-400">{t('zoneDetail.columns.product')}</p>
                   <p className="text-white font-semibold">{viewDevice.product_name || '-'}</p>
                 </div>
                 {viewDevice.product_category && (
                   <div>
-                    <p className="text-sm text-gray-400">Kategorie</p>
+                    <p className="text-sm text-gray-400">{t('admin.tabs.categories')}</p>
                     <p className="text-white font-semibold">{viewDevice.product_category}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-400">Status</p>
-                  <p className="text-white font-semibold">{viewDevice.status}</p>
+                  <p className="text-sm text-gray-400">{t('devices.status')}</p>
+                  <p className="text-white font-semibold">{statusLabel(viewDevice.status)}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Seriennummer</p>
+                  <p className="text-sm text-gray-400">{t('devices.serialNumber')}</p>
                   <p className="text-white font-semibold">{viewDevice.serial_number || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Barcode</p>
+                  <p className="text-sm text-gray-400">{t('devices.barcode')}</p>
                   <p className="text-white font-semibold">{viewDevice.barcode || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">QR-Code</p>
+                  <p className="text-sm text-gray-400">{t('labels.qrCode')}</p>
                   <p className="text-white font-semibold">{viewDevice.qr_code || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Zone</p>
+                  <p className="text-sm text-gray-400">{t('devices.zone')}</p>
                   <p className="text-white font-semibold">
                     {viewDevice.zone_code ? `${viewDevice.zone_code} - ${viewDevice.zone_name}` : '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Standort</p>
+                  <p className="text-sm text-gray-400">{t('admin.devices.location')}</p>
                   <p className="text-white font-semibold">{viewDevice.current_location || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Zustand</p>
+                  <p className="text-sm text-gray-400">{t('devices.condition')}</p>
                   <p className="text-white font-semibold">
                     {viewDevice.condition_rating ? `${viewDevice.condition_rating}/10` : '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Betriebsstunden</p>
+                  <p className="text-sm text-gray-400">{t('devices.usageHours')}</p>
                   <p className="text-white font-semibold">
                     {viewDevice.usage_hours ? `${viewDevice.usage_hours}h` : '-'}
                   </p>
                 </div>
                 {viewDevice.purchase_date && (
                   <div>
-                    <p className="text-sm text-gray-400">Kaufdatum</p>
+                    <p className="text-sm text-gray-400">{t('admin.devices.purchaseDate')}</p>
                     <p className="text-white font-semibold">
                       {viewDevice.purchase_date}
                     </p>
@@ -1062,7 +1098,7 @@ export function DevicesTab() {
                 )}
                 {viewDevice.last_maintenance && (
                   <div>
-                    <p className="text-sm text-gray-400">Letzte Wartung</p>
+                    <p className="text-sm text-gray-400">{t('admin.devices.lastMaintenance')}</p>
                     <p className="text-white font-semibold">
                       {viewDevice.last_maintenance}
                     </p>
@@ -1070,7 +1106,7 @@ export function DevicesTab() {
                 )}
                 {viewDevice.next_maintenance && (
                   <div>
-                    <p className="text-sm text-gray-400">Nächste Wartung</p>
+                    <p className="text-sm text-gray-400">{t('admin.devices.nextMaintenance')}</p>
                     <p className="text-white font-semibold">
                       {viewDevice.next_maintenance}
                     </p>
@@ -1078,13 +1114,13 @@ export function DevicesTab() {
                 )}
                 {viewDevice.case_name && (
                   <div>
-                    <p className="text-sm text-gray-400">Case</p>
+                    <p className="text-sm text-gray-400">{t('devices.case')}</p>
                     <p className="text-white font-semibold">{viewDevice.case_name}</p>
                   </div>
                 )}
                 {viewDevice.job_number && (
                   <div>
-                    <p className="text-sm text-gray-400">Job</p>
+                    <p className="text-sm text-gray-400">{t('devices.job')}</p>
                     <p className="text-white font-semibold">{viewDevice.job_number}</p>
                   </div>
                 )}
@@ -1092,7 +1128,7 @@ export function DevicesTab() {
 
               {viewDevice.notes && (
                 <div className="border border-white/10 rounded-xl p-4 text-sm text-gray-300 bg-white/5">
-                  <p className="font-semibold text-white mb-1">Notizen</p>
+                  <p className="font-semibold text-white mb-1">{t('modals.productDependencies.notes')}</p>
                   <p className="whitespace-pre-line">{viewDevice.notes}</p>
                 </div>
               )}
@@ -1103,14 +1139,14 @@ export function DevicesTab() {
                   className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
                 >
                   <QrCode className="w-5 h-5" />
-                  QR-Code
+                  {t('labels.qrCode')}
                 </button>
                 <button
                   onClick={() => downloadBarcode(viewDevice.device_id)}
                   className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download className="w-5 h-5" />
-                  Barcode
+                  {t('devices.barcode')}
                 </button>
                 {viewDevice.label_path && (
                   <button
@@ -1118,7 +1154,7 @@ export function DevicesTab() {
                     className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
                   >
                     <Download className="w-5 h-5" />
-                    Label
+                    {t('nav.labels')}
                   </button>
                 )}
                 <button
@@ -1129,7 +1165,7 @@ export function DevicesTab() {
                   className="flex-1 btn-primary flex items-center justify-center gap-2"
                 >
                   <Pencil className="w-5 h-5" />
-                  Bearbeiten
+                  {t('common.edit')}
                 </button>
               </div>
             </div>

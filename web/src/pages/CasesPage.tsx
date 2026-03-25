@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, Search, MapPin, Box, RefreshCw, Plus, Edit2, Trash2, X, Printer } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   casesApi,
   devicesApi,
@@ -13,7 +14,7 @@ import {
   type Device,
   type Zone,
 } from '../lib/api';
-import { formatStatus, getStatusColor } from '../lib/utils';
+import { getStatusColor } from '../lib/utils';
 import { CaseDetailModal } from '../components/CaseDetailModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
 import { DeviceTreeModal } from '../components/DeviceTreeModal';
@@ -40,6 +41,7 @@ interface CaseFormData {
 }
 
 export function CasesPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,8 @@ export function CasesPage() {
       return acc;
     }, {});
   }, [cases]);
+
+  const formatCaseStatus = (status: string) => t(`casesPage.statuses.${status}`, status);
 
   const loadCases = async (overrideSearch?: string) => {
     setLoading(true);
@@ -138,7 +142,7 @@ export function CasesPage() {
 
   const handleLocateDevice = async (device: CaseDevice) => {
     if (!device.zone_code) {
-      setActionMessage({ type: 'error', text: 'Kein Fachcode vorhanden – Gerät nicht im Lager.' });
+      setActionMessage({ type: 'error', text: t('casesPage.messages.noBinCode') });
       clearActionMessage();
       return;
     }
@@ -147,12 +151,12 @@ export function CasesPage() {
       await ledApi.locateBin(device.zone_code);
       setActionMessage({
         type: 'success',
-        text: `Fach ${device.zone_code} wird hervorgehoben.`,
+        text: t('casesPage.messages.binHighlighted', { code: device.zone_code }),
       });
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: 'LED-Befehl fehlgeschlagen: ' + (error.response?.data?.error || error.message || error.toString()),
+        text: t('casesPage.messages.ledFailed', { error: error.response?.data?.error || error.message || error.toString() }),
       });
     } finally {
       clearActionMessage();
@@ -178,7 +182,7 @@ export function CasesPage() {
       console.error('Failed to load device:', error);
       setActionMessage({
         type: 'error',
-        text: 'Gerätedetails konnten nicht geladen werden.',
+        text: t('casesPage.messages.deviceDetailsFailed'),
       });
       clearActionMessage();
     }
@@ -208,7 +212,7 @@ export function CasesPage() {
       if (data.success_count > 0) {
         setActionMessage({
           type: 'success',
-          text: `${data.success_count} Gerät(e) erfolgreich hinzugefügt`,
+          text: t('casesPage.messages.devicesAdded', { count: data.success_count }),
         });
 
         // Reload case devices
@@ -229,7 +233,7 @@ export function CasesPage() {
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: 'Fehler beim Hinzufügen der Geräte: ' + (error.response?.data?.error || error.message),
+        text: t('casesPage.messages.addDevicesFailed', { error: error.response?.data?.error || error.message }),
       });
     } finally {
       clearActionMessage();
@@ -244,7 +248,7 @@ export function CasesPage() {
 
       setActionMessage({
         type: 'success',
-        text: `Gerät ${deviceId} erfolgreich entfernt`,
+        text: t('casesPage.messages.deviceRemoved', { id: deviceId }),
       });
 
       // Reload case devices
@@ -254,7 +258,7 @@ export function CasesPage() {
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: 'Fehler beim Entfernen: ' + (error.response?.data?.error || error.message),
+        text: t('casesPage.messages.removeFailed', { error: error.response?.data?.error || error.message }),
       });
     } finally {
       clearActionMessage();
@@ -269,7 +273,7 @@ export function CasesPage() {
 
       setActionMessage({
         type: 'success',
-        text: `Gerät ${deviceId} erfolgreich entfernt`,
+        text: t('casesPage.messages.deviceRemoved', { id: deviceId }),
       });
 
       // Reload case devices
@@ -279,7 +283,7 @@ export function CasesPage() {
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: 'Fehler beim Entfernen: ' + (error.response?.data?.error || error.message),
+        text: t('casesPage.messages.removeFailed', { error: error.response?.data?.error || error.message }),
       });
     } finally {
       clearActionMessage();
@@ -350,7 +354,7 @@ export function CasesPage() {
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formData.name.trim()) {
-      setActionMessage({ type: 'error', text: 'Name ist erforderlich' });
+      setActionMessage({ type: 'error', text: t('casesPage.messages.nameRequired') });
       clearActionMessage();
       return;
     }
@@ -359,17 +363,17 @@ export function CasesPage() {
     try {
       if (editingCaseId) {
         await casesApi.update(editingCaseId, formData);
-        setActionMessage({ type: 'success', text: 'Case erfolgreich aktualisiert' });
+        setActionMessage({ type: 'success', text: t('casesPage.messages.updated') });
       } else {
         await casesApi.create(formData);
-        setActionMessage({ type: 'success', text: 'Case erfolgreich erstellt' });
+        setActionMessage({ type: 'success', text: t('casesPage.messages.created') });
       }
       setFormModalOpen(false);
       await loadCases();
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: error.response?.data?.error || 'Fehler beim Speichern',
+        text: error.response?.data?.error || t('casesPage.messages.saveFailed'),
       });
     } finally {
       setSubmitting(false);
@@ -378,18 +382,18 @@ export function CasesPage() {
   };
 
   const handleDelete = async (caseId: number, caseName: string) => {
-    if (!confirm(`Möchten Sie das Case "${caseName}" wirklich löschen?`)) {
+    if (!confirm(t('casesPage.messages.deleteConfirm', { name: caseName }))) {
       return;
     }
 
     try {
       await casesApi.delete(caseId);
-      setActionMessage({ type: 'success', text: 'Case erfolgreich gelöscht' });
+      setActionMessage({ type: 'success', text: t('casesPage.messages.deleted') });
       await loadCases();
     } catch (error: any) {
       setActionMessage({
         type: 'error',
-        text: error.response?.data?.message || error.response?.data?.error || 'Fehler beim Löschen',
+        text: error.response?.data?.message || error.response?.data?.error || t('casesPage.messages.deleteFailed'),
       });
     } finally {
       clearActionMessage();
@@ -403,7 +407,7 @@ export function CasesPage() {
       const defaultTemplate = templates.find(t => t.is_default) || templates[0];
 
       if (!defaultTemplate) {
-        alert('Kein Label-Template gefunden. Bitte erstellen Sie erst ein Template unter "Labels".');
+        alert(t('casesPage.messages.noTemplate'));
         return;
       }
 
@@ -413,7 +417,7 @@ export function CasesPage() {
       // Open label preview in new window
       const labelWindow = window.open('', '_blank', 'width=800,height=600');
       if (!labelWindow) {
-        alert('Popup wurde blockiert. Bitte erlauben Sie Popups für diese Seite.');
+        alert(t('casesPage.messages.popupBlocked'));
         return;
       }
 
@@ -422,7 +426,7 @@ export function CasesPage() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Label - ${caseName}</title>
+          <title>${t('casesPage.print.title', { name: caseName })}</title>
           <style>
             body {
               margin: 0;
@@ -478,8 +482,8 @@ export function CasesPage() {
         <body>
           <div class="container">
             <div class="header">
-              <h1>Label: ${caseName}</h1>
-              <button onclick="window.print()">Drucken</button>
+              <h1>${t('casesPage.print.heading', { name: caseName })}</h1>
+              <button onclick="window.print()">${t('casesPage.print.print')}</button>
             </div>
             <div class="label-preview" style="width: ${labelData.template.width}mm; height: ${labelData.template.height}mm;">
               ${labelData.elements.map((elem: any) => {
@@ -500,7 +504,7 @@ export function CasesPage() {
       labelWindow.document.close();
     } catch (error: any) {
       console.error('Failed to generate label:', error);
-      alert('Fehler beim Erstellen des Labels: ' + (error.response?.data?.error || error.message));
+      alert(t('casesPage.messages.labelCreateFailed', { error: error.response?.data?.error || error.message }));
     }
   };
 
@@ -508,9 +512,9 @@ export function CasesPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Cases</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">{t('cases.title')}</h2>
           <p className="text-sm sm:text-base text-gray-400">
-            {cases.length} Cases • {totalDevices} Geräte gesamt
+            {t('casesPage.summary', { caseCount: cases.length, deviceCount: totalDevices })}
           </p>
         </div>
         <div className="flex gap-2">
@@ -519,14 +523,14 @@ export function CasesPage() {
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neues Case
+            {t('casesPage.newCase')}
           </button>
           <button
             onClick={() => loadCases()}
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
-            Aktualisieren
+            {t('casesPage.refresh')}
           </button>
         </div>
       </div>
@@ -538,7 +542,7 @@ export function CasesPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cases suchen…"
+            placeholder={t('casesPage.searchPlaceholder')}
             className="w-full pl-10 pr-3 py-2.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
         </div>
@@ -548,23 +552,23 @@ export function CasesPage() {
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:border-accent-red"
           >
-            <option value="all">Alle Status</option>
-            <option value="free">Frei</option>
-            <option value="rented">Vermietet</option>
-            <option value="maintance">Wartung</option>
+            <option value="all">{t('casesPage.filters.allStatuses')}</option>
+            <option value="free">{t('casesPage.statuses.free')}</option>
+            <option value="rented">{t('casesPage.statuses.rented')}</option>
+            <option value="maintance">{t('casesPage.statuses.maintance')}</option>
           </select>
           <button
             type="submit"
             className="px-4 py-2 bg-accent-red/80 hover:bg-accent-red rounded-lg text-sm font-semibold text-white transition-colors"
           >
-            Suchen
+            {t('common.search')}
           </button>
           <button
             type="button"
             onClick={handleResetFilters}
             className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold text-white transition-colors"
           >
-            Zurücksetzen
+            {t('casesPage.reset')}
           </button>
         </div>
       </form>
@@ -582,21 +586,21 @@ export function CasesPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <SummaryCard label="Frei" value={statusCounts['free'] ?? 0} tone="green" />
-        <SummaryCard label="Vermietet" value={statusCounts['rented'] ?? 0} tone="red" />
-        <SummaryCard label="Wartung" value={statusCounts['maintance'] ?? 0} tone="yellow" />
-        <SummaryCard label="Geräte in Cases" value={totalDevices} tone="blue" />
+        <SummaryCard label={t('casesPage.statuses.free')} value={statusCounts['free'] ?? 0} tone="green" />
+        <SummaryCard label={t('casesPage.statuses.rented')} value={statusCounts['rented'] ?? 0} tone="red" />
+        <SummaryCard label={t('casesPage.statuses.maintance')} value={statusCounts['maintance'] ?? 0} tone="yellow" />
+        <SummaryCard label={t('casesPage.devicesInCases')} value={totalDevices} tone="blue" />
       </div>
 
       <div className="glass-dark rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/10 min-h-[320px]">
         {loading ? (
           <div className="flex flex-col items-center justify-center h-60 gap-3 text-gray-400">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-red" />
-            <p className="text-sm">Cases werden geladen…</p>
+              <p className="text-sm">{t('casesPage.loading')}</p>
           </div>
         ) : cases.length === 0 ? (
           <div className="text-center py-12 text-gray-400 text-sm">
-            Keine Cases gefunden.
+              {t('cases.noCases')}
           </div>
         ) : (
           <div className="space-y-3">
@@ -615,7 +619,7 @@ export function CasesPage() {
                       <span
                         className={`text-[10px] sm:text-xs font-semibold px-2 py-1 rounded-full bg-white/10 uppercase tracking-wide ${getStatusColor(caseItem.status)}`}
                       >
-                        {formatStatus(caseItem.status)}
+                        {formatCaseStatus(caseItem.status)}
                       </span>
                     </div>
                     {caseItem.description && (
@@ -624,7 +628,7 @@ export function CasesPage() {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-2">
                       <span className="flex items-center gap-1">
                         <Package className="w-3 h-3" />
-                        {caseItem.device_count} Gerät{caseItem.device_count === 1 ? '' : 'e'}
+                        {t('casesPage.deviceCount', { count: caseItem.device_count })}
                       </span>
                       {caseItem.zone_name && (
                         <span className="flex items-center gap-1">
@@ -643,32 +647,32 @@ export function CasesPage() {
                     onClick={() => handleOpenCase(caseItem)}
                     className="px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white"
                   >
-                    Details
+                    {t('casesPage.details')}
                   </button>
                   <button
                     onClick={() => handleOpenZone({ zone_id: caseItem.zone_id, zone_code: caseItem.zone_code })}
                     disabled={!caseItem.zone_id && !caseItem.zone_code}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white/10 hover:bg-white/20 transition-colors text-white disabled:opacity-50"
                   >
-                    <MapPin className="w-4 h-4" /> Zone
+                    <MapPin className="w-4 h-4" /> {t('devices.zone')}
                   </button>
                   <button
                     onClick={() => handlePrintLabel(caseItem.case_id, caseItem.name)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-green-600/80 hover:bg-green-600 transition-colors text-white"
                   >
-                    <Printer className="w-4 h-4" /> Label
+                    <Printer className="w-4 h-4" /> {t('nav.labels')}
                   </button>
                   <button
                     onClick={() => handleOpenEditModal(caseItem)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600/80 hover:bg-blue-600 transition-colors text-white"
                   >
-                    <Edit2 className="w-4 h-4" /> Bearbeiten
+                    <Edit2 className="w-4 h-4" /> {t('common.edit')}
                   </button>
                   <button
                     onClick={() => handleDelete(caseItem.case_id, caseItem.name)}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-red-600/80 hover:bg-red-600 transition-colors text-white"
                   >
-                    <Trash2 className="w-4 h-4" /> Löschen
+                    <Trash2 className="w-4 h-4" /> {t('common.delete')}
                   </button>
                 </div>
               </div>
@@ -710,7 +714,7 @@ export function CasesPage() {
           <div className="glass-dark rounded-2xl w-full max-w-2xl shadow-2xl my-8">
             <div className="flex items-center justify-between p-6 border-b border-white/10">
               <h2 className="text-2xl font-bold text-white">
-                {editingCaseId ? 'Case Bearbeiten' : 'Neues Case'}
+                {editingCaseId ? t('casesPage.editCase') : t('casesPage.newCase')}
               </h2>
               <button
                 onClick={() => setFormModalOpen(false)}
@@ -724,7 +728,7 @@ export function CasesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-white mb-2">
-                    Name <span className="text-accent-red">*</span>
+                    {t('cases.name')} <span className="text-accent-red">*</span>
                   </label>
                   <input
                     type="text"
@@ -736,7 +740,7 @@ export function CasesPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-white mb-2">Beschreibung</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('cases.description')}</label>
                   <textarea
                     value={formData.description || ''}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -746,26 +750,26 @@ export function CasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Status</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('cases.status')}</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors"
                   >
-                    <option value="free">Frei</option>
-                    <option value="rented">Vermietet</option>
-                    <option value="maintance">Wartung</option>
+                    <option value="free">{t('casesPage.statuses.free')}</option>
+                    <option value="rented">{t('casesPage.statuses.rented')}</option>
+                    <option value="maintance">{t('casesPage.statuses.maintance')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Zone</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('devices.zone')}</label>
                   <select
                     value={formData.zone_id || ''}
                     onChange={(e) => setFormData({ ...formData, zone_id: e.target.value ? parseInt(e.target.value) : undefined })}
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors"
                   >
-                    <option value="">Keine Zone</option>
+                    <option value="">{t('casesPage.noZone')}</option>
                     {zones.map((zone) => (
                       <option key={zone.zone_id} value={zone.zone_id}>
                         {zone.name} ({zone.code})
@@ -775,7 +779,7 @@ export function CasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Breite (cm)</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('casesPage.width')}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -786,7 +790,7 @@ export function CasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Höhe (cm)</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('casesPage.height')}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -797,7 +801,7 @@ export function CasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Tiefe (cm)</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('casesPage.depth')}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -808,7 +812,7 @@ export function CasesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2">Gewicht (kg)</label>
+                  <label className="block text-sm font-semibold text-white mb-2">{t('cases.weight')}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -821,7 +825,7 @@ export function CasesPage() {
                 {!editingCaseId && (
                   <>
                     <div>
-                      <label className="block text-sm font-semibold text-white mb-2">Barcode</label>
+                      <label className="block text-sm font-semibold text-white mb-2">{t('devices.barcode')}</label>
                       <input
                         type="text"
                         value={formData.barcode || ''}
@@ -831,7 +835,7 @@ export function CasesPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-white mb-2">RFID Tag</label>
+                      <label className="block text-sm font-semibold text-white mb-2">{t('casesPage.rfidTag')}</label>
                       <input
                         type="text"
                         value={formData.rfid_tag || ''}
@@ -848,7 +852,7 @@ export function CasesPage() {
                 <div className="border-t border-white/10 pt-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-lg font-semibold text-white">
-                      Geräte ({editingCaseDevices.length})
+                      {t('casesPage.devicesSection', { count: editingCaseDevices.length })}
                     </h3>
                     <button
                       type="button"
@@ -856,13 +860,13 @@ export function CasesPage() {
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-accent-red/80 hover:bg-accent-red transition-colors text-white"
                     >
                       <Plus className="w-4 h-4" />
-                      Geräte hinzufügen
+                      {t('zoneDetail.addDevices')}
                     </button>
                   </div>
 
                   {editingCaseDevices.length === 0 ? (
                     <div className="text-center text-gray-400 text-sm py-8 bg-white/5 rounded-lg">
-                      Keine Geräte in diesem Case.
+                      {t('casesPage.noDevicesInCase')}
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -882,7 +886,7 @@ export function CasesPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (confirm(`Gerät ${device.device_id} aus diesem Case entfernen?`)) {
+                              if (confirm(t('casesPage.messages.removeDeviceConfirm', { id: device.device_id }))) {
                                 void handleRemoveDeviceFromEditCase(device.device_id);
                               }
                             }}
@@ -903,14 +907,14 @@ export function CasesPage() {
                   disabled={submitting}
                   className="flex-1 px-4 py-3 bg-accent-red/80 hover:bg-accent-red rounded-lg font-semibold text-white transition-colors disabled:opacity-50"
                 >
-                  {submitting ? 'Speichern...' : editingCaseId ? 'Aktualisieren' : 'Erstellen'}
+                  {submitting ? t('common.saving') : editingCaseId ? t('common.update') : t('common.create')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormModalOpen(false)}
                   className="px-4 py-3 bg-white/10 hover:bg-white/20 rounded-lg font-semibold text-white transition-colors"
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>

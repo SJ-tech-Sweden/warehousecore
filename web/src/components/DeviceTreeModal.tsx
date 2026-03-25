@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, ChevronRight, Package } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ModalPortal } from './ModalPortal';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
@@ -44,6 +46,7 @@ interface DeviceTreeModalProps {
 }
 
 export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTreeModalProps) {
+  const { t } = useTranslation();
   const [treeData, setTreeData] = useState<Category[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -112,20 +115,21 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Package className="w-6 h-6 text-accent-red" />
-            Geräte hinzufügen
+            {t('modals.deviceTree.addDevices')}
           </h2>
           <button
             onClick={handleClose}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            aria-label={t('common.close')}
+            title={t('common.close')}
           >
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
-
         {/* Selected Devices Count */}
         <div className="px-6 py-3 bg-white/5 border-b border-white/10">
           <p className="text-sm text-gray-400">
-            {selectedDevices.size} Gerät{selectedDevices.size !== 1 ? 'e' : ''} ausgewählt
+            {t('modals.deviceTree.selectedCount', { count: selectedDevices.size })}
           </p>
         </div>
 
@@ -137,7 +141,7 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
             </div>
           ) : treeData.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              Keine Geräte gefunden
+              {t('modals.deviceTree.noDevices')}
             </div>
           ) : (
             <div className="space-y-2">
@@ -150,6 +154,7 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
                   onToggleNode={toggleNode}
                   onToggleDevice={toggleDeviceSelection}
                   currentZoneId={zoneId}
+                  t={t}
                 />
               ))}
             </div>
@@ -162,14 +167,14 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
             onClick={handleClose}
             className="px-6 py-2.5 glass hover:bg-white/10 text-white font-semibold rounded-xl transition-all"
           >
-            Abbrechen
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={selectedDevices.size === 0}
             className="px-6 py-2.5 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {selectedDevices.size} Gerät{selectedDevices.size !== 1 ? 'e' : ''} hinzufügen
+            {t('modals.deviceTree.addSelected', { count: selectedDevices.size })}
           </button>
         </div>
         </div>
@@ -186,6 +191,7 @@ function CategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  t,
 }: {
   category: Category;
   expandedNodes: Set<string>;
@@ -193,6 +199,7 @@ function CategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  t: TFunction;
 }) {
   const nodeId = `cat-${category.id}`;
   const isExpanded = expandedNodes.has(nodeId);
@@ -210,7 +217,7 @@ function CategoryNode({
         />
         <span className="text-lg">📁</span>
         <span className="font-semibold text-white">{category.name}</span>
-        <span className="text-sm text-gray-400">({category.device_count} Geräte)</span>
+        <span className="text-sm text-gray-400">({t('modals.deviceTree.countShort', { count: category.device_count })})</span>
       </div>
 
       {isExpanded && (
@@ -224,6 +231,7 @@ function CategoryNode({
               onToggleNode={onToggleNode}
               onToggleDevice={onToggleDevice}
               currentZoneId={currentZoneId}
+              t={t}
             />
           ))}
         </div>
@@ -240,6 +248,7 @@ function SubcategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  t,
 }: {
   subcategory: Subcategory;
   expandedNodes: Set<string>;
@@ -247,6 +256,7 @@ function SubcategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  t: TFunction;
 }) {
   const nodeId = `subcat-${subcategory.id}`;
   const isExpanded = expandedNodes.has(nodeId);
@@ -278,6 +288,7 @@ function SubcategoryNode({
               onToggleNode={onToggleNode}
               onToggleDevice={onToggleDevice}
               currentZoneId={currentZoneId}
+              t={t}
             />
           ))}
         </div>
@@ -294,6 +305,7 @@ function SubbiercategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  t,
 }: {
   subbiercategory: Subbiercategory;
   expandedNodes: Set<string>;
@@ -301,6 +313,7 @@ function SubbiercategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  t: TFunction;
 }) {
   const nodeId = `subbier-${subbiercategory.id}`;
   const isExpanded = expandedNodes.has(nodeId);
@@ -330,6 +343,7 @@ function SubbiercategoryNode({
               isSelected={selectedDevices.has(device.device_id)}
               onToggle={onToggleDevice}
               isInCurrentZone={device.zone_id === currentZoneId}
+              t={t}
             />
           ))}
         </div>
@@ -344,11 +358,13 @@ function DeviceNode({
   isSelected,
   onToggle,
   isInCurrentZone,
+  t,
 }: {
   device: Device;
   isSelected: boolean;
   onToggle: (id: string) => void;
   isInCurrentZone: boolean;
+  t: TFunction;
 }) {
   const statusColors: Record<string, string> = {
     in_storage: 'text-green-400',
@@ -379,7 +395,7 @@ function DeviceNode({
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         {isInCurrentZone && (
-          <span className="text-xs text-gray-500 italic">Bereits in dieser Zone</span>
+          <span className="text-xs text-gray-500 italic">{t('modals.deviceTree.alreadyInZone')}</span>
         )}
         {device.zone_code && !isInCurrentZone && (
           <span className="text-xs text-gray-500">📍 {device.zone_code}</span>

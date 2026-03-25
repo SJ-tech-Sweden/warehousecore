@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Wrench,
   AlertTriangle,
@@ -17,6 +18,7 @@ type DefectFilter = 'all' | 'open' | 'in_progress' | 'repaired' | 'closed';
 type InspectionFilter = 'all' | 'overdue' | 'upcoming';
 
 export function MaintenancePage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabView>('overview');
   const [stats, setStats] = useState<MaintenanceStats | null>(null);
   const [defects, setDefects] = useState<Defect[]>([]);
@@ -90,7 +92,7 @@ export function MaintenancePage() {
       loadDefects();
     } catch (error) {
       console.error('Failed to create defect:', error);
-      alert('Fehler beim Erstellen des Defektberichts');
+      alert(t('maintenance.createDefectError'));
     }
   };
 
@@ -101,9 +103,12 @@ export function MaintenancePage() {
       loadDefects();
     } catch (error) {
       console.error('Failed to update defect:', error);
-      alert('Fehler beim Aktualisieren des Status');
+      alert(t('maintenance.updateStatusError'));
     }
   };
+
+  const getSeverityLabel = (severity: string) => t(`maintenance.severity.${severity}`);
+  const getStatusLabel = (status: string) => t(`maintenance.status.${status}`);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -153,14 +158,14 @@ export function MaintenancePage() {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">Wartung & Instandhaltung</h1>
-          <p className="text-sm sm:text-base text-gray-400">Verwaltung von Defekten, Reparaturen und Inspektionen</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">{t('maintenance.title')}</h1>
+          <p className="text-sm sm:text-base text-gray-400">{t('maintenance.subtitle')}</p>
         </div>
 
         {loading ? (
           <div className="text-center py-8 sm:py-12">
             <div className="inline-block animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-accent-red"></div>
-            <p className="text-sm sm:text-base text-gray-400 mt-3 sm:mt-4">Lade Daten...</p>
+            <p className="text-sm sm:text-base text-gray-400 mt-3 sm:mt-4">{t('maintenance.loadingData')}</p>
           </div>
         ) : (
           <>
@@ -173,7 +178,7 @@ export function MaintenancePage() {
                     {stats?.open_defects || 0}
                   </span>
                 </div>
-                <p className="text-gray-400 text-[10px] sm:text-sm">Offene Defekte</p>
+                <p className="text-gray-400 text-[10px] sm:text-sm">{t('maintenance.stats.openDefects')}</p>
               </div>
 
               <div className="glass-dark rounded-lg sm:rounded-2xl p-3 sm:p-6 border-2 border-white/10">
@@ -183,7 +188,7 @@ export function MaintenancePage() {
                     {stats?.in_progress_defects || 0}
                   </span>
                 </div>
-                <p className="text-gray-400 text-[10px] sm:text-sm">In Bearbeitung</p>
+                <p className="text-gray-400 text-[10px] sm:text-sm">{t('maintenance.stats.inProgressDefects')}</p>
               </div>
 
               <div className="glass-dark rounded-lg sm:rounded-2xl p-3 sm:p-6 border-2 border-white/10">
@@ -193,7 +198,7 @@ export function MaintenancePage() {
                     {stats?.repaired_defects || 0}
                   </span>
                 </div>
-                <p className="text-gray-400 text-[10px] sm:text-sm">Repariert</p>
+                <p className="text-gray-400 text-[10px] sm:text-sm">{t('maintenance.stats.repairedDefects')}</p>
               </div>
 
               <div className="glass-dark rounded-lg sm:rounded-2xl p-3 sm:p-6 border-2 border-white/10">
@@ -203,7 +208,7 @@ export function MaintenancePage() {
                     {stats?.overdue_inspections || 0}
                   </span>
                 </div>
-                <p className="text-gray-400 text-[10px] sm:text-sm">Überfällige Prüfungen</p>
+                <p className="text-gray-400 text-[10px] sm:text-sm">{t('maintenance.stats.overdueInspections')}</p>
               </div>
 
               <div className="glass-dark rounded-lg sm:rounded-2xl p-3 sm:p-6 border-2 border-white/10">
@@ -213,7 +218,7 @@ export function MaintenancePage() {
                     {stats?.upcoming_inspections || 0}
                   </span>
                 </div>
-                <p className="text-gray-400 text-[10px] sm:text-sm">Anstehende Prüfungen</p>
+                <p className="text-gray-400 text-[10px] sm:text-sm">{t('maintenance.stats.upcomingInspections')}</p>
               </div>
             </div>
 
@@ -227,9 +232,9 @@ export function MaintenancePage() {
                   <AlertTriangle className="w-8 h-8 sm:w-12 sm:h-12 text-accent-red" />
                   <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500 group-hover:text-accent-red transition-colors" />
                 </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Defektmanagement</h3>
+                <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">{t('maintenance.defectManagementTitle')}</h3>
                 <p className="text-xs sm:text-base text-gray-400">
-                  Defektberichte erstellen, Reparaturen verfolgen und Status aktualisieren
+                  {t('maintenance.defectManagementDescription')}
                 </p>
               </button>
 
@@ -241,9 +246,9 @@ export function MaintenancePage() {
                   <Calendar className="w-8 h-8 sm:w-12 sm:h-12 text-blue-500" />
                   <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-gray-500 group-hover:text-accent-red transition-colors" />
                 </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">Inspektionen</h3>
+                <h3 className="text-lg sm:text-2xl font-bold text-white mb-1 sm:mb-2">{t('maintenance.inspections')}</h3>
                 <p className="text-xs sm:text-base text-gray-400">
-                  Prüfintervalle verwalten, überfällige Prüfungen ansehen
+                  {t('maintenance.inspectionDescription')}
                 </p>
               </button>
             </div>
@@ -262,20 +267,20 @@ export function MaintenancePage() {
             onClick={() => setActiveTab('overview')}
             className="text-sm sm:text-base text-gray-400 hover:text-white mb-3 sm:mb-4 flex items-center gap-2"
           >
-            ← Zurück zur Übersicht
+            ← {t('maintenance.backToOverview')}
           </button>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
             <div>
-              <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">Defektberichte</h1>
-              <p className="text-sm sm:text-base text-gray-400">Verwaltung von Defekten und Reparaturen</p>
+              <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">{t('maintenance.defectsTitle')}</h1>
+              <p className="text-sm sm:text-base text-gray-400">{t('maintenance.defectsSubtitle')}</p>
             </div>
             <button
               onClick={() => setShowDefectForm(!showDefectForm)}
               className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all flex items-center gap-2 self-start sm:self-auto"
             >
               <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-              Neuer Defekt
+              {t('maintenance.newDefect')}
             </button>
           </div>
         </div>
@@ -283,12 +288,12 @@ export function MaintenancePage() {
         {/* Create Defect Form */}
         {showDefectForm && (
           <div className="glass-dark rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-white/10 mb-4 sm:mb-6">
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">Defektbericht erstellen</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4">{t('maintenance.createDefect')}</h3>
             <form onSubmit={handleCreateDefect} className="space-y-3 sm:space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5 sm:mb-2">
-                    Geräte-ID *
+                    {t('maintenance.form.deviceId')}
                   </label>
                   <input
                     type="text"
@@ -303,7 +308,7 @@ export function MaintenancePage() {
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5 sm:mb-2">
-                    Schweregrad *
+                    {t('maintenance.form.severity')}
                   </label>
                   <select
                     value={defectForm.severity}
@@ -312,17 +317,17 @@ export function MaintenancePage() {
                     }
                     className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-white/10 border-2 border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white focus:outline-none focus:border-accent-red"
                   >
-                    <option value="low">Niedrig</option>
-                    <option value="medium">Mittel</option>
-                    <option value="high">Hoch</option>
-                    <option value="critical">Kritisch</option>
+                    <option value="low">{t('maintenance.severity.low')}</option>
+                    <option value="medium">{t('maintenance.severity.medium')}</option>
+                    <option value="high">{t('maintenance.severity.high')}</option>
+                    <option value="critical">{t('maintenance.severity.critical')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5 sm:mb-2">
-                  Titel *
+                  {t('maintenance.form.title')}
                 </label>
                 <input
                   type="text"
@@ -335,7 +340,7 @@ export function MaintenancePage() {
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5 sm:mb-2">
-                  Beschreibung *
+                  {t('maintenance.form.description')}
                 </label>
                 <textarea
                   value={defectForm.description}
@@ -353,14 +358,14 @@ export function MaintenancePage() {
                   type="submit"
                   className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl hover:shadow-lg transition-all"
                 >
-                  Defekt erstellen
+                  {t('maintenance.form.submit')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowDefectForm(false)}
                   className="px-4 sm:px-6 py-2.5 sm:py-3 glass text-gray-400 hover:text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all"
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
               </div>
             </form>
@@ -380,7 +385,7 @@ export function MaintenancePage() {
                     : 'glass text-gray-400 hover:text-white'
                 }`}
               >
-                {filter === 'all' ? 'Alle' : filter === 'open' ? 'Offen' : filter === 'in_progress' ? 'In Bearbeitung' : filter === 'repaired' ? 'Repariert' : 'Geschlossen'}
+                {filter === 'all' ? t('maintenance.filters.all') : filter === 'open' ? t('maintenance.status.open') : filter === 'in_progress' ? t('maintenance.status.in_progress') : filter === 'repaired' ? t('maintenance.status.repaired') : t('maintenance.status.closed')}
               </button>
             )
           )}
@@ -391,7 +396,7 @@ export function MaintenancePage() {
           {defects.length === 0 ? (
             <div className="glass-dark rounded-xl sm:rounded-2xl p-8 sm:p-12 text-center">
               <AlertTriangle className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
-              <p className="text-sm sm:text-lg text-gray-400">Keine Defektberichte gefunden</p>
+              <p className="text-sm sm:text-lg text-gray-400">{t('maintenance.noDefects')}</p>
             </div>
           ) : (
             defects.map((defect) => (
@@ -408,27 +413,28 @@ export function MaintenancePage() {
                           defect.severity
                         )}`}
                       >
-                        {defect.severity.toUpperCase()}
+                        {getSeverityLabel(defect.severity)}
                       </span>
                       <span
                         className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold ${getStatusColor(
                           defect.status
                         )}`}
                       >
-                        {defect.status}
+                        {getStatusLabel(defect.status)}
                       </span>
                     </div>
                     <p className="text-gray-400 text-xs sm:text-sm mb-2 sm:mb-3 line-clamp-2">{defect.description}</p>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-xs sm:text-sm text-gray-500">
                       <span className="truncate">Gerät: {defect.device_id}</span>
+                      <span className="truncate">{t('maintenance.deviceLabel', { id: defect.device_id })}</span>
                       {defect.product_name && <span className="hidden sm:inline">•</span>}
                       {defect.product_name && <span className="truncate">{defect.product_name}</span>}
                       <span className="hidden sm:inline">•</span>
-                      <span>Gemeldet: {formatDate(defect.reported_at)}</span>
+                      <span>{t('maintenance.reportedAt', { date: formatDate(defect.reported_at) })}</span>
                       {defect.repair_cost && (
                         <>
                           <span className="hidden sm:inline">•</span>
-                          <span>Kosten: €{defect.repair_cost.toFixed(2)}</span>
+                          <span>{t('maintenance.cost', { amount: defect.repair_cost.toFixed(2) })}</span>
                         </>
                       )}
                     </div>
@@ -444,7 +450,7 @@ export function MaintenancePage() {
                           }
                           className="px-3 sm:px-4 py-1.5 sm:py-2 bg-yellow-500/20 text-yellow-400 rounded-lg sm:rounded-xl hover:bg-yellow-500/30 transition-all text-xs sm:text-sm font-semibold whitespace-nowrap"
                         >
-                          In Bearbeitung
+                          {t('maintenance.actions.startProgress')}
                         </button>
                       )}
                       {defect.status === 'in_progress' && (
@@ -454,7 +460,7 @@ export function MaintenancePage() {
                           }
                           className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500/20 text-green-400 rounded-lg sm:rounded-xl hover:bg-green-500/30 transition-all text-xs sm:text-sm font-semibold whitespace-nowrap"
                         >
-                          Repariert
+                          {t('maintenance.actions.markRepaired')}
                         </button>
                       )}
                       {defect.status === 'repaired' && (
@@ -464,7 +470,7 @@ export function MaintenancePage() {
                           }
                           className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-500/20 text-gray-400 rounded-lg sm:rounded-xl hover:bg-gray-500/30 transition-all text-xs sm:text-sm font-semibold whitespace-nowrap"
                         >
-                          Schließen
+                          {t('maintenance.actions.close')}
                         </button>
                       )}
                     </div>
@@ -486,11 +492,11 @@ export function MaintenancePage() {
           onClick={() => setActiveTab('overview')}
           className="text-sm sm:text-base text-gray-400 hover:text-white mb-3 sm:mb-4 flex items-center gap-2"
         >
-          ← Zurück zur Übersicht
+          ← {t('maintenance.backToOverview')}
         </button>
 
-        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">Inspektionen</h1>
-        <p className="text-sm sm:text-base text-gray-400">Verwaltung von Prüfintervallen und anstehenden Inspektionen</p>
+        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">{t('maintenance.inspections')}</h1>
+        <p className="text-sm sm:text-base text-gray-400">{t('maintenance.inspectionsSubtitle')}</p>
       </div>
 
       {/* Filter Tabs */}
@@ -505,7 +511,7 @@ export function MaintenancePage() {
                 : 'glass text-gray-400 hover:text-white'
             }`}
           >
-            {filter === 'all' ? 'Alle' : filter === 'overdue' ? 'Überfällig' : 'Anstehend (30 Tage)'}
+            {filter === 'all' ? t('maintenance.filters.all') : filter === 'overdue' ? t('maintenance.filters.overdue') : t('maintenance.filters.upcoming')}
           </button>
         ))}
       </div>
@@ -515,7 +521,7 @@ export function MaintenancePage() {
         {inspections.length === 0 ? (
           <div className="glass-dark rounded-xl sm:rounded-2xl p-8 sm:p-12 text-center">
             <Calendar className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
-            <p className="text-sm sm:text-lg text-gray-400">Keine Inspektionen gefunden</p>
+            <p className="text-sm sm:text-lg text-gray-400">{t('maintenance.noInspections')}</p>
           </div>
         ) : (
           inspections.map((inspection) => (
@@ -535,30 +541,30 @@ export function MaintenancePage() {
                     </h3>
                     {isOverdue(inspection.next_inspection) && (
                       <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-red-500/20 text-red-400">
-                        ÜBERFÄLLIG
+                        {t('maintenance.overdueBadge')}
                       </span>
                     )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm mb-2 sm:mb-3">
                     <div>
-                      <p className="text-gray-500 text-[10px] sm:text-xs">Gerät/Produkt</p>
+                      <p className="text-gray-500 text-[10px] sm:text-xs">{t('maintenance.inspectionFields.deviceOrProduct')}</p>
                       <p className="text-white font-semibold truncate">
                         {inspection.device_name || inspection.product_name || '-'}
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-500 text-[10px] sm:text-xs">Intervall</p>
+                      <p className="text-gray-500 text-[10px] sm:text-xs">{t('maintenance.inspectionFields.interval')}</p>
                       <p className="text-white font-semibold">
-                        {inspection.interval_days} Tage
+                        {t('maintenance.intervalDays', { count: inspection.interval_days })}
                       </p>
                     </div>
                     <div>
-                      <p className="text-gray-500 text-[10px] sm:text-xs">Letzte Prüfung</p>
+                      <p className="text-gray-500 text-[10px] sm:text-xs">{t('maintenance.inspectionFields.lastInspection')}</p>
                       <p className="text-white font-semibold">
                         {inspection.last_inspection
                           ? formatDate(inspection.last_inspection)
-                          : 'Noch keine'}
+                          : t('maintenance.noInspectionYet')}
                       </p>
                     </div>
                   </div>
@@ -579,7 +585,7 @@ export function MaintenancePage() {
                             : 'text-blue-400'
                         }`}
                       >
-                        Nächste Prüfung: {formatDate(inspection.next_inspection)}
+                        {t('maintenance.nextInspection', { date: formatDate(inspection.next_inspection) })}
                       </span>
                     </div>
                   )}

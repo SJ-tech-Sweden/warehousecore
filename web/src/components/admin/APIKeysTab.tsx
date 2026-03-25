@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2, ToggleLeft, ToggleRight, RefreshCcw, Copy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { apiKeysAdminApi, type APIKeyItem } from '../../lib/api';
 
 export function APIKeysTab() {
+  const { t } = useTranslation();
   const [keys, setKeys] = useState<APIKeyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -22,7 +24,7 @@ export function APIKeysTab() {
       setKeys(data.keys || []);
     } catch (err) {
       console.error('Failed to load API keys', err);
-      setError('Konnte API-Keys nicht laden');
+      setError(t('admin.apiKeys.errors.load'));
     } finally {
       setLoading(false);
     }
@@ -30,7 +32,7 @@ export function APIKeysTab() {
 
   const createKey = async () => {
     if (!newName.trim()) {
-      setError('Name ist erforderlich');
+      setError(t('admin.apiKeys.errors.nameRequired'));
       return;
     }
     setCreating(true);
@@ -43,7 +45,7 @@ export function APIKeysTab() {
       await loadKeys();
     } catch (err) {
       console.error('Failed to create API key', err);
-      setError('Erstellen fehlgeschlagen');
+      setError(t('admin.apiKeys.errors.create'));
     } finally {
       setCreating(false);
     }
@@ -55,18 +57,18 @@ export function APIKeysTab() {
       await loadKeys();
     } catch (err) {
       console.error('Failed to update API key status', err);
-      setError('Aktualisieren fehlgeschlagen');
+      setError(t('admin.apiKeys.errors.update'));
     }
   };
 
   const deleteKey = async (id: number) => {
-    if (!confirm('Diesen API-Key wirklich löschen?')) return;
+    if (!confirm(t('admin.apiKeys.confirmDelete'))) return;
     try {
       await apiKeysAdminApi.delete(id);
       await loadKeys();
     } catch (err) {
       console.error('Failed to delete API key', err);
-      setError('Löschen fehlgeschlagen');
+      setError(t('admin.apiKeys.errors.delete'));
     }
   };
 
@@ -75,8 +77,8 @@ export function APIKeysTab() {
       <div className="flex items-center gap-3">
         <KeyRound className="w-6 h-6 text-accent-red" />
         <div>
-          <h2 className="text-2xl font-bold text-white">API-Keys</h2>
-          <p className="text-gray-400 text-sm">Zugriff auf die öffentlichen Website-Feeds absichern</p>
+          <h2 className="text-2xl font-bold text-white">{t('admin.apiKeys.title')}</h2>
+          <p className="text-gray-400 text-sm">{t('admin.apiKeys.subtitle')}</p>
         </div>
       </div>
 
@@ -84,10 +86,10 @@ export function APIKeysTab() {
 
       <div className="glass-dark rounded-xl p-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="block text-sm text-gray-300 mb-1">Name / Beschreibung</label>
+          <label className="block text-sm text-gray-300 mb-1">{t('admin.apiKeys.nameDescription')}</label>
           <input
             className="w-full px-4 py-3 bg-dark-light border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red"
-            placeholder="z.B. tsweb-frontend"
+            placeholder={t('admin.apiKeys.namePlaceholder')}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
@@ -97,42 +99,42 @@ export function APIKeysTab() {
           disabled={creating}
           className="flex items-center gap-2 px-4 py-3 bg-accent-red hover:bg-accent-red/80 rounded-lg text-white font-semibold disabled:opacity-60"
         >
-          <Plus className="w-4 h-4" /> Neuer Key
+          <Plus className="w-4 h-4" /> {t('admin.apiKeys.newKey')}
         </button>
         <button
           onClick={loadKeys}
           className="flex items-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 rounded-lg text-white"
         >
-          <RefreshCcw className="w-4 h-4" /> Aktualisieren
+          <RefreshCcw className="w-4 h-4" /> {t('common.update')}
         </button>
       </div>
 
       {plainKey && (
         <div className="bg-green-500/10 border border-green-500/20 text-green-200 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold">Neuer API-Key (nur einmal sichtbar):</div>
+            <div className="text-sm font-semibold">{t('admin.apiKeys.oneTimeVisible')}</div>
             <div className="font-mono break-all">{plainKey}</div>
           </div>
           <button
             onClick={() => navigator.clipboard.writeText(plainKey)}
             className="flex items-center gap-2 px-3 py-2 bg-green-500/20 hover:bg-green-500/30 rounded-md text-green-100"
           >
-            <Copy className="w-4 h-4" /> Kopieren
+            <Copy className="w-4 h-4" /> {t('admin.apiKeys.copy')}
           </button>
         </div>
       )}
 
       <div className="glass-dark rounded-xl overflow-hidden">
         <div className="grid grid-cols-12 px-4 py-3 text-sm font-semibold text-gray-300 border-b border-white/5">
-          <div className="col-span-4">Name</div>
-          <div className="col-span-3">Status</div>
-          <div className="col-span-3">Zuletzt genutzt</div>
-          <div className="col-span-2 text-right">Aktionen</div>
+          <div className="col-span-4">{t('cases.name')}</div>
+          <div className="col-span-3">{t('devices.status')}</div>
+          <div className="col-span-3">{t('admin.apiKeys.lastUsed')}</div>
+          <div className="col-span-2 text-right">{t('labels.actions')}</div>
         </div>
         {loading ? (
-          <div className="p-6 text-center text-gray-400">Lade...</div>
+          <div className="p-6 text-center text-gray-400">{t('common.loading')}</div>
         ) : keys.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">Keine API-Keys vorhanden</div>
+          <div className="p-6 text-center text-gray-400">{t('admin.apiKeys.empty')}</div>
         ) : (
           keys.map((k) => (
             <div
@@ -141,35 +143,35 @@ export function APIKeysTab() {
             >
               <div className="col-span-4">
                 <div className="font-semibold text-white">{k.name}</div>
-                <div className="text-xs text-gray-400">ID: {k.id}</div>
+                <div className="text-xs text-gray-400">{t('admin.apiKeys.id', { id: k.id })}</div>
               </div>
               <div className="col-span-3 flex items-center gap-2">
                 {k.is_active ? (
                   <>
                     <ToggleRight className="w-5 h-5 text-green-400" />
-                    <span className="text-green-300">Aktiv</span>
+                    <span className="text-green-300">{t('zones.active')}</span>
                   </>
                 ) : (
                   <>
                     <ToggleLeft className="w-5 h-5 text-gray-500" />
-                    <span className="text-gray-400">Inaktiv</span>
+                    <span className="text-gray-400">{t('zones.inactive')}</span>
                   </>
                 )}
                 <button
                   onClick={() => toggleKey(k.id, k.is_active)}
                   className="ml-3 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs"
                 >
-                  {k.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                  {k.is_active ? t('admin.apiKeys.deactivate') : t('admin.apiKeys.activate')}
                 </button>
               </div>
               <div className="col-span-3 text-gray-300 text-sm">
-                {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : '—'}
+                {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : t('admin.apiKeys.neverUsed')}
               </div>
               <div className="col-span-2 flex justify-end gap-2">
                 <button
                   onClick={() => deleteKey(k.id)}
                   className="p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-300"
-                  title="Löschen"
+                  title={t('common.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

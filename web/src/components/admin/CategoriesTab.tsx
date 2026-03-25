@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 
 interface Category {
@@ -25,6 +26,7 @@ interface Subbiercategory {
 type Level = 'category' | 'subcategory' | 'subbiercategory';
 
 export function CategoriesTab() {
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [subbiercategories, setSubbiercategories] = useState<Subbiercategory[]>([]);
@@ -78,7 +80,7 @@ export function CategoriesTab() {
       setEditing(null);
       setFormData({});
     } catch (error: any) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      alert(t('admin.categories.errors.prefix') + (error.response?.data?.error || error.message));
     }
   };
 
@@ -93,7 +95,7 @@ export function CategoriesTab() {
       setEditing(null);
       setFormData({});
     } catch (error: any) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      alert(t('admin.categories.errors.prefix') + (error.response?.data?.error || error.message));
     }
   };
 
@@ -108,12 +110,12 @@ export function CategoriesTab() {
       setEditing(null);
       setFormData({});
     } catch (error: any) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      alert(t('admin.categories.errors.prefix') + (error.response?.data?.error || error.message));
     }
   };
 
   const handleDelete = async (level: Level, id: number | string) => {
-    if (!confirm('Wirklich löschen?')) return;
+    if (!confirm(t('admin.categories.confirmDelete'))) return;
 
     try {
       await api.delete(`/admin/${level === 'category' ? 'categories' : level === 'subcategory' ? 'subcategories' : 'subbiercategories'}/${id}`);
@@ -121,7 +123,7 @@ export function CategoriesTab() {
       else if (level === 'subcategory') loadSubcategories();
       else loadSubbiercategories();
     } catch (error: any) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      alert(t('admin.categories.errors.prefix') + (error.response?.data?.error || error.message));
     }
   };
 
@@ -130,7 +132,7 @@ export function CategoriesTab() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-white">Kategorien verwalten</h2>
+      <h2 className="text-xl font-bold text-white">{t('admin.categories.title')}</h2>
 
       {/* Level Selector */}
       <div className="flex gap-2 overflow-x-auto scrollbar-thin">
@@ -138,19 +140,19 @@ export function CategoriesTab() {
           onClick={() => setActiveLevel('category')}
           className={`px-3 sm:px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${activeLevel === 'category' ? 'bg-accent-red text-white' : 'bg-white/10 text-gray-400'}`}
         >
-          Kategorien
+          {t('admin.categories.levels.categories')}
         </button>
         <button
           onClick={() => setActiveLevel('subcategory')}
           className={`px-3 sm:px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${activeLevel === 'subcategory' ? 'bg-accent-red text-white' : 'bg-white/10 text-gray-400'}`}
         >
-          Unterkategorien
+          {t('admin.categories.levels.subcategories')}
         </button>
         <button
           onClick={() => setActiveLevel('subbiercategory')}
           className={`px-3 sm:px-4 py-2 rounded-lg font-semibold whitespace-nowrap flex-shrink-0 text-sm sm:text-base ${activeLevel === 'subbiercategory' ? 'bg-accent-red text-white' : 'bg-white/10 text-gray-400'}`}
         >
-          Sub-Unterkategorien
+          {t('admin.categories.levels.subSubcategories')}
         </button>
       </div>
 
@@ -162,34 +164,36 @@ export function CategoriesTab() {
             className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neue Kategorie
+            {t('admin.categories.newCategory')}
           </button>
 
           {editing && (
             <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
               <input
                 type="text"
-                placeholder="Name"
+                placeholder={t('common.name')}
                 value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('common.name')}
               />
               <input
                 type="text"
-                placeholder="Abkürzung (max. 3 Zeichen)"
+                placeholder={t('admin.categories.abbreviationPlaceholder')}
                 maxLength={3}
                 value={formData.abbreviation || ''}
                 onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('admin.categories.abbreviation')}
               />
               <div className="flex gap-2">
                 <button onClick={handleSaveCategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" />
-                  Speichern
+                  {t('common.save')}
                 </button>
                 <button onClick={() => { setEditing(null); setFormData({}); }} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <X className="w-4 h-4" />
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -202,10 +206,10 @@ export function CategoriesTab() {
                 <p className="text-gray-400 text-sm">{cat.abbreviation}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setEditing(cat.category_id); setFormData(cat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                <button onClick={() => { setEditing(cat.category_id); setFormData(cat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400" title={t('common.edit')} aria-label={t('common.edit')}>
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete('category', cat.category_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400">
+                <button onClick={() => handleDelete('category', cat.category_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400" title={t('common.delete')} aria-label={t('common.delete')}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -222,17 +226,18 @@ export function CategoriesTab() {
             className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neue Unterkategorie
+            {t('admin.categories.newSubcategory')}
           </button>
 
           <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
-            <div className="text-sm font-semibold text-white">Nach Kategorie filtern</div>
+            <div className="text-sm font-semibold text-white">{t('admin.categories.filterByCategory')}</div>
             <select
               value={subcategoryFilter}
               onChange={(e) => setSubcategoryFilter(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
               className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+              title={t('admin.categories.filterByCategory')}
             >
-              <option value="">Alle Kategorien</option>
+              <option value="">{t('admin.categories.allCategories')}</option>
               {categories.map(cat => (
                 <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
               ))}
@@ -243,25 +248,28 @@ export function CategoriesTab() {
             <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
               <input
                 type="text"
-                placeholder="Name"
+                placeholder={t('common.name')}
                 value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('common.name')}
               />
               <input
                 type="text"
-                placeholder="Abkürzung (max. 3 Zeichen)"
+                placeholder={t('admin.categories.abbreviationPlaceholder')}
                 maxLength={3}
                 value={formData.abbreviation || ''}
                 onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('admin.categories.abbreviation')}
               />
               <select
                 value={formData.category_id || ''}
                 onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('products.category')}
               >
-                <option value="">-- Kategorie wählen --</option>
+                <option value="">{t('admin.categories.chooseCategory')}</option>
                 {categories.map(cat => (
                   <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
                 ))}
@@ -269,11 +277,11 @@ export function CategoriesTab() {
               <div className="flex gap-2">
                 <button onClick={handleSaveSubcategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" />
-                  Speichern
+                  {t('common.save')}
                 </button>
                 <button onClick={() => { setEditing(null); setFormData({}); }} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <X className="w-4 h-4" />
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -286,13 +294,13 @@ export function CategoriesTab() {
                 <div>
                   <h3 className="text-white font-semibold">{subcat.name}</h3>
                   <p className="text-gray-400 text-sm">{subcat.abbreviation}</p>
-                  {parentCategory && <p className="text-gray-500 text-xs mt-1">Kategorie: {parentCategory.name}</p>}
+                  {parentCategory && <p className="text-gray-500 text-xs mt-1">{t('products.category')}: {parentCategory.name}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditing(subcat.subcategory_id); setFormData(subcat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                  <button onClick={() => { setEditing(subcat.subcategory_id); setFormData(subcat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400" title={t('common.edit')} aria-label={t('common.edit')}>
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete('subcategory', subcat.subcategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400">
+                  <button onClick={() => handleDelete('subcategory', subcat.subcategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400" title={t('common.delete')} aria-label={t('common.delete')}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -310,17 +318,18 @@ export function CategoriesTab() {
             className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            Neue Sub-Unterkategorie
+            {t('admin.categories.newSubSubcategory')}
           </button>
 
           <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
-            <div className="text-sm font-semibold text-white">Nach Unterkategorie filtern</div>
+            <div className="text-sm font-semibold text-white">{t('admin.categories.filterBySubcategory')}</div>
             <select
               value={subbiercategoryFilter}
               onChange={(e) => setSubbiercategoryFilter(e.target.value === '' ? '' : e.target.value)}
               className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+              title={t('admin.categories.filterBySubcategory')}
             >
-              <option value="">Alle Unterkategorien</option>
+              <option value="">{t('admin.categories.allSubcategories')}</option>
               {subcategories.map(subcat => {
                 const parentCategory = categories.find(c => c.category_id === subcat.category_id);
                 return (
@@ -336,25 +345,28 @@ export function CategoriesTab() {
             <div className="glass rounded-xl p-4 space-y-3 border-2 border-accent-red">
               <input
                 type="text"
-                placeholder="Name"
+                placeholder={t('common.name')}
                 value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('common.name')}
               />
               <input
                 type="text"
-                placeholder="Abkürzung (max. 3 Zeichen)"
+                placeholder={t('admin.categories.abbreviationPlaceholder')}
                 maxLength={3}
                 value={formData.abbreviation || ''}
                 onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('admin.categories.abbreviation')}
               />
               <select
                 value={formData.subcategory_id || ''}
                 onChange={(e) => setFormData({ ...formData, subcategory_id: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg glass text-white"
+                title={t('admin.categories.levels.subcategories')}
               >
-                <option value="">-- Unterkategorie wählen --</option>
+                <option value="">{t('admin.categories.chooseSubcategory')}</option>
                 {subcategories.map(subcat => (
                   <option key={subcat.subcategory_id} value={subcat.subcategory_id}>{subcat.name}</option>
                 ))}
@@ -362,11 +374,11 @@ export function CategoriesTab() {
               <div className="flex gap-2">
                 <button onClick={handleSaveSubbiercategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" />
-                  Speichern
+                  {t('common.save')}
                 </button>
                 <button onClick={() => { setEditing(null); setFormData({}); }} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <X className="w-4 h-4" />
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>
@@ -379,13 +391,13 @@ export function CategoriesTab() {
                 <div>
                   <h3 className="text-white font-semibold">{subbiercat.name}</h3>
                   <p className="text-gray-400 text-sm">{subbiercat.abbreviation}</p>
-                  {parentSubcategory && <p className="text-gray-500 text-xs mt-1">Unterkategorie: {parentSubcategory.name}</p>}
+                  {parentSubcategory && <p className="text-gray-500 text-xs mt-1">{t('admin.categories.levels.subcategories')}: {parentSubcategory.name}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { setEditing(subbiercat.subbiercategory_id); setFormData(subbiercat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                  <button onClick={() => { setEditing(subbiercat.subbiercategory_id); setFormData(subbiercat); }} className="p-2 hover:bg-white/10 rounded-lg text-blue-400" title={t('common.edit')} aria-label={t('common.edit')}>
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete('subbiercategory', subbiercat.subbiercategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400">
+                  <button onClick={() => handleDelete('subbiercategory', subbiercat.subbiercategory_id)} className="p-2 hover:bg-white/10 rounded-lg text-red-400" title={t('common.delete')} aria-label={t('common.delete')}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

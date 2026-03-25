@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Package, Ruler, Weight, Zap, Tag, Box, DollarSign, Wrench, Barcode, Info, Image as ImageIcon, UploadCloud, Loader2, Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ModalPortal } from './ModalPortal';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 import { productPicturesApi, productWebsiteApi } from '../lib/api';
@@ -43,6 +44,7 @@ interface ProductDetailModalProps {
 }
 
 export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
+  const { t, i18n } = useTranslation();
   useBlockBodyScroll(isOpen);
 
   const [pictures, setPictures] = useState<ProductPicture[]>([]);
@@ -61,7 +63,8 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
   const formatCurrency = (value?: number) => {
     if (value == null) return '—';
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
+    const locale = i18n.language?.startsWith('de') ? 'de-DE' : 'en-US';
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(value);
   };
 
   const formatMeasurement = (value?: number, unit?: string) => {
@@ -88,9 +91,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       const status = (error as { response?: { status?: number } })?.response?.status;
       if (status === 503 || status === 500) {
         setPicturesUnavailable(true);
-        setPictureError('Bilderablage ist nicht erreichbar oder nicht konfiguriert.');
+        setPictureError(t('modals.productDetail.errors.storageUnavailable'));
       } else {
-        setPictureError('Bilder konnten nicht geladen werden.');
+        setPictureError(t('modals.productDetail.errors.loadPictures'));
       }
       setPictures([]);
     } finally {
@@ -145,7 +148,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       await loadPictures();
     } catch (error) {
       console.error('Failed to upload product pictures', error);
-      setPictureError('Upload fehlgeschlagen. Bitte erneut versuchen.');
+      setPictureError(t('modals.productDetail.errors.upload'));
       setPictures(prev => prev.filter(pic => !pic.temporary));
     } finally {
       tempPreviews.forEach(pic => {
@@ -170,7 +173,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
       }
     } catch (error) {
       console.error('Failed to delete product picture', error);
-      setPictureError('Löschen fehlgeschlagen. Bitte erneut versuchen.');
+      setPictureError(t('modals.productDetail.errors.deletePicture'));
     } finally {
       setDeleting(null);
     }
@@ -204,10 +207,10 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
         website_images: images,
         website_thumbnail: websiteThumbnail ?? undefined,
       });
-      setWebsiteMessage('Website-Einstellungen gespeichert');
+      setWebsiteMessage(t('modals.productDetail.website.saved'));
     } catch (error) {
       console.error('Failed to save website settings', error);
-      setPictureError('Website-Einstellungen konnten nicht gespeichert werden.');
+      setPictureError(t('modals.productDetail.errors.saveWebsite'));
     } finally {
       setSavingWebsite(false);
     }
@@ -237,7 +240,8 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const formatDate = (iso: string) => {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return '—';
-    return date.toLocaleString('de-DE');
+    const locale = i18n.language?.startsWith('de') ? 'de-DE' : 'en-US';
+    return date.toLocaleString(locale);
   };
 
   if (!isOpen || !product) return null;
@@ -253,14 +257,16 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div>
                 <h2 className="text-2xl font-bold text-white">{product.name}</h2>
                 <p className="text-sm text-gray-400">
-                  Produkt ID: {product.product_id}
-                  {product.device_count !== undefined && ` • ${product.device_count} Geräte`}
+                  {t('modals.productDetail.productId', { id: product.product_id })}
+                  {product.device_count !== undefined && ` • ${t('modals.productDetail.deviceCount', { count: product.device_count })}`}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+              aria-label={t('common.close')}
+              title={t('common.close')}
             >
               <X className="w-5 h-5" />
             </button>
@@ -272,11 +278,11 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="flex items-center justify-between mb-3 gap-3">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Produktbilder</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.images.title')}</h3>
                 </div>
                 <label className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-white/20 transition disabled:opacity-60 disabled:cursor-not-allowed">
                   <UploadCloud className="w-4 h-4" />
-                  <span>{uploadingPictures ? 'Lädt...' : 'Bilder hochladen'}</span>
+                  <span>{uploadingPictures ? t('common.loading') : t('modals.productDetail.images.upload')}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -289,14 +295,14 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               </div>
               {pictureError && <p className="text-sm text-red-400 mb-2">{pictureError}</p>}
               {picturesUnavailable ? (
-                <p className="text-gray-400">Bilderablage ist nicht eingerichtet.</p>
+                <p className="text-gray-400">{t('modals.productDetail.images.notConfigured')}</p>
               ) : loadingPictures ? (
                 <div className="flex items-center gap-2 text-gray-300">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Bilder werden geladen...</span>
+                  <span>{t('modals.productDetail.images.loading')}</span>
                 </div>
               ) : pictures.length === 0 ? (
-                <p className="text-gray-400">Noch keine Bilder hochgeladen.</p>
+                <p className="text-gray-400">{t('modals.productDetail.images.empty')}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                   {pictures.map((picture, index) => (
@@ -307,7 +313,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     >
                       <img
                         src={picture.thumbnail_url || picture.preview_url || picture.download_url}
-                        alt={`${product.name} Bild`}
+                        alt={t('modals.productDetail.images.alt', { name: product.name })}
                         className="h-36 w-full object-cover transition duration-300 group-hover:scale-105"
                         loading="lazy"
                       />
@@ -319,9 +325,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                         }}
                         className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-1 text-xs text-white opacity-90 transition group-hover:opacity-100 disabled:opacity-50"
                         disabled={deleting === picture.file_name}
-                        title="Bild löschen"
+                        title={t('modals.productDetail.images.deleteTitle')}
                       >
-                        {deleting === picture.file_name ? '...' : 'Löschen'}
+                        {deleting === picture.file_name ? '...' : t('common.delete')}
                       </button>
                       <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-xs text-white">
@@ -339,7 +345,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Eye className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Website</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.website.title')}</h3>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-gray-200 cursor-pointer select-none">
                   <input
@@ -352,12 +358,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                       void persistWebsiteSettings(next);
                     }}
                   />
-                  Auf Website anzeigen
+                  {t('modals.productDetail.website.showOnWebsite')}
                 </label>
               </div>
               {pictures.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-400">Bilder auswählen und Thumbnail festlegen:</p>
+                  <p className="text-sm text-gray-400">{t('modals.productDetail.website.selectImages')}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {pictures.map(pic => (
                       <div key={pic.file_name} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-2 min-w-0">
@@ -376,7 +382,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                                 checked={selectedImages.has(pic.file_name)}
                                 onChange={() => toggleWebsiteImage(pic.file_name)}
                               />
-                              Auf Website
+                              {t('modals.productDetail.website.onWebsite')}
                             </label>
                             <label className="flex items-center gap-1 text-xs text-gray-200">
                               <input
@@ -390,7 +396,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                                   setWebsiteMessage(null);
                                 }}
                               />
-                              Thumbnail
+                              {t('modals.productDetail.website.thumbnail')}
                             </label>
                           </div>
                         </div>
@@ -404,12 +410,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                       disabled={savingWebsite}
                       className="px-4 py-2 rounded-lg bg-accent-red text-white text-sm font-semibold hover:bg-accent-red/90 transition disabled:opacity-60"
                     >
-                      {savingWebsite ? 'Speichert...' : 'Website speichern'}
+                      {savingWebsite ? t('common.saving') : t('modals.productDetail.website.save')}
                     </button>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">Keine Bilder vorhanden. Bitte zuerst Bilder hochladen.</p>
+                <p className="text-sm text-gray-400">{t('modals.productDetail.website.noImages')}</p>
               )}
             </div>
 
@@ -417,17 +423,17 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             <div className="flex gap-2">
               {product.is_consumable && (
                 <span className="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-sm font-semibold">
-                  Verbrauchsmaterial
+                  {t('zoneDetail.consumable')}
                 </span>
               )}
               {product.is_accessory && (
                 <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-semibold">
-                  Zubehör
+                  {t('zoneDetail.accessory')}
                 </span>
               )}
               {!product.is_consumable && !product.is_accessory && (
                 <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm font-semibold">
-                  Standard-Produkt
+                  {t('modals.productDetail.standardProduct')}
                 </span>
               )}
             </div>
@@ -437,7 +443,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Info className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Beschreibung</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('cases.description')}</h3>
                 </div>
                 <p className="text-gray-300">{product.description}</p>
               </div>
@@ -447,28 +453,28 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
             <div className="glass rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Tag className="w-5 h-5 text-accent-red" />
-                <h3 className="text-lg font-semibold text-white">Kategorisierung</h3>
+                <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.classification')}</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <p className="text-sm text-gray-400">Kategoriepfad</p>
+                  <p className="text-sm text-gray-400">{t('modals.productDetail.categoryPath')}</p>
                   <p className="text-white font-medium">{categoryPath()}</p>
                 </div>
                 {product.brand_name && (
                   <div>
-                    <p className="text-sm text-gray-400">Marke</p>
+                    <p className="text-sm text-gray-400">{t('admin.tabs.brands')}</p>
                     <p className="text-white font-medium">{product.brand_name}</p>
                   </div>
                 )}
                 {product.manufacturer_name && (
                   <div>
-                    <p className="text-sm text-gray-400">Hersteller</p>
+                    <p className="text-sm text-gray-400">{t('modals.productDetail.manufacturer')}</p>
                     <p className="text-white font-medium">{product.manufacturer_name}</p>
                   </div>
                 )}
                 {product.pos_in_category != null && (
                   <div>
-                    <p className="text-sm text-gray-400">Position in Kategorie</p>
+                    <p className="text-sm text-gray-400">{t('modals.productDetail.positionInCategory')}</p>
                     <p className="text-white font-medium">{product.pos_in_category}</p>
                   </div>
                 )}
@@ -480,18 +486,18 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <DollarSign className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Preise</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.prices')}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {product.item_cost_per_day != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Preis pro Tag</p>
+                      <p className="text-sm text-gray-400">{t('modals.productDetail.pricePerDay')}</p>
                       <p className="text-2xl font-bold text-white">{formatCurrency(product.item_cost_per_day)}</p>
                     </div>
                   )}
                   {product.price_per_unit != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Preis pro Einheit</p>
+                      <p className="text-sm text-gray-400">{t('modals.productDetail.pricePerUnit')}</p>
                       <p className="text-2xl font-bold text-white">{formatCurrency(product.price_per_unit)}</p>
                     </div>
                   )}
@@ -504,24 +510,24 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Box className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Lagerbestand</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.stock')}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="bg-white/5 rounded-lg p-3">
-                    <p className="text-sm text-gray-400">Aktueller Bestand</p>
+                    <p className="text-sm text-gray-400">{t('modals.productDetail.currentStock')}</p>
                     <p className="text-xl font-bold text-white">
                       {product.stock_quantity != null ? product.stock_quantity : '—'} {product.count_type_abbreviation || ''}
                     </p>
                   </div>
                   <div className="bg-white/5 rounded-lg p-3">
-                    <p className="text-sm text-gray-400">Mindestbestand</p>
+                    <p className="text-sm text-gray-400">{t('modals.productDetail.minStock')}</p>
                     <p className="text-xl font-bold text-white">
                       {product.min_stock_level != null ? product.min_stock_level : '—'} {product.count_type_abbreviation || ''}
                     </p>
                   </div>
                   {product.generic_barcode && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Barcode</p>
+                      <p className="text-sm text-gray-400">{t('devices.barcode')}</p>
                       <p className="text-sm font-mono text-white">{product.generic_barcode}</p>
                     </div>
                   )}
@@ -534,33 +540,33 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Ruler className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Physische Eigenschaften</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.physicalProperties')}</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {product.weight != null && (
                     <div className="bg-white/5 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-1">
                         <Weight className="w-4 h-4 text-gray-400" />
-                        <p className="text-sm text-gray-400">Gewicht</p>
+                        <p className="text-sm text-gray-400">{t('cases.weight')}</p>
                       </div>
                       <p className="text-lg font-semibold text-white">{formatMeasurement(product.weight, 'kg')}</p>
                     </div>
                   )}
                   {product.height != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Höhe</p>
+                      <p className="text-sm text-gray-400">{t('casesPage.height')}</p>
                       <p className="text-lg font-semibold text-white">{formatMeasurement(product.height, 'cm')}</p>
                     </div>
                   )}
                   {product.width != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Breite</p>
+                      <p className="text-sm text-gray-400">{t('casesPage.width')}</p>
                       <p className="text-lg font-semibold text-white">{formatMeasurement(product.width, 'cm')}</p>
                     </div>
                   )}
                   {product.depth != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Tiefe</p>
+                      <p className="text-sm text-gray-400">{t('casesPage.depth')}</p>
                       <p className="text-lg font-semibold text-white">{formatMeasurement(product.depth, 'cm')}</p>
                     </div>
                   )}
@@ -573,12 +579,12 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Technische Details</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.technicalDetails')}</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {product.power_consumption != null && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm text-gray-400">Leistungsaufnahme</p>
+                      <p className="text-sm text-gray-400">{t('modals.productDetail.powerConsumption')}</p>
                       <p className="text-lg font-semibold text-white">{formatMeasurement(product.power_consumption, 'W')}</p>
                     </div>
                   )}
@@ -586,9 +592,9 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     <div className="bg-white/5 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-1">
                         <Wrench className="w-4 h-4 text-gray-400" />
-                        <p className="text-sm text-gray-400">Wartungsintervall</p>
+                        <p className="text-sm text-gray-400">{t('modals.productDetail.maintenanceInterval')}</p>
                       </div>
-                      <p className="text-lg font-semibold text-white">{product.maintenance_interval} Tage</p>
+                      <p className="text-lg font-semibold text-white">{t('modals.productDetail.days', { count: product.maintenance_interval })}</p>
                     </div>
                   )}
                 </div>
@@ -600,10 +606,10 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               <div className="glass rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Barcode className="w-5 h-5 text-accent-red" />
-                  <h3 className="text-lg font-semibold text-white">Identifikation</h3>
+                  <h3 className="text-lg font-semibold text-white">{t('modals.productDetail.identification')}</h3>
                 </div>
                 <div className="bg-white/5 rounded-lg p-3">
-                  <p className="text-sm text-gray-400">Generischer Barcode</p>
+                  <p className="text-sm text-gray-400">{t('modals.productDetail.genericBarcode')}</p>
                   <p className="text-lg font-mono text-white">{product.generic_barcode}</p>
                 </div>
               </div>
@@ -617,7 +623,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   onClick={() => setPreviewIndex(null)}
                   className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
                 >
-                  Schließen
+                  {t('common.close')}
                 </button>
                 <div className="absolute left-2 top-1/2 -translate-y-1/2">
                   <button
@@ -655,7 +661,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                   />
                   {lightboxLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white">
-                      Lädt...
+                      {t('common.loading')}
                     </div>
                   )}
                 </div>
@@ -669,7 +675,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
                     className="rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                     disabled={deleting === pictures[previewIndex].file_name}
                   >
-                    {deleting === pictures[previewIndex].file_name ? 'Löscht...' : 'Bild löschen'}
+                    {deleting === pictures[previewIndex].file_name ? t('modals.productDetail.images.deleting') : t('modals.productDetail.images.delete')}
                   </button>
                 </div>
               </div>
@@ -682,7 +688,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
               onClick={onClose}
               className="px-6 py-2 rounded-lg text-sm font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
             >
-              Schließen
+              {t('common.close')}
             </button>
           </div>
         </div>

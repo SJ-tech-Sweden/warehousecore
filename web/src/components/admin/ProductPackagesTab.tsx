@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Plus,
   Pencil,
@@ -119,6 +120,7 @@ function formatPrice(value?: number | string | null, fallback = '-') {
 }
 
 export function ProductPackagesTab() {
+  const { t } = useTranslation();
   const [packages, setPackages] = useState<ProductPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -282,7 +284,7 @@ export function ProductPackagesTab() {
   const handleAddDevices = async (productId: number) => {
     const quantity = formData.device_quantity;
     if (!quantity || quantity <= 0) {
-      window.alert('Bitte eine gültige Anzahl eingeben.');
+      window.alert(t('admin.productPackages.errors.invalidQuantity'));
       return;
     }
 
@@ -300,7 +302,7 @@ export function ProductPackagesTab() {
       setFormData({ ...formData, device_quantity: undefined, device_prefix: '' });
     } catch (error) {
       console.error('Failed to add devices:', error);
-      window.alert('Fehler beim Hinzufügen der Geräte.');
+      window.alert(t('admin.productPackages.errors.addDevices'));
     }
   };
 
@@ -399,13 +401,13 @@ export function ProductPackagesTab() {
     setFormError(null);
 
     if (!formData.name.trim()) {
-      setFormError('Bitte gib einen Namen für das Paket an.');
+      setFormError(t('admin.productPackages.errors.nameRequired'));
       setSubmitting(false);
       return;
     }
 
     if (formData.items.length === 0) {
-      setFormError('Ein Paket muss mindestens ein Produkt enthalten.');
+      setFormError(t('admin.productPackages.errors.itemsRequired'));
       setSubmitting(false);
       return;
     }
@@ -441,7 +443,7 @@ export function ProductPackagesTab() {
             await Promise.all(deletePromises);
           } catch (deviceError) {
             console.error('Failed to delete some devices:', deviceError);
-            window.alert('Paket gespeichert, aber einige Geräte konnten nicht gelöscht werden.');
+            window.alert(t('admin.productPackages.errors.partialDeviceDelete'));
           }
         }
       } else {
@@ -458,7 +460,7 @@ export function ProductPackagesTab() {
             });
           } catch (deviceError) {
             console.error('Failed to create devices:', deviceError);
-            window.alert('Paket erstellt, aber Geräte konnten nicht angelegt werden.');
+            window.alert(t('admin.productPackages.errors.deviceCreate'));
           }
         }
       }
@@ -481,7 +483,7 @@ export function ProductPackagesTab() {
           });
         } catch (imageError) {
           console.error('Failed to upload images:', imageError);
-          window.alert('Paket gespeichert, aber Bilder konnten nicht hochgeladen werden.');
+          window.alert(t('admin.productPackages.errors.imageUpload'));
         }
       }
 
@@ -490,7 +492,7 @@ export function ProductPackagesTab() {
     } catch (error) {
       console.error('Failed to save product package:', error);
       const message =
-        (error as any)?.response?.data?.error || 'Fehler beim Speichern des Produktpakets';
+        (error as any)?.response?.data?.error || t('admin.productPackages.errors.save');
       setFormError(message);
     } finally {
       setSubmitting(false);
@@ -498,14 +500,14 @@ export function ProductPackagesTab() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Möchten Sie dieses Produktpaket wirklich löschen?')) return;
+    if (!confirm(t('admin.productPackages.confirmDelete'))) return;
 
     try {
       await api.delete(`/admin/product-packages/${id}`);
       fetchPackages();
     } catch (error) {
       console.error('Failed to delete product package:', error);
-      alert('Fehler beim Löschen des Produktpakets');
+      alert(t('admin.productPackages.errors.delete'));
     }
   };
 
@@ -575,7 +577,7 @@ export function ProductPackagesTab() {
 
   const getProductName = (productId: number) => {
     const product = products.find(p => p.product_id === productId);
-    return product?.name || `Produkt #${productId}`;
+    return product?.name || t('admin.productPackages.productWithId', { id: productId });
   };
 
   return (
@@ -583,15 +585,15 @@ export function ProductPackagesTab() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-white">Produktpakete</h2>
-          <p className="text-gray-400">Verwalten Sie Produktpakete für Jobs</p>
+          <h2 className="text-2xl font-bold text-white">{t('admin.productPackages.title')}</h2>
+          <p className="text-gray-400">{t('admin.productPackages.subtitle')}</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 rounded-xl bg-accent-red/90 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-900/40 transition-all hover:bg-accent-red focus:outline-none focus:ring-2 focus:ring-red-400"
         >
           <Plus className="w-5 h-5" />
-          Neues Paket
+          {t('admin.productPackages.newPackage')}
         </button>
       </div>
 
@@ -601,10 +603,11 @@ export function ProductPackagesTab() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Pakete durchsuchen..."
+            placeholder={t('admin.productPackages.searchPlaceholder')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-accent-red"
+            title={t('common.search')}
           />
         </div>
         <button
@@ -612,27 +615,27 @@ export function ProductPackagesTab() {
           className="btn-secondary flex items-center gap-2"
         >
           <RefreshCcw className="w-5 h-5" />
-          Aktualisieren
+          {t('common.update')}
         </button>
       </div>
 
       {/* Packages Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Lade Produktpakete...</div>
+        <div className="text-center py-12 text-gray-400">{t('admin.productPackages.loading')}</div>
       ) : packages.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
-          Keine Produktpakete gefunden. Erstellen Sie ein neues Paket.
+          {t('admin.productPackages.empty')}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4 text-gray-400 font-semibold">Name</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-semibold">Beschreibung</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Preis</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Artikel</th>
-                <th className="text-right py-3 px-4 text-gray-400 font-semibold">Aktionen</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-semibold">{t('common.name')}</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-semibold">{t('cases.description')}</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">{t('products.price')}</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">{t('admin.productPackages.items')}</th>
+                <th className="text-right py-3 px-4 text-gray-400 font-semibold">{t('labels.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -649,21 +652,24 @@ export function ProductPackagesTab() {
                       <button
                         onClick={() => handleViewPackage(pkg)}
                         className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
-                        title="Anzeigen"
+                        title={t('casesPage.details')}
+                        aria-label={t('casesPage.details')}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleOpenModal(pkg)}
                         className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors"
-                        title="Bearbeiten"
+                        title={t('common.edit')}
+                        aria-label={t('common.edit')}
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(pkg.package_id)}
                         className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                        title="Löschen"
+                        title={t('common.delete')}
+                        aria-label={t('common.delete')}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -683,11 +689,13 @@ export function ProductPackagesTab() {
             <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-white">
-                  {editingPackage ? 'Paket bearbeiten' : 'Neues Paket'}
+                  {editingPackage ? t('admin.productPackages.editPackage') : t('admin.productPackages.newPackage')}
                 </h3>
                 <button
                   onClick={handleCloseModal}
                   className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title={t('common.close')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -702,7 +710,7 @@ export function ProductPackagesTab() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Name *
+                  {t('common.name')} *
                 </label>
                 <input
                   type="text"
@@ -710,24 +718,26 @@ export function ProductPackagesTab() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
                   required
+                  title={t('common.name')}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Beschreibung
+                  {t('cases.description')}
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
                   rows={3}
+                  title={t('cases.description')}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Preis (€)
+                  {t('products.price')} (€)
                 </label>
                 <input
                   type="number"
@@ -735,6 +745,7 @@ export function ProductPackagesTab() {
                   value={formData.price}
                   onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                  title={t('products.price')}
                 />
               </div>
 
@@ -747,13 +758,13 @@ export function ProductPackagesTab() {
                   className="h-4 w-4 rounded border-gray-600 text-accent-red focus:ring-accent-red"
                 />
                 <label htmlFor="pkg-website-visible" className="text-sm text-gray-200 select-none">
-                  Paket auf Website anzeigen
+                  {t('admin.productPackages.websiteVisible')}
                 </label>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Kategorie
+                  {t('products.category')}
                 </label>
                 <select
                   value={formData.category_id}
@@ -767,8 +778,9 @@ export function ProductPackagesTab() {
                     });
                   }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                  title={t('products.category')}
                 >
-                  <option value="">Keine Kategorie</option>
+                  <option value="">{t('admin.productPackages.noCategory')}</option>
                   {categories.map((cat) => (
                     <option key={cat.category_id} value={cat.category_id}>
                       {cat.name}
@@ -779,7 +791,7 @@ export function ProductPackagesTab() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Subkategorie
+                  {t('admin.productPackages.subcategory')}
                 </label>
                 <select
                   value={formData.subcategory_id}
@@ -793,8 +805,9 @@ export function ProductPackagesTab() {
                   }}
                   disabled={!formData.category_id}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={t('admin.productPackages.subcategory')}
                 >
-                  <option value="">Keine Subkategorie</option>
+                  <option value="">{t('admin.productPackages.noSubcategory')}</option>
                   {filteredSubcategories.map((sub) => (
                     <option key={sub.subcategory_id} value={sub.subcategory_id}>
                       {sub.name}
@@ -805,7 +818,7 @@ export function ProductPackagesTab() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Sub-Subkategorie
+                  {t('admin.productPackages.subSubcategory')}
                 </label>
                 <select
                   value={formData.subbiercategory_id}
@@ -818,8 +831,9 @@ export function ProductPackagesTab() {
                   }}
                   disabled={!formData.subcategory_id}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={t('admin.productPackages.subSubcategory')}
                 >
-                  <option value="">Keine Sub-Subkategorie</option>
+                  <option value="">{t('admin.productPackages.noSubSubcategory')}</option>
                   {filteredSubbiercategories.map((subbier) => (
                     <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
                       {subbier.name}
@@ -829,15 +843,15 @@ export function ProductPackagesTab() {
               </div>
 
               <div className="border-t border-gray-700 pt-4">
-                <h4 className="text-lg font-semibold text-white mb-3">Website-Bilder</h4>
+                <h4 className="text-lg font-semibold text-white mb-3">{t('modals.productDetail.images.title')}</h4>
                 <p className="text-sm text-gray-400 mb-3">
-                  Lade Bilder für die Website hoch. Markiere ein Bild als Thumbnail, das in der Übersicht angezeigt wird.
+                  {t('admin.productPackages.websiteImagesHelp')}
                 </p>
 
                 <div className="mb-3">
                   <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
                     <Plus className="w-4 h-4" />
-                    Bilder auswählen
+                    {t('modals.productDetail.images.upload')}
                     <input
                       type="file"
                       accept="image/*"
@@ -867,19 +881,19 @@ export function ProductPackagesTab() {
                                 : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                             }`}
                           >
-                            {thumbnailIndex === index ? '✓ Thumbnail' : 'Als Thumbnail'}
+                            {thumbnailIndex === index ? t('admin.productPackages.thumbnailSelected') : t('admin.productPackages.setThumbnail')}
                           </button>
                           <button
                             type="button"
                             onClick={() => handleRemoveImage(index)}
                             className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                           >
-                            Entfernen
+                            {t('common.remove')}
                           </button>
                         </div>
                         {thumbnailIndex === index && (
                           <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                            Thumbnail
+                            {t('modals.productDetail.website.thumbnail')}
                           </div>
                         )}
                       </div>
@@ -889,7 +903,7 @@ export function ProductPackagesTab() {
               </div>
 
               <div className="border-t border-gray-700 pt-4">
-                <h4 className="text-lg font-semibold text-white mb-3">Produkte</h4>
+                <h4 className="text-lg font-semibold text-white mb-3">{t('products.title')}</h4>
 
                 {/* Add Item Section */}
                 <div className="flex gap-2 mb-4">
@@ -897,8 +911,9 @@ export function ProductPackagesTab() {
                     value={selectedProduct}
                     onChange={(e) => setSelectedProduct(Number(e.target.value))}
                     className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                    title={t('products.title')}
                   >
-                    <option value="">Produkt auswählen...</option>
+                    <option value="">{t('admin.devices.selectProduct')}</option>
                     {products.map((product) => (
                       <option key={product.product_id} value={product.product_id}>
                         {product.name} {product.category_name ? `(${product.category_name})` : ''}
@@ -911,7 +926,8 @@ export function ProductPackagesTab() {
                     value={selectedQuantity}
                     onChange={(e) => setSelectedQuantity(parseInt(e.target.value) || 1)}
                     className="w-24 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
-                    placeholder="Anzahl"
+                    placeholder={t('admin.devices.quantity')}
+                    title={t('admin.devices.quantity')}
                   />
                   <button
                     type="button"
@@ -919,13 +935,13 @@ export function ProductPackagesTab() {
                     className="btn-primary flex items-center gap-2 min-w-[120px]"
                   >
                     <Plus className="w-4 h-4" />
-                    Hinzufügen
+                    {t('common.add')}
                   </button>
                 </div>
 
                 {/* Items List */}
                 {formData.items.length === 0 ? (
-                  <p className="text-gray-400 text-center py-4">Keine Produkte hinzugefügt</p>
+                  <p className="text-gray-400 text-center py-4">{t('admin.productPackages.noProductsAdded')}</p>
                 ) : (
                   <div className="space-y-2">
                     {formData.items.map((item, index) => (
@@ -938,6 +954,8 @@ export function ProductPackagesTab() {
                           type="button"
                           onClick={() => handleRemoveItem(index)}
                           className="text-red-400 hover:bg-red-400/10 p-2 rounded-lg transition-colors"
+                          title={t('common.remove')}
+                          aria-label={t('common.remove')}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -948,9 +966,9 @@ export function ProductPackagesTab() {
               </div>
 
               <div className="border-t border-gray-700 pt-4">
-                <h4 className="text-lg font-semibold text-white mb-2">OCR-Zuordnungen</h4>
+                <h4 className="text-lg font-semibold text-white mb-2">{t('admin.productPackages.ocrAssignments')}</h4>
                 <p className="text-sm text-gray-400 mb-3">
-                  Definiere Schlagwörter oder Kürzel, die bei OCR-Erkennung automatisch diesem Paket zugeordnet werden.
+                  {t('admin.productPackages.ocrHelp')}
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -964,18 +982,19 @@ export function ProductPackagesTab() {
                       }
                     }}
                     className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
-                    placeholder="z.B. Basic Audio Set"
+                    placeholder={t('admin.productPackages.aliasPlaceholder')}
+                    title={t('admin.productPackages.ocrAssignments')}
                   />
                   <button
                     type="button"
                     onClick={handleAddAlias}
                     className="btn-secondary px-4"
                   >
-                    Hinzufügen
+                    {t('common.add')}
                   </button>
                 </div>
                 {formData.aliases.length === 0 ? (
-                  <p className="text-gray-500 text-sm mt-2">Noch keine Schlüsselwörter definiert.</p>
+                  <p className="text-gray-500 text-sm mt-2">{t('admin.productPackages.noKeywords')}</p>
                 ) : (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {formData.aliases.map((alias) => (
@@ -988,7 +1007,7 @@ export function ProductPackagesTab() {
                           type="button"
                           onClick={() => handleRemoveAlias(alias)}
                           className="text-gray-400 hover:text-white"
-                          aria-label="Alias entfernen"
+                          aria-label={t('admin.productPackages.removeAlias')}
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1001,17 +1020,17 @@ export function ProductPackagesTab() {
               {/* Device Management Section */}
               <div className="border-t border-gray-700 pt-4">
                 <h4 className="text-lg font-semibold text-white mb-3">
-                  {editingPackage ? 'Geräte verwalten' : 'Geräte erstellen (optional)'}
+                  {editingPackage ? t('admin.productPackages.manageDevices') : t('admin.productPackages.createDevicesOptional')}
                 </h4>
 
                 {editingPackage && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-300">
-                        {packageDevices.length} Gerät(e) zugeordnet
+                        {t('admin.productPackages.assignedDevices', { count: packageDevices.length })}
                       </span>
                       {loadingDevices && (
-                        <span className="text-xs text-gray-400">Lade...</span>
+                        <span className="text-xs text-gray-400">{t('common.loading')}</span>
                       )}
                     </div>
 
@@ -1042,7 +1061,7 @@ export function ProductPackagesTab() {
                                   ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
                                   : 'text-gray-400 hover:bg-white/10 hover:text-red-400'
                               }`}
-                              title={devicesToDelete.has(device.device_id) ? 'Löschen rückgängig' : 'Zum Löschen markieren'}
+                              title={devicesToDelete.has(device.device_id) ? t('admin.productPackages.undoDelete') : t('admin.productPackages.markForDelete')}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1053,7 +1072,7 @@ export function ProductPackagesTab() {
 
                     {devicesToDelete.size > 0 && (
                       <p className="text-xs text-red-300">
-                        {devicesToDelete.size} Gerät(e) zum Löschen markiert. Änderungen werden beim Speichern angewendet.
+                        {t('admin.productPackages.markedForDelete', { count: devicesToDelete.size })}
                       </p>
                     )}
                   </div>
@@ -1062,7 +1081,7 @@ export function ProductPackagesTab() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mt-4">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Anzahl Geräte {editingPackage && 'hinzufügen'}
+                      {editingPackage ? t('admin.productPackages.deviceCountAdd') : t('admin.productPackages.deviceCount')}
                     </label>
                     <input
                       type="number"
@@ -1075,12 +1094,13 @@ export function ProductPackagesTab() {
                         })
                       }
                       placeholder="z. B. 10"
+                      title={t('admin.productPackages.deviceCount')}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                     />
                   </div>
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Geräte-Präfix
+                      {t('admin.productPackages.devicePrefix')}
                     </label>
                     <input
                       type="text"
@@ -1091,7 +1111,8 @@ export function ProductPackagesTab() {
                           device_prefix: event.target.value,
                         })
                       }
-                      placeholder="z. B. PKG"
+                      placeholder={t('admin.productPackages.devicePrefixPlaceholder')}
+                      title={t('admin.productPackages.devicePrefix')}
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
                     />
                   </div>
@@ -1109,12 +1130,12 @@ export function ProductPackagesTab() {
                     disabled={!formData.device_quantity || formData.device_quantity <= 0}
                     className="w-full mt-3 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Geräte jetzt hinzufügen
+                    {t('admin.productPackages.addDevicesNow')}
                   </button>
                 )}
 
                 <p className="text-xs text-gray-400 mt-3">
-                  Geräte werden automatisch mit aufsteigender Nummerierung erstellt (z. B. {formData.device_prefix || 'PKG'}0001).
+                  {t('admin.productPackages.autoNumberingHint', { prefix: formData.device_prefix || 'PKG' })}
                 </p>
               </div>
 
@@ -1125,10 +1146,10 @@ export function ProductPackagesTab() {
                   className="flex-1 btn-secondary"
                   disabled={submitting}
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </button>
                 <button type="submit" className="flex-1 btn-primary" disabled={submitting}>
-                  {submitting ? 'Speichert...' : editingPackage ? 'Speichern' : 'Erstellen'}
+                  {submitting ? t('common.saving') : editingPackage ? t('common.save') : t('common.create')}
                 </button>
               </div>
             </form>
@@ -1147,6 +1168,8 @@ export function ProductPackagesTab() {
                 <button
                   onClick={() => setViewPackage(null)}
                   className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title={t('common.close')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -1155,20 +1178,20 @@ export function ProductPackagesTab() {
             <div className="space-y-4">
               {viewPackage.description && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Beschreibung</h4>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">{t('cases.description')}</h4>
                   <p className="text-white">{viewPackage.description}</p>
                 </div>
               )}
 
               {viewPackagePriceDisplay && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400 mb-1">Preis</h4>
+                  <h4 className="text-sm font-medium text-gray-400 mb-1">{t('products.price')}</h4>
                   <p className="text-white text-xl font-bold">{viewPackagePriceDisplay}</p>
                 </div>
               )}
 
               <div>
-                <h4 className="text-sm font-medium text-gray-400 mb-1">OCR-Schlüsselwörter</h4>
+                <h4 className="text-sm font-medium text-gray-400 mb-1">{t('admin.productPackages.ocrKeywords')}</h4>
                 {viewPackage.aliases && viewPackage.aliases.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {viewPackage.aliases.map((alias) => (
@@ -1178,12 +1201,12 @@ export function ProductPackagesTab() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm">Keine Schlüsselwörter definiert.</p>
+                  <p className="text-gray-500 text-sm">{t('admin.productPackages.noKeywords')}</p>
                 )}
               </div>
 
               <div>
-                <h4 className="text-sm font-medium text-gray-400 mb-3">Produkte ({viewPackage.total_items} Artikel)</h4>
+                <h4 className="text-sm font-medium text-gray-400 mb-3">{t('admin.productPackages.productsWithItems', { items: viewPackage.total_items })}</h4>
                 {viewPackage.items && viewPackage.items.length > 0 ? (
                   <div className="space-y-2">
                     {viewPackage.items.map((item) => (
@@ -1201,7 +1224,7 @@ export function ProductPackagesTab() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-400">Keine Produkte</p>
+                  <p className="text-gray-400">{t('admin.productPackages.noProducts')}</p>
                 )}
               </div>
             </div>
@@ -1210,7 +1233,7 @@ export function ProductPackagesTab() {
               onClick={() => setViewPackage(null)}
               className="w-full mt-6 btn-secondary"
             >
-              Schließen
+              {t('common.close')}
             </button>
           </div>
           </div>

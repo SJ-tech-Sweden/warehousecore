@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
 
 interface CountType {
@@ -16,6 +17,7 @@ interface CountTypeFormData {
 }
 
 export function CountTypesTab() {
+  const { t } = useTranslation();
   const [countTypes, setCountTypes] = useState<CountType[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -34,7 +36,7 @@ export function CountTypesTab() {
       setCountTypes(data || []);
     } catch (error: any) {
       console.error('Failed to load measurement units:', error);
-      setMessage('Mess-Einheiten konnten nicht geladen werden.');
+      setMessage(t('admin.countTypes.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export function CountTypesTab() {
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.abbreviation.trim()) {
-      setMessage('Name und Abkürzung sind erforderlich.');
+      setMessage(t('admin.countTypes.messages.required'));
       return;
     }
 
@@ -65,17 +67,17 @@ export function CountTypesTab() {
       }
       await loadCountTypes();
       resetForm();
-      setMessage('Mess-Einheit gespeichert.');
+      setMessage(t('admin.countTypes.messages.saved'));
     } catch (error: any) {
       console.error('Failed to save measurement unit:', error);
-      setMessage(error?.response?.data?.error || 'Speichern fehlgeschlagen.');
+      setMessage(error?.response?.data?.error || t('admin.countTypes.messages.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Mess-Einheit wirklich löschen?')) return;
+    if (!confirm(t('admin.countTypes.confirmDelete'))) return;
     setMessage('');
     try {
       await api.delete(`/admin/count-types/${id}`);
@@ -83,7 +85,7 @@ export function CountTypesTab() {
       resetForm();
     } catch (error: any) {
       console.error('Failed to delete measurement unit:', error);
-      setMessage(error?.response?.data?.error || 'Löschen fehlgeschlagen.');
+      setMessage(error?.response?.data?.error || t('admin.countTypes.messages.deleteFailed'));
     }
   };
 
@@ -100,8 +102,8 @@ export function CountTypesTab() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-white">Mess-Einheiten verwalten</h2>
-          <p className="text-gray-400 text-sm">Einheiten für Zubehör und Verbrauchsmaterialien</p>
+          <h2 className="text-xl font-bold text-white">{t('admin.countTypes.title')}</h2>
+          <p className="text-gray-400 text-sm">{t('admin.countTypes.subtitle')}</p>
         </div>
         <button
           onClick={() => {
@@ -111,7 +113,7 @@ export function CountTypesTab() {
           className="px-4 py-2 bg-accent-red text-white rounded-lg font-semibold hover:shadow-lg flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          Neue Einheit
+          {t('admin.countTypes.newUnit')}
         </button>
       </div>
 
@@ -132,18 +134,20 @@ export function CountTypesTab() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <input
               type="text"
-              placeholder="Name (z.B. Kilogramm)"
+              placeholder={t('admin.countTypes.namePlaceholder')}
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 rounded-lg glass text-white"
+              title={t('common.name')}
             />
             <input
               type="text"
-              placeholder="Abkürzung (z.B. kg)"
+              placeholder={t('admin.countTypes.abbreviationPlaceholder')}
               maxLength={10}
               value={formData.abbreviation}
               onChange={e => setFormData({ ...formData, abbreviation: e.target.value })}
               className="w-full px-3 py-2 rounded-lg glass text-white"
+              title={t('admin.countTypes.abbreviation')}
             />
             <label className="flex items-center gap-2 text-white font-semibold">
               <input
@@ -151,8 +155,9 @@ export function CountTypesTab() {
                 checked={formData.is_active}
                 onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                 className="w-5 h-5 rounded border-white/20 bg-white/10 text-accent-red focus:ring-accent-red"
+                title={t('admin.countTypes.active')}
               />
-              Aktiv
+              {t('admin.countTypes.active')}
             </label>
           </div>
           <div className="flex gap-2">
@@ -162,14 +167,14 @@ export function CountTypesTab() {
               className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" />
-              {saving ? 'Speichert...' : 'Speichern'}
+              {saving ? t('common.saving') : t('common.save')}
             </button>
             <button
               onClick={resetForm}
               className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg flex items-center justify-center gap-2"
             >
               <X className="w-4 h-4" />
-              Abbrechen
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -177,9 +182,9 @@ export function CountTypesTab() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-white">Lädt...</div>
+          <div className="text-white">{t('common.loading')}</div>
         ) : countTypes.length === 0 ? (
-          <div className="text-gray-400">Keine Mess-Einheiten gefunden.</div>
+          <div className="text-gray-400">{t('admin.countTypes.empty')}</div>
         ) : (
           countTypes.map(ct => (
             <div key={ct.count_type_id} className="glass rounded-xl p-4 flex items-center justify-between">
@@ -187,19 +192,23 @@ export function CountTypesTab() {
                 <h3 className="text-white font-semibold">{ct.name}</h3>
                 <p className="text-gray-400 text-sm">{ct.abbreviation}</p>
                 <p className={`text-xs mt-1 ${ct.is_active ? 'text-green-400' : 'text-gray-500'}`}>
-                  {ct.is_active ? 'Aktiv' : 'Inaktiv'}
+                  {ct.is_active ? t('admin.countTypes.active') : t('admin.countTypes.inactive')}
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => startEdit(ct)}
                   className="p-2 hover:bg-white/10 rounded-lg text-blue-400"
+                  title={t('common.edit')}
+                  aria-label={t('common.edit')}
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(ct.count_type_id)}
                   className="p-2 hover:bg-white/10 rounded-lg text-red-400"
+                  title={t('common.delete')}
+                  aria-label={t('common.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

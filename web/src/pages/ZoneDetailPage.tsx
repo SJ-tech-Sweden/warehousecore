@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MapPin, Package, ChevronRight, ArrowLeft, Plus, Trash2, FlaskConical } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { zonesApi, type ProductInZone } from '../lib/api';
 import { DeviceTreeModal } from '../components/DeviceTreeModal';
 import { DeviceDetailModal } from '../components/DeviceDetailModal';
@@ -44,6 +45,7 @@ interface DeviceInZone {
 }
 
 export function ZoneDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [zone, setZone] = useState<ZoneDetails | null>(null);
@@ -166,7 +168,7 @@ export function ZoneDetailPage() {
       loadZoneDetails(); // Reload to show new shelves
     } catch (error) {
       console.error('Failed to create shelves:', error);
-      alert('Fehler beim Erstellen der Fächer');
+      alert(t('zoneDetail.createShelvesError'));
     }
   };
 
@@ -174,16 +176,16 @@ export function ZoneDetailPage() {
     if (!zone) return;
 
     if (zone.device_count > 0) {
-      alert('Diese Zone enthält noch Geräte und kann nicht gelöscht werden.');
+      alert(t('zoneDetail.deleteBlockedDevices'));
       return;
     }
 
     if (zone.subzones && zone.subzones.length > 0) {
-      alert('Diese Zone enthält noch Unterzonen und kann nicht gelöscht werden.');
+      alert(t('zoneDetail.deleteBlockedSubzones'));
       return;
     }
 
-    if (!confirm(`Zone "${zone.name}" (${zone.code}) wirklich löschen?`)) {
+    if (!confirm(t('zoneDetail.deleteConfirm', { name: zone.name, code: zone.code }))) {
       return;
     }
 
@@ -192,14 +194,14 @@ export function ZoneDetailPage() {
       navigate('/zones');
     } catch (error) {
       console.error('Failed to delete zone:', error);
-      alert('Fehler beim Löschen der Zone');
+      alert(t('zoneDetail.deleteError'));
     }
   };
 
   const handleDeleteSubzone = async (e: React.MouseEvent, subzone: any) => {
     e.stopPropagation(); // Prevent navigation when clicking delete
 
-    if (!confirm(`Zone "${subzone.name}" (${subzone.code}) wirklich löschen?`)) {
+    if (!confirm(t('zoneDetail.deleteConfirm', { name: subzone.name, code: subzone.code }))) {
       return;
     }
 
@@ -208,7 +210,7 @@ export function ZoneDetailPage() {
       loadZoneDetails(); // Reload to show updated subzones list
     } catch (error) {
       console.error('Failed to delete subzone:', error);
-      alert('Fehler beim Löschen der Zone. Prüfe ob die Zone Unterzonen oder Geräte enthält.');
+      alert(t('zoneDetail.deleteErrorWithChildren'));
     }
   };
 
@@ -247,15 +249,15 @@ export function ZoneDetailPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(`${result.success} von ${result.total} Geräten erfolgreich zugewiesen`);
+        alert(t('zoneDetail.assignSuccess', { success: result.success, total: result.total }));
         loadDevices(); // Reload devices
         loadZoneDetails(); // Reload zone details to update device count
       } else {
-        alert(`Fehler beim Zuweisen der Geräte: ${result.error || 'Unbekannter Fehler'}`);
+        alert(t('zoneDetail.assignErrorWithReason', { error: result.error || t('zoneDetail.unknownError') }));
       }
     } catch (error) {
       console.error('Failed to assign devices:', error);
-      alert('Fehler beim Zuweisen der Geräte');
+      alert(t('zoneDetail.assignError'));
     }
   };
 
@@ -270,12 +272,12 @@ export function ZoneDetailPage() {
   if (!zone) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400">Zone nicht gefunden</p>
+        <p className="text-gray-400">{t('zoneDetail.notFound')}</p>
       </div>
     );
   }
 
-  const defaultTypeInfo = { label: 'Sonstige', icon: '📍' };
+  const defaultTypeInfo = { label: t('zoneDetail.defaultType'), icon: '📍' };
   const typeInfo = zoneTypeMap[zone.type] || defaultTypeInfo;
 
   return (
@@ -287,7 +289,7 @@ export function ZoneDetailPage() {
           className="flex items-center gap-2 text-sm sm:text-base text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Zurück zu Lager
+          {t('zoneDetail.backToZones')}
         </button>
 
         {/* Breadcrumb */}
@@ -323,7 +325,7 @@ export function ZoneDetailPage() {
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 glass text-red-400 hover:text-red-300 hover:bg-red-900/20 font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
             >
               <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Löschen</span>
+              <span className="hidden sm:inline">{t('common.delete')}</span>
               <span className="sm:hidden">🗑️</span>
             </button>
             <button
@@ -331,13 +333,13 @@ export function ZoneDetailPage() {
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
             >
               <Package className="w-4 h-4" />
-              <span className="hidden sm:inline">Geräte hinzufügen</span>
-              <span className="sm:hidden">Geräte</span>
+              <span className="hidden sm:inline">{t('zoneDetail.addDevices')}</span>
+              <span className="sm:hidden">{t('zoneDetail.devicesShort')}</span>
             </button>
             {zone.type === 'rack' && (
               <button
                 onClick={() => {
-                  const count = prompt('Wie viele Fächer sollen erstellt werden?', '5');
+                  const count = prompt(t('zoneDetail.createShelvesPrompt'), t('zoneDetail.createShelvesDefault'));
                   if (count) {
                     handleCreateShelves(parseInt(count));
                   }
@@ -345,8 +347,8 @@ export function ZoneDetailPage() {
                 className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl transition-all whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Fächer erstellen</span>
-                <span className="sm:hidden">Fächer</span>
+                <span className="hidden sm:inline">{t('zoneDetail.createShelves')}</span>
+                <span className="sm:hidden">{t('zoneDetail.shelvesShort')}</span>
               </button>
             )}
             <button
@@ -354,8 +356,8 @@ export function ZoneDetailPage() {
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-accent-red to-red-700 text-white font-semibold text-sm sm:text-base rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-accent-red/50 transition-all whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Unterzone erstellen</span>
-              <span className="sm:hidden">Unterzone</span>
+              <span className="hidden sm:inline">{t('zoneDetail.createSubzone')}</span>
+              <span className="sm:hidden">{t('zoneDetail.subzoneShort')}</span>
             </button>
           </div>
         </div>
@@ -368,16 +370,16 @@ export function ZoneDetailPage() {
         <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
           <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
             <div className="text-xl sm:text-2xl font-bold text-white">{zone.device_count}</div>
-            <div className="text-xs sm:text-sm text-gray-400">Geräte</div>
+            <div className="text-xs sm:text-sm text-gray-400">{t('zoneDetail.stats.devices')}</div>
           </div>
           <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
             <div className="text-xl sm:text-2xl font-bold text-white">{zone.subzones?.length || 0}</div>
-            <div className="text-xs sm:text-sm text-gray-400">Unterzonen</div>
+            <div className="text-xs sm:text-sm text-gray-400">{t('zoneDetail.stats.subzones')}</div>
           </div>
           {zone.capacity && (
             <div className="glass rounded-lg sm:rounded-xl p-3 sm:p-4">
               <div className="text-xl sm:text-2xl font-bold text-white">{zone.capacity}</div>
-              <div className="text-xs sm:text-sm text-gray-400">Kapazität</div>
+              <div className="text-xs sm:text-sm text-gray-400">{t('zoneDetail.stats.capacity')}</div>
             </div>
           )}
         </div>
@@ -388,7 +390,7 @@ export function ZoneDetailPage() {
         <div>
           <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
             <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
-            Unterzonen
+            {t('zoneDetail.subzones')}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {zone.subzones.map((subzone) => {
@@ -402,7 +404,7 @@ export function ZoneDetailPage() {
                   <button
                     onClick={(e) => handleDeleteSubzone(e, subzone)}
                     className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1.5 sm:p-2 glass-dark rounded-lg text-red-400 hover:text-red-300 hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-all z-10"
-                    title="Zone löschen"
+                    title={t('zonesPage.deleteZone')}
                   >
                     <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
@@ -414,9 +416,9 @@ export function ZoneDetailPage() {
                       </h4>
                       <p className="text-xs sm:text-sm text-gray-400 font-mono truncate">{subzone.code}</p>
                       <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2 text-[10px] sm:text-xs text-gray-500">
-                        <span>{subzone.device_count} Geräte</span>
+                        <span>{t('zoneDetail.subzoneDevices', { count: subzone.device_count })}</span>
                         {subzone.subzone_count > 0 && (
-                          <span>{subzone.subzone_count} Unterzonen</span>
+                          <span>{t('zoneDetail.subzoneSubzones', { count: subzone.subzone_count })}</span>
                         )}
                       </div>
                     </div>
@@ -433,18 +435,18 @@ export function ZoneDetailPage() {
         <div>
           <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
             <Package className="w-4 h-4 sm:w-5 sm:h-5" />
-            Gelagerte Geräte ({devices.length})
+            {t('zoneDetail.storedDevices', { count: devices.length })}
           </h3>
           <div className="glass-dark rounded-xl sm:rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Geräte-ID</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Produkt</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">Hersteller</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">Modell</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden lg:table-cell">Barcode</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.deviceId')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.product')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">{t('zoneDetail.columns.manufacturer')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden md:table-cell">{t('zoneDetail.columns.model')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap hidden lg:table-cell">{t('zoneDetail.columns.barcode')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -473,17 +475,17 @@ export function ZoneDetailPage() {
         <div>
           <h3 className="text-lg sm:text-xl font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
             <FlaskConical className="w-4 h-4 sm:w-5 sm:h-5" />
-            Verbrauchsmaterialien & Zubehör ({products.length})
+            {t('zoneDetail.productsTitle', { count: products.length })}
           </h3>
           <div className="glass-dark rounded-xl sm:rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Produkt</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Typ</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Menge</th>
-                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">Einheit</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.product')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.type')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.quantity')}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold text-gray-400 whitespace-nowrap">{t('zoneDetail.columns.unit')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -496,12 +498,12 @@ export function ZoneDetailPage() {
                       <td className="p-2 sm:p-4 text-xs sm:text-sm">
                         {product.is_consumable && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-medium">
-                            Verbrauchsmaterial
+                            {t('zoneDetail.consumable')}
                           </span>
                         )}
                         {product.is_accessory && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium">
-                            Zubehör
+                            {t('zoneDetail.accessory')}
                           </span>
                         )}
                       </td>
@@ -519,12 +521,12 @@ export function ZoneDetailPage() {
       {devices.length === 0 && products.length === 0 && (!zone.subzones || zone.subzones.length === 0) && (
         <div className="text-center py-8 sm:py-12 glass rounded-xl sm:rounded-2xl">
           <Package className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
-          <p className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4">Diese Zone ist leer</p>
+          <p className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4">{t('zoneDetail.empty')}</p>
           <button
             onClick={handleCreateSubzone}
             className="text-sm sm:text-base text-accent-red hover:text-red-500 font-semibold"
           >
-            Unterzone erstellen
+            {t('zoneDetail.createSubzone')}
           </button>
         </div>
       )}

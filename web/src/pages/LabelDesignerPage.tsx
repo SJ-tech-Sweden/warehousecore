@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Trash2, Download, Printer, QrCode, Barcode, Type, Save, Image as ImageIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { labelsApi, devicesApi, casesApi } from '../lib/api';
 import type { LabelTemplate, LabelElement, Device, CaseSummary } from '../lib/api';
 import JSZip from 'jszip';
@@ -10,14 +11,14 @@ interface DesignElement extends LabelElement {
   image_data?: string; // Base64 encoded image data
 }
 
-const PRESET_SIZES = [
-  { name: '62x29mm (Standard)', width: 62, height: 29 },
-  { name: '100x50mm (Groß)', width: 100, height: 50 },
-  { name: '50x25mm (Klein)', width: 50, height: 25 },
-  { name: 'Custom', width: 0, height: 0 },
-];
-
 export default function LabelDesignerPage() {
+  const { t } = useTranslation();
+  const presetSizes = [
+    { name: t('labels.presets.standard'), width: 62, height: 29 },
+    { name: t('labels.presets.large'), width: 100, height: 50 },
+    { name: t('labels.presets.small'), width: 50, height: 25 },
+    { name: t('labels.presets.custom'), width: 0, height: 0 },
+  ];
   const [labelWidth, setLabelWidth] = useState(62);
   const [labelHeight, setLabelHeight] = useState(29);
   const [elements, setElements] = useState<DesignElement[]>([]);
@@ -27,7 +28,7 @@ export default function LabelDesignerPage() {
   const [previewDevice, setPreviewDevice] = useState<Device | null>(null);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [templateName, setTemplateName] = useState('Neues Template');
+  const [templateName, setTemplateName] = useState('');
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [currentTemplateId, setCurrentTemplateId] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +38,10 @@ export default function LabelDesignerPage() {
     loadCases();
     loadTemplates();
   }, []);
+
+  useEffect(() => {
+    setTemplateName((current) => current || t('labels.newTemplate'));
+  }, [t]);
 
   const loadDevices = async () => {
     try {
@@ -86,7 +91,7 @@ export default function LabelDesignerPage() {
 
   const createNewTemplate = () => {
     setCurrentTemplateId(null);
-    setTemplateName('Neues Template');
+    setTemplateName(t('labels.newTemplate'));
     setLabelWidth(62);
     setLabelHeight(29);
     setElements([]);
@@ -94,7 +99,7 @@ export default function LabelDesignerPage() {
   };
 
   const deleteTemplate = async (id: number) => {
-    if (!confirm('Template wirklich löschen?')) return;
+    if (!confirm(t('labels.confirmDelete'))) return;
 
     try {
       await labelsApi.deleteTemplate(id);
@@ -102,10 +107,10 @@ export default function LabelDesignerPage() {
       if (currentTemplateId === id) {
         createNewTemplate();
       }
-      alert('Template gelöscht!');
+      alert(t('labels.templateDeleted'));
     } catch (error) {
       console.error('Failed to delete template:', error);
-      alert('Fehler beim Löschen');
+      alert(t('labels.deleteError'));
     }
   };
 
@@ -154,7 +159,7 @@ export default function LabelDesignerPage() {
 
   const saveTemplate = async () => {
     if (!templateName.trim()) {
-      alert('Bitte Template-Namen eingeben!');
+      alert(t('labels.templateNameRequired'));
       return;
     }
 
@@ -176,18 +181,18 @@ export default function LabelDesignerPage() {
       if (currentTemplateId) {
         // Update existing template
         await labelsApi.updateTemplate(currentTemplateId, template);
-        alert('Template aktualisiert!');
+        alert(t('labels.templateUpdated'));
       } else {
         // Create new template
         const { data } = await labelsApi.createTemplate(template);
         setCurrentTemplateId(data.id || null);
-        alert('Template erstellt!');
+        alert(t('labels.templateSaved'));
       }
 
       await loadTemplates();
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert('Fehler beim Speichern');
+      alert(t('labels.saveError'));
     } finally {
       setSaving(false);
     }
@@ -195,17 +200,17 @@ export default function LabelDesignerPage() {
 
   const setAsDefault = async () => {
     if (!currentTemplateId) {
-      alert('Bitte Template zuerst speichern!');
+      alert(t('labels.saveFirst'));
       return;
     }
 
     try {
       await labelsApi.updateTemplate(currentTemplateId, { is_default: true });
       await loadTemplates();
-      alert('Als Standard gesetzt!');
+      alert(t('labels.setAsDefaultSuccess'));
     } catch (error) {
       console.error('Failed to set default:', error);
-      alert('Fehler beim Setzen des Standards');
+      alert(t('labels.setDefaultError'));
     }
   };
 
@@ -307,14 +312,14 @@ export default function LabelDesignerPage() {
   const generateAllLabels = async () => {
     const totalItems = devices.length + cases.length;
     if (totalItems === 0) {
-      alert('Keine Devices oder Cases gefunden!');
+      alert(t('labels.noDevicesOrCases'));
       return;
     }
 
     // Find default template
     const defaultTemplate = templates.find((t) => t.is_default);
     if (!defaultTemplate) {
-      alert('Bitte zuerst ein Template als Standard setzen!');
+      alert(t('labels.setDefaultFirst'));
       return;
     }
 
@@ -375,10 +380,16 @@ export default function LabelDesignerPage() {
         }
       }
 
-      alert(`${successCount}/${totalItems} Labels generiert!\n(${devices.length} Devices + ${cases.length} Cases)${failCount > 0 ? `\n${failCount} Fehler` : ''}`);
+      alert(t('labels.labelsGenerated', {
+        success: successCount,
+        total: totalItems,
+        devices: devices.length,
+        cases: cases.length,
+        errors: failCount > 0 ? `\n${t('labels.errorsCount', { count: failCount })}` : '',
+      }));
     } catch (error) {
       console.error('Generation failed:', error);
-      alert('Fehler beim Generieren');
+      alert(t('labels.generateError'));
     } finally {
       setExporting(false);
       if (devices.length > 0) {
@@ -401,18 +412,18 @@ export default function LabelDesignerPage() {
     const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length;
 
     if (totalMissing === 0) {
-      alert('Alle Devices und Cases haben bereits Labels!');
+      alert(t('labels.allHaveLabels'));
       return;
     }
 
-    if (!confirm(`${totalMissing} Items ohne Labels gefunden (${devicesWithoutLabels.length} Devices + ${casesWithoutLabels.length} Cases).\n\nLabels jetzt generieren?`)) {
+    if (!confirm(t('labels.missingLabelsFound', { count: totalMissing, devices: devicesWithoutLabels.length, cases: casesWithoutLabels.length }))) {
       return;
     }
 
     // Find default template
     const defaultTemplate = templates.find((t) => t.is_default);
     if (!defaultTemplate) {
-      alert('Bitte zuerst ein Template als Standard setzen!');
+      alert(t('labels.setDefaultFirst'));
       return;
     }
 
@@ -473,14 +484,20 @@ export default function LabelDesignerPage() {
         }
       }
 
-      alert(`${successCount}/${totalMissing} fehlende Labels generiert!\n(${devicesWithoutLabels.length} Devices + ${casesWithoutLabels.length} Cases)${failCount > 0 ? `\n${failCount} Fehler` : ''}`);
+      alert(t('labels.missingLabelsGenerated', {
+        success: successCount,
+        total: totalMissing,
+        devices: devicesWithoutLabels.length,
+        cases: casesWithoutLabels.length,
+        errors: failCount > 0 ? `\n${t('labels.errorsCount', { count: failCount })}` : '',
+      }));
 
       // Reload devices and cases to refresh label_path info
       await loadDevices();
       await loadCases();
     } catch (error) {
       console.error('Generation failed:', error);
-      alert('Fehler beim Generieren');
+      alert(t('labels.generateError'));
     } finally {
       setExporting(false);
       if (devices.length > 0) {
@@ -548,7 +565,7 @@ export default function LabelDesignerPage() {
       }
 
       if (exportedCount === 0) {
-        alert('Keine generierten Labels gefunden! Bitte zuerst Labels generieren.');
+        alert(t('labels.noGeneratedLabels'));
         return;
       }
 
@@ -560,10 +577,13 @@ export default function LabelDesignerPage() {
       link.click();
       URL.revokeObjectURL(link.href);
 
-      alert(`${exportedCount} Labels erfolgreich in ZIP exportiert!${skippedCount > 0 ? `\n${skippedCount} Labels übersprungen (nicht generiert)` : ''}`);
+      alert(t('labels.labelsExported', {
+        count: exportedCount,
+        skipped: skippedCount > 0 ? `\n${t('labels.skippedCount', { count: skippedCount })}` : '',
+      }));
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Fehler beim Export');
+      alert(t('labels.exportError'));
     } finally {
       setExporting(false);
     }
@@ -576,7 +596,7 @@ export default function LabelDesignerPage() {
     if (printWindow) {
       printWindow.document.write(`
         <html>
-          <head><title>Print Label</title></head>
+          <head><title>${t('labels.printPreview')}</title></head>
           <body style="margin:0;display:flex;justify-content:center;align-items:center;">
             <img src="${dataUrl}" onload="window.print();window.close();" />
           </body>
@@ -591,8 +611,8 @@ export default function LabelDesignerPage() {
   return (
     <div className="label-designer">
       <div className="label-designer-header">
-        <h1>🏷️ Label Designer</h1>
-        <p>Erstelle und verwalte Label-Templates für deine Devices</p>
+        <h1>🏷️ {t('labels.title')}</h1>
+        <p>{t('labels.subtitle')}</p>
       </div>
 
       <div className="designer-grid">
@@ -600,13 +620,13 @@ export default function LabelDesignerPage() {
         <div className="designer-panel glass-dark">
           {/* Template Management */}
           <div className="panel-section">
-            <h3>Template</h3>
+            <h3>{t('labels.template')}</h3>
             <input
               type="text"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               className="input-field"
-              placeholder="Template Name"
+              placeholder={t('labels.templateName')}
             />
             <select
               className="input-select w-full"
@@ -621,7 +641,7 @@ export default function LabelDesignerPage() {
                 }
               }}
             >
-              <option value="new">+ Neues Template</option>
+              <option value="new">+ {t('labels.newTemplate')}</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} {t.is_default ? '★' : ''}
@@ -630,34 +650,34 @@ export default function LabelDesignerPage() {
             </select>
             <div className="button-group">
               <button onClick={saveTemplate} disabled={saving} className="btn-save">
-                <Save size={18} /> {saving ? 'Speichere...' : currentTemplateId ? 'Aktualisieren' : 'Speichern'}
+                <Save size={18} /> {saving ? t('labels.savingTemplate') : currentTemplateId ? t('common.update') : t('common.save')}
               </button>
               {currentTemplateId && !templates.find((t) => t.id === currentTemplateId)?.is_default && (
                 <button onClick={setAsDefault} className="btn-add">
-                  Als Standard setzen ★
+                  {t('labels.setAsDefault')} ★
                 </button>
               )}
               {currentTemplateId && (
                 <button onClick={() => deleteTemplate(currentTemplateId)} className="btn-delete-small">
-                  <Trash2 size={18} /> Löschen
+                  <Trash2 size={18} /> {t('common.delete')}
                 </button>
               )}
             </div>
           </div>
 
           <div className="panel-section">
-            <h3>Label-Größe</h3>
+            <h3>{t('labels.labelSize')}</h3>
             <select
               className="input-select"
               onChange={(e) => {
-                const preset = PRESET_SIZES[parseInt(e.target.value)];
+                const preset = presetSizes[parseInt(e.target.value)];
                 if (preset.width > 0) {
                   setLabelWidth(preset.width);
                   setLabelHeight(preset.height);
                 }
               }}
             >
-              {PRESET_SIZES.map((size, i) => (
+              {presetSizes.map((size, i) => (
                 <option key={i} value={i}>
                   {size.name}
                 </option>
@@ -669,7 +689,7 @@ export default function LabelDesignerPage() {
                 value={labelWidth}
                 onChange={(e) => setLabelWidth(Number(e.target.value))}
                 className="input-field-small"
-                placeholder="Breite"
+                placeholder={t('labels.width')}
               />
               <span>×</span>
               <input
@@ -677,26 +697,26 @@ export default function LabelDesignerPage() {
                 value={labelHeight}
                 onChange={(e) => setLabelHeight(Number(e.target.value))}
                 className="input-field-small"
-                placeholder="Höhe"
+                placeholder={t('labels.height')}
               />
               <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)' }}>mm</span>
             </div>
           </div>
 
           <div className="panel-section">
-            <h3>Elemente hinzufügen</h3>
+            <h3>{t('labels.addElement')}</h3>
             <div className="button-group">
               <button onClick={() => addElement('qrcode')} className="btn-add">
-                <QrCode size={18} /> QR-Code
+                <QrCode size={18} /> {t('labels.qrCode')}
               </button>
               <button onClick={() => addElement('barcode')} className="btn-add">
-                <Barcode size={18} /> Barcode
+                <Barcode size={18} /> {t('labels.barcode')}
               </button>
               <button onClick={() => addElement('text')} className="btn-add">
-                <Type size={18} /> Text
+                <Type size={18} /> {t('labels.text')}
               </button>
               <button onClick={() => addElement('image')} className="btn-add">
-                <ImageIcon size={18} /> Bild / Logo
+                <ImageIcon size={18} /> {t('labels.image')}
               </button>
             </div>
           </div>
@@ -704,14 +724,14 @@ export default function LabelDesignerPage() {
           {selectedElem && (
             <div className="panel-section">
               <div className="section-header">
-                <h3>Eigenschaften</h3>
+                <h3>{t('labels.properties')}</h3>
                 <button onClick={() => deleteElement(selectedElem.id)} className="btn-delete-small">
                   <Trash2 size={14} />
                 </button>
               </div>
 
               <div className="property-grid">
-                <label>X Position (mm)</label>
+                <label>{t('labels.fields.xPosition')}</label>
                 <input
                   type="number"
                   value={selectedElem.x}
@@ -719,7 +739,7 @@ export default function LabelDesignerPage() {
                   className="input-field-small"
                 />
 
-                <label>Y Position (mm)</label>
+                <label>{t('labels.fields.yPosition')}</label>
                 <input
                   type="number"
                   value={selectedElem.y}
@@ -727,7 +747,7 @@ export default function LabelDesignerPage() {
                   className="input-field-small"
                 />
 
-                <label>Breite (mm)</label>
+                <label>{t('labels.fields.width')}</label>
                 <input
                   type="number"
                   value={selectedElem.width}
@@ -735,7 +755,7 @@ export default function LabelDesignerPage() {
                   className="input-field-small"
                 />
 
-                <label>Höhe (mm)</label>
+                <label>{t('labels.fields.height')}</label>
                 <input
                   type="number"
                   value={selectedElem.height}
@@ -745,22 +765,22 @@ export default function LabelDesignerPage() {
 
                 {selectedElem.type !== 'image' && (
                   <>
-                    <label>Inhalt</label>
+                    <label>{t('labels.content')}</label>
                     <select
                       value={selectedElem.content}
                       onChange={(e) => updateElement(selectedElem.id, { content: e.target.value })}
                       className="input-field-small"
                     >
-                      <option value="device_id">Device ID</option>
-                      <option value="product_name">Produktname</option>
-                      <option value="device_name">Device Name</option>
+                      <option value="device_id">{t('labels.contentOptions.deviceId')}</option>
+                      <option value="product_name">{t('labels.contentOptions.productName')}</option>
+                      <option value="device_name">{t('labels.contentOptions.deviceName')}</option>
                     </select>
                   </>
                 )}
 
                 {selectedElem.type === 'image' && (
                   <>
-                    <label>Bild hochladen</label>
+                    <label>{t('labels.fields.uploadImage')}</label>
                     <input
                       type="file"
                       accept="image/png,image/jpeg,image/jpg,image/svg+xml"
@@ -781,7 +801,7 @@ export default function LabelDesignerPage() {
 
                 {selectedElem.type === 'text' && (
                   <>
-                    <label>Schriftgröße</label>
+                    <label>{t('labels.fields.fontSize')}</label>
                     <input
                       type="number"
                       value={selectedElem.style.font_size}
@@ -793,7 +813,7 @@ export default function LabelDesignerPage() {
                       className="input-field-small"
                     />
 
-                    <label>Schriftart</label>
+                    <label>{t('labels.fields.fontFamily')}</label>
                     <select
                       value={selectedElem.style.font_family}
                       onChange={(e) =>
@@ -812,7 +832,7 @@ export default function LabelDesignerPage() {
                       <option value="Georgia">Georgia</option>
                     </select>
 
-                    <label>Schriftstil</label>
+                    <label>{t('labels.fields.fontWeight')}</label>
                     <select
                       value={selectedElem.style.font_weight}
                       onChange={(e) =>
@@ -822,8 +842,8 @@ export default function LabelDesignerPage() {
                       }
                       className="input-field-small"
                     >
-                      <option value="normal">Normal</option>
-                      <option value="bold">Fett</option>
+                      <option value="normal">{t('labels.fontWeight.normal')}</option>
+                      <option value="bold">{t('labels.fontWeight.bold')}</option>
                     </select>
                   </>
                 )}
@@ -837,10 +857,10 @@ export default function LabelDesignerPage() {
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               className="input-field"
-              placeholder="Template Name"
+              placeholder={t('labels.templateName')}
             />
             <button onClick={saveTemplate} disabled={saving} className="btn-save">
-              <Save size={18} /> {saving ? 'Speichert...' : 'Template Speichern'}
+              <Save size={18} /> {saving ? t('common.saving') : t('labels.saveTemplate')}
             </button>
           </div>
         </div>
@@ -848,7 +868,7 @@ export default function LabelDesignerPage() {
         {/* Center - Canvas Preview */}
         <div className="designer-canvas-area glass-dark">
           <div className="canvas-header">
-            <h3>Vorschau</h3>
+            <h3>{t('labels.preview')}</h3>
             <select
               value={previewDevice?.device_id || ''}
               onChange={(e) => {
@@ -876,14 +896,14 @@ export default function LabelDesignerPage() {
               }}
               className="input-select-small"
             >
-              <optgroup label="Devices">
+              <optgroup label={t('labels.previewGroups.devices')}>
                 {devices.map((d) => (
                   <option key={d.device_id} value={d.device_id}>
                     {d.device_id} - {d.product_name}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="Cases">
+              <optgroup label={t('labels.previewGroups.cases')}>
                 {cases.map((c) => (
                   <option key={`CASE-${c.case_id}`} value={`CASE-${c.case_id}`}>
                     CASE-{c.case_id} - {c.name}
@@ -900,7 +920,7 @@ export default function LabelDesignerPage() {
         {/* Right Panel - Elements List & Actions */}
         <div className="designer-panel glass-dark">
           <div className="panel-section">
-            <h3>Elemente ({elements.length})</h3>
+            <h3>{t('labels.elements')} ({elements.length})</h3>
             <div className="elements-list">
               {elements.map((elem) => (
                 <div
@@ -915,8 +935,8 @@ export default function LabelDesignerPage() {
                     {elem.type === 'image' && <ImageIcon size={16} />}
                   </div>
                   <div className="element-info">
-                    <div className="element-type">{elem.type === 'qrcode' ? 'QR-Code' : elem.type === 'barcode' ? 'Barcode' : elem.type === 'image' ? 'Bild/Logo' : 'Text'}</div>
-                    <div className="element-content">{elem.content || 'Kein Bild'}</div>
+                    <div className="element-type">{elem.type === 'qrcode' ? t('labels.qrCode') : elem.type === 'barcode' ? t('labels.barcode') : elem.type === 'image' ? t('labels.image') : t('labels.text')}</div>
+                    <div className="element-content">{elem.content || t('labels.noImage')}</div>
                   </div>
                   <button onClick={(e) => { e.stopPropagation(); deleteElement(elem.id); }} className="btn-delete-mini">
                     <Trash2 size={14} />
@@ -924,25 +944,25 @@ export default function LabelDesignerPage() {
                 </div>
               ))}
               {elements.length === 0 && (
-                <div className="empty-state">Keine Elemente</div>
+                <div className="empty-state">{t('labels.noElements')}</div>
               )}
             </div>
           </div>
 
           <div className="panel-section">
-            <h3>Aktionen</h3>
+            <h3>{t('labels.actions')}</h3>
             <div className="action-buttons">
               <button onClick={handlePrint} disabled={!previewDevice} className="btn-action">
-                <Printer size={18} /> Vorschau Drucken
+                <Printer size={18} /> {t('labels.printPreview')}
               </button>
               <button onClick={generateMissingLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary" style={{ backgroundColor: '#10b981' }}>
-                <Save size={18} /> <span className="hidden sm:inline">{exporting ? 'Generiere...' : 'Fehlende Labels Generieren'}</span><span className="sm:hidden">{exporting ? 'Generiere...' : 'Fehlende'}</span>
+                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generating') : t('labels.generateMissing')}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.missingShort')}</span>
               </button>
               <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary">
-                <Save size={18} /> <span className="hidden sm:inline">{exporting ? `Generiere ${devices.length + cases.length}...` : `Alle Labels Generieren (${devices.length} Devices + ${cases.length} Cases)`}</span><span className="sm:hidden">{exporting ? 'Generiere...' : 'Alle'}</span>
+                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generatingCount', { count: devices.length + cases.length }) : t('labels.generateAllWithCount', { devices: devices.length, cases: cases.length })}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.allShort')}</span>
               </button>
               <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action">
-                <Download size={18} /> <span className="hidden sm:inline">{exporting ? 'Exportiere Labels...' : 'Alle Labels Exportieren (ZIP)'}</span><span className="sm:hidden">{exporting ? 'Export...' : 'Export'}</span>
+                <Download size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.exporting') : t('labels.exportAll')}</span><span className="sm:hidden">{exporting ? t('labels.exportShortLoading') : t('labels.exportShort')}</span>
               </button>
             </div>
           </div>

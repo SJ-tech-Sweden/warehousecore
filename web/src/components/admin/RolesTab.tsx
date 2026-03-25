@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Users, Shield, Save } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 interface Role {
   id: number;
@@ -19,6 +20,7 @@ interface UserWithRoles {
 }
 
 export function RolesTab() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -88,9 +90,9 @@ export function RolesTab() {
       });
       await loadData();
       setSelectedUser(null);
-      alert('Rollen erfolgreich aktualisiert');
+      alert(t('admin.rolesTab.messages.updated'));
     } catch (error: any) {
-      alert('Fehler: ' + (error.response?.data?.error || error.message));
+      alert(`${t('common.error')}: ` + (error.response?.data?.error || error.message));
     } finally {
       setSaving(false);
     }
@@ -101,15 +103,15 @@ export function RolesTab() {
       <div className="flex items-center gap-3">
         <Users className="w-6 h-6 text-blue-400" />
         <div>
-          <h2 className="text-xl font-bold text-white">Rollen & Benutzer</h2>
-          <p className="text-gray-400 text-sm">Benutzerrollen verwalten</p>
+          <h2 className="text-xl font-bold text-white">{t('admin.rolesTab.title')}</h2>
+          <p className="text-gray-400 text-sm">{t('admin.rolesTab.subtitle')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Users List */}
         <div className="space-y-2">
-          <h3 className="text-white font-semibold mb-3">Benutzer</h3>
+          <h3 className="text-white font-semibold mb-3">{t('admin.rolesTab.users')}</h3>
           {users.map(user => (
             <div
               key={user.userID}
@@ -151,7 +153,7 @@ export function RolesTab() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-white font-semibold mb-2">
-                  Rollen für {selectedUser.first_name} {selectedUser.last_name}
+                  {t('admin.rolesTab.rolesFor', { name: `${selectedUser.first_name} ${selectedUser.last_name}` })}
                 </h3>
                 <p className="text-gray-400 text-sm">{selectedUser.email}</p>
               </div>
@@ -166,7 +168,7 @@ export function RolesTab() {
                       className={`flex items-center gap-3 p-3 rounded-lg glass transition-colors ${
                         disabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-white/5'
                       }`}
-                      title={disabled ? 'Nur System-Admins dürfen diese Rolle ändern' : undefined}
+                      title={disabled ? t('admin.rolesTab.restrictedTitle') : undefined}
                     >
                       <input
                         type="checkbox"
@@ -183,7 +185,7 @@ export function RolesTab() {
                         <p className="text-gray-400 text-sm">{role.description}</p>
                         {disabled && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Diese Rolle kann nur durch System-Admins angepasst werden.
+                            {t('admin.rolesTab.restrictedDescription')}
                           </p>
                         )}
                       </div>
@@ -202,13 +204,13 @@ export function RolesTab() {
                 }`}
               >
                 <Save className="w-5 h-5" />
-                <span>{saving ? 'Speichert...' : 'Speichern'}</span>
+                <span>{saving ? t('common.saving') : t('common.save')}</span>
               </button>
             </div>
           ) : (
             <div className="text-center text-gray-400 py-12">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Wähle einen Benutzer aus, um Rollen zu verwalten</p>
+              <p>{t('admin.rolesTab.selectUserHint')}</p>
             </div>
           )}
         </div>

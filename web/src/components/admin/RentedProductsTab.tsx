@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
+import { useTranslation } from 'react-i18next';
 
 interface RentalEquipment {
   equipment_id: number;
@@ -71,6 +72,7 @@ function useDebouncedValue<T>(value: T, delay: number) {
 }
 
 export function RentedProductsTab() {
+  const { t, i18n } = useTranslation();
   const [equipment, setEquipment] = useState<RentalEquipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -208,7 +210,7 @@ export function RentedProductsTab() {
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Mietprodukt "${name}" wirklich löschen?`)) {
+    if (!window.confirm(t('admin.rentedProducts.confirmDelete', { name }))) {
       return;
     }
 
@@ -218,7 +220,7 @@ export function RentedProductsTab() {
       await fetchSuppliers();
     } catch (error) {
       console.error('Failed to delete rental equipment:', error);
-      window.alert('Fehler beim Löschen des Mietprodukts.');
+      window.alert(t('admin.rentedProducts.errors.delete'));
     }
   };
 
@@ -226,11 +228,11 @@ export function RentedProductsTab() {
     event.preventDefault();
 
     if (!formData.product_name.trim()) {
-      window.alert('Der Produktname ist erforderlich.');
+      window.alert(t('admin.rentedProducts.errors.productNameRequired'));
       return;
     }
     if (!formData.supplier_name.trim()) {
-      window.alert('Der Lieferantenname ist erforderlich.');
+      window.alert(t('admin.rentedProducts.errors.supplierRequired'));
       return;
     }
 
@@ -259,7 +261,7 @@ export function RentedProductsTab() {
       closeModal();
     } catch (error) {
       console.error('Failed to save rental equipment:', error);
-      window.alert('Fehler beim Speichern des Mietprodukts.');
+      window.alert(t('admin.rentedProducts.errors.save'));
     } finally {
       setSubmitting(false);
     }
@@ -290,10 +292,10 @@ export function RentedProductsTab() {
     <div className="space-y-4">
       <div className="flex flex-col gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Mietprodukte verwalten</h2>
+          <h2 className="text-xl font-bold text-white">{t('admin.rentedProducts.title')}</h2>
           <p className="text-sm text-gray-400">
-            {sortedEquipment.length} Mietprodukte geladen
-            {hasActiveFilters ? ' - Filter aktiv' : ''}
+            {t('admin.rentedProducts.loadedCount', { count: sortedEquipment.length })}
+            {hasActiveFilters ? ` ${t('admin.rentedProducts.filtersActive')}` : ''}
           </p>
         </div>
 
@@ -304,8 +306,9 @@ export function RentedProductsTab() {
               <input
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
-                placeholder="Suchen (Name, Lieferant, Beschreibung ...)"
+                placeholder={t('admin.rentedProducts.searchPlaceholder')}
                 className="w-full rounded-lg bg-white/10 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 outline-none transition focus:bg-white/15 focus:ring-1 focus:ring-accent-red"
+                title={t('admin.rentedProducts.searchPlaceholder')}
               />
             </div>
 
@@ -313,8 +316,9 @@ export function RentedProductsTab() {
               value={supplierFilter}
               onChange={event => setSupplierFilter(event.target.value)}
               className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:bg-white/15 focus:ring-1 focus:ring-accent-red"
+              title={t('admin.rentedProducts.allSuppliers')}
             >
-              <option value="">Alle Lieferanten</option>
+              <option value="">{t('admin.rentedProducts.allSuppliers')}</option>
               {suppliers.map(supplier => (
                 <option key={supplier} value={supplier}>
                   {supplier}
@@ -328,7 +332,7 @@ export function RentedProductsTab() {
                 onClick={clearFilters}
                 className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 whitespace-nowrap"
               >
-                Filter zurücksetzen
+                {t('admin.rentedProducts.resetFilters')}
               </button>
             )}
           </div>
@@ -344,7 +348,7 @@ export function RentedProductsTab() {
               }`}
             >
               <List className="h-4 w-4" />
-              <span className="hidden sm:inline">Tabelle</span>
+              <span className="hidden sm:inline">{t('admin.devices.tableView')}</span>
             </button>
             <button
               type="button"
@@ -356,7 +360,7 @@ export function RentedProductsTab() {
               }`}
             >
               <LayoutGrid className="h-4 w-4" />
-              <span className="hidden sm:inline">Karten</span>
+              <span className="hidden sm:inline">{t('admin.devices.cardView')}</span>
             </button>
             <button
               type="button"
@@ -365,15 +369,15 @@ export function RentedProductsTab() {
               className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
             >
               <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Aktualisieren</span>
+              <span className="hidden sm:inline">{t('common.refresh')}</span>
             </button>
             <button
               onClick={handleOpenCreateModal}
               className="flex items-center gap-2 rounded-xl bg-accent-red px-4 py-2 font-semibold text-white hover:shadow-lg"
             >
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Neues Mietprodukt</span>
-              <span className="sm:hidden">Neu</span>
+              <span className="hidden sm:inline">{t('admin.rentedProducts.newItem')}</span>
+              <span className="sm:hidden">{t('common.new')}</span>
             </button>
           </div>
         </div>
@@ -382,17 +386,17 @@ export function RentedProductsTab() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300 backdrop-blur">
         <div className="flex flex-wrap items-center gap-6">
           <span>
-            <strong className="text-white">{sortedEquipment.length}</strong> Mietprodukte
+            <strong className="text-white">{sortedEquipment.length}</strong> {t('admin.rentedProducts.items')}
           </span>
           <span>
-            Gesamt Mietkosten: <strong className="text-white">{formatCurrency(totalRentalCost)}</strong>
+            {t('admin.rentedProducts.totalRentalCost')}: <strong className="text-white">{formatCurrency(totalRentalCost)}</strong>
           </span>
           <span>
-            Gesamt Kundenpreis: <strong className="text-green-400">{formatCurrency(totalCustomerRevenue)}</strong>
+            {t('admin.rentedProducts.totalCustomerPrice')}: <strong className="text-green-400">{formatCurrency(totalCustomerRevenue)}</strong>
           </span>
           {supplierFilter && (
             <span>
-              Gefiltert nach: <strong className="text-white">{supplierFilter}</strong>
+              {t('admin.rentedProducts.filteredBy')}: <strong className="text-white">{supplierFilter}</strong>
             </span>
           )}
         </div>
@@ -400,13 +404,13 @@ export function RentedProductsTab() {
 
       {loading ? (
         <div className="glass rounded-xl p-8 text-center text-gray-400">
-          Lade Mietprodukte ...
+          {t('admin.rentedProducts.loading')}
         </div>
       ) : sortedEquipment.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center text-gray-400">
           <Building2 className="mx-auto mb-4 h-12 w-12 text-gray-600" />
-          Keine Mietprodukte gefunden
-          {hasActiveFilters ? ' - bitte Filter anpassen.' : '.'}
+          {t('admin.rentedProducts.empty')}
+          {hasActiveFilters ? ` ${t('admin.rentedProducts.adjustFilters')}` : '.'}
         </div>
       ) : viewMode === 'table' ? (
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -414,13 +418,13 @@ export function RentedProductsTab() {
             <table className="min-w-full divide-y divide-white/10 text-sm text-gray-200">
               <thead className="bg-white/5 text-xs uppercase tracking-wide text-gray-400">
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold">Produkt</th>
-                  <th className="px-4 py-3 text-left font-semibold">Lieferant</th>
-                  <th className="px-4 py-3 text-right font-semibold">Mietpreis</th>
-                  <th className="px-4 py-3 text-right font-semibold">Kundenpreis</th>
-                  <th className="px-4 py-3 text-right font-semibold">Marge</th>
-                  <th className="px-4 py-3 text-center font-semibold">Status</th>
-                  <th className="px-4 py-3 text-right font-semibold">Aktionen</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('admin.rentedProducts.columns.product')}</th>
+                  <th className="px-4 py-3 text-left font-semibold">{t('admin.rentedProducts.columns.supplier')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('admin.rentedProducts.columns.rentalPrice')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('admin.rentedProducts.columns.customerPrice')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('admin.rentedProducts.columns.margin')}</th>
+                  <th className="px-4 py-3 text-center font-semibold">{t('admin.rentedProducts.columns.status')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('admin.rentedProducts.columns.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10">
@@ -464,7 +468,7 @@ export function RentedProductsTab() {
                             ? 'bg-green-500/20 text-green-400'
                             : 'bg-gray-500/20 text-gray-400'
                         }`}>
-                          {item.is_active ? 'Aktiv' : 'Inaktiv'}
+                          {item.is_active ? t('admin.rentedProducts.active') : t('admin.rentedProducts.inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3 align-top">
@@ -472,21 +476,24 @@ export function RentedProductsTab() {
                           <button
                             onClick={() => setViewEquipment(item)}
                             className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                            title="Details anzeigen"
+                            title={t('admin.rentedProducts.viewDetails')}
+                            aria-label={t('admin.rentedProducts.viewDetails')}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleEditEquipment(item)}
                             className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                            title="Bearbeiten"
+                            title={t('common.edit')}
+                            aria-label={t('common.edit')}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(item.equipment_id, item.product_name)}
                             className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
-                            title="Löschen"
+                            title={t('common.delete')}
+                            aria-label={t('common.delete')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -514,7 +521,7 @@ export function RentedProductsTab() {
                           ? 'bg-green-500/20 text-green-400'
                           : 'bg-gray-500/20 text-gray-400'
                       }`}>
-                        {item.is_active ? 'Aktiv' : 'Inaktiv'}
+                        {item.is_active ? t('admin.rentedProducts.active') : t('admin.rentedProducts.inactive')}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2 text-sm text-gray-400">
@@ -526,15 +533,15 @@ export function RentedProductsTab() {
                     )}
                     <div className="mt-3 grid grid-cols-3 gap-2 text-center">
                       <div>
-                        <p className="text-xs text-gray-500">Mietpreis</p>
+                        <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.rentalPrice')}</p>
                         <p className="text-sm font-medium text-gray-300">{formatCurrency(item.rental_price)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Kundenpreis</p>
+                        <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.customerPrice')}</p>
                         <p className="text-sm font-medium text-green-400">{formatCurrency(item.customer_price)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Marge</p>
+                        <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.margin')}</p>
                         <p className={`text-sm font-medium ${margin > 0 ? 'text-green-400' : margin < 0 ? 'text-red-400' : 'text-gray-400'}`}>
                           {margin > 0 ? '+' : ''}{margin.toFixed(1)}%
                         </p>
@@ -545,21 +552,24 @@ export function RentedProductsTab() {
                     <button
                       onClick={() => setViewEquipment(item)}
                       className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                      title="Details anzeigen"
+                      title={t('admin.rentedProducts.viewDetails')}
+                      aria-label={t('admin.rentedProducts.viewDetails')}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleEditEquipment(item)}
                       className="rounded-lg bg-white/10 p-2 text-gray-200 transition hover:bg-white/20 hover:text-white"
-                      title="Bearbeiten"
+                      title={t('common.edit')}
+                      aria-label={t('common.edit')}
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(item.equipment_id, item.product_name)}
                       className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
-                      title="Löschen"
+                      title={t('common.delete')}
+                      aria-label={t('common.delete')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -578,11 +588,13 @@ export function RentedProductsTab() {
             <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-white">
-                  {editingId ? 'Mietprodukt bearbeiten' : 'Neues Mietprodukt'}
+                  {editingId ? t('admin.rentedProducts.editItem') : t('admin.rentedProducts.newItem')}
                 </h3>
                 <button
                   onClick={closeModal}
                   className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title={t('common.close')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -591,29 +603,31 @@ export function RentedProductsTab() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">
-                    Produktname <span className="text-accent-red">*</span>
+                    {t('admin.rentedProducts.fields.productName')} <span className="text-accent-red">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.product_name}
                     onChange={event => setFormData({ ...formData, product_name: event.target.value })}
-                    placeholder="z.B. Bühnenpodest 2x1m"
+                    placeholder={t('admin.rentedProducts.placeholders.productName')}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    title={t('admin.rentedProducts.fields.productName')}
                     required
                   />
                 </div>
 
                 <div>
                   <label className="mb-2 block text-sm font-semibold text-white">
-                    Lieferant <span className="text-accent-red">*</span>
+                    {t('admin.rentedProducts.fields.supplier')} <span className="text-accent-red">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.supplier_name}
                     onChange={event => setFormData({ ...formData, supplier_name: event.target.value })}
-                    placeholder="z.B. Stagetec GmbH"
+                    placeholder={t('admin.rentedProducts.placeholders.supplier')}
                     list="supplier-suggestions"
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    title={t('admin.rentedProducts.fields.supplier')}
                     required
                   />
                   <datalist id="supplier-suggestions">
@@ -626,7 +640,7 @@ export function RentedProductsTab() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Mietpreis (intern) <span className="text-accent-red">*</span>
+                      {t('admin.rentedProducts.fields.rentalPrice')} <span className="text-accent-red">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -642,15 +656,16 @@ export function RentedProductsTab() {
                         }
                         placeholder="15.00"
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 pr-8 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                        title={t('admin.rentedProducts.fields.rentalPrice')}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">Was Sie dem Lieferanten zahlen</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('admin.rentedProducts.help.rentalPrice')}</p>
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
-                      Kundenpreis <span className="text-accent-red">*</span>
+                      {t('admin.rentedProducts.fields.customerPrice')} <span className="text-accent-red">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -666,16 +681,17 @@ export function RentedProductsTab() {
                         }
                         placeholder="25.00"
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 pr-8 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                        title={t('admin.rentedProducts.fields.customerPrice')}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">€</span>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">Was der Kunde zahlt</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('admin.rentedProducts.help.customerPrice')}</p>
                   </div>
                 </div>
 
                 {formData.rental_price > 0 && formData.customer_price > 0 && (
                   <div className="rounded-lg bg-white/5 p-3 text-center">
-                    <span className="text-sm text-gray-400">Gewinnmarge: </span>
+                    <span className="text-sm text-gray-400">{t('admin.rentedProducts.marginLabel')} </span>
                     <span className={`text-lg font-bold ${
                       profitMargin(formData.rental_price, formData.customer_price) > 0
                         ? 'text-green-400'
@@ -685,41 +701,44 @@ export function RentedProductsTab() {
                       {profitMargin(formData.rental_price, formData.customer_price).toFixed(1)}%
                     </span>
                     <span className="ml-2 text-sm text-gray-400">
-                      ({formatCurrency(formData.customer_price - formData.rental_price)} Gewinn)
+                      ({formatCurrency(formData.customer_price - formData.rental_price)} {t('admin.rentedProducts.profit')})
                     </span>
                   </div>
                 )}
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">Kategorie</label>
+                  <label className="mb-2 block text-sm font-semibold text-white">{t('products.category')}</label>
                   <input
                     type="text"
                     value={formData.category}
                     onChange={event => setFormData({ ...formData, category: event.target.value })}
-                    placeholder="z.B. Bühne, Rigging, Audio"
+                    placeholder={t('admin.rentedProducts.placeholders.category')}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    title={t('products.category')}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">Beschreibung</label>
+                  <label className="mb-2 block text-sm font-semibold text-white">{t('common.description')}</label>
                   <textarea
                     value={formData.description}
                     onChange={event => setFormData({ ...formData, description: event.target.value })}
                     rows={3}
-                    placeholder="Optionale Beschreibung des Mietprodukts..."
+                    placeholder={t('admin.rentedProducts.placeholders.description')}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    title={t('common.description')}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">Notizen</label>
+                  <label className="mb-2 block text-sm font-semibold text-white">{t('common.notes')}</label>
                   <textarea
                     value={formData.notes}
                     onChange={event => setFormData({ ...formData, notes: event.target.value })}
                     rows={2}
-                    placeholder="Interne Notizen (z.B. Kontaktperson, Lieferzeiten)..."
+                    placeholder={t('admin.rentedProducts.placeholders.notes')}
                     className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
+                    title={t('common.notes')}
                   />
                 </div>
 
@@ -732,7 +751,7 @@ export function RentedProductsTab() {
                     className="h-4 w-4 rounded border-white/20 bg-white/10 text-accent-red focus:ring-accent-red"
                   />
                   <label htmlFor="is_active" className="text-sm font-medium text-white">
-                    Produkt ist aktiv und kann für Jobs verwendet werden
+                    {t('admin.rentedProducts.fields.activeHelp')}
                   </label>
                 </div>
 
@@ -743,10 +762,10 @@ export function RentedProductsTab() {
                     className="flex-1 btn-secondary"
                     disabled={submitting}
                   >
-                    Abbrechen
+                    {t('common.cancel')}
                   </button>
                   <button type="submit" className="flex-1 btn-primary" disabled={submitting}>
-                    {submitting ? 'Speichert...' : editingId ? 'Speichern' : 'Erstellen'}
+                    {submitting ? t('common.saving') : editingId ? t('common.save') : t('common.create')}
                   </button>
                 </div>
               </form>
@@ -765,6 +784,8 @@ export function RentedProductsTab() {
                 <button
                   onClick={closeDetailModal}
                   className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  title={t('common.close')}
+                  aria-label={t('common.close')}
                 >
                   <X className="w-6 h-6" />
                 </button>
@@ -774,22 +795,22 @@ export function RentedProductsTab() {
                 <div className="flex items-center gap-3 rounded-lg bg-white/5 p-4">
                   <Building2 className="h-6 w-6 text-blue-400" />
                   <div>
-                    <p className="text-xs text-gray-500">Lieferant</p>
+                    <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.supplier')}</p>
                     <p className="text-lg font-medium text-white">{viewEquipment.supplier_name}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="rounded-lg bg-white/5 p-4 text-center">
-                    <p className="text-xs text-gray-500">Mietpreis</p>
+                    <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.rentalPrice')}</p>
                     <p className="text-xl font-bold text-gray-300">{formatCurrency(viewEquipment.rental_price)}</p>
                   </div>
                   <div className="rounded-lg bg-white/5 p-4 text-center">
-                    <p className="text-xs text-gray-500">Kundenpreis</p>
+                    <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.customerPrice')}</p>
                     <p className="text-xl font-bold text-green-400">{formatCurrency(viewEquipment.customer_price)}</p>
                   </div>
                   <div className="rounded-lg bg-white/5 p-4 text-center">
-                    <p className="text-xs text-gray-500">Marge</p>
+                    <p className="text-xs text-gray-500">{t('admin.rentedProducts.columns.margin')}</p>
                     <p className={`text-xl font-bold ${
                       profitMargin(viewEquipment.rental_price, viewEquipment.customer_price) > 0
                         ? 'text-green-400'
@@ -803,39 +824,39 @@ export function RentedProductsTab() {
 
                 {viewEquipment.category && (
                   <div>
-                    <p className="text-xs text-gray-500">Kategorie</p>
+                    <p className="text-xs text-gray-500">{t('products.category')}</p>
                     <p className="text-white">{viewEquipment.category}</p>
                   </div>
                 )}
 
                 {viewEquipment.description && (
                   <div>
-                    <p className="text-xs text-gray-500">Beschreibung</p>
+                    <p className="text-xs text-gray-500">{t('common.description')}</p>
                     <p className="text-white">{viewEquipment.description}</p>
                   </div>
                 )}
 
                 {viewEquipment.notes && (
                   <div>
-                    <p className="text-xs text-gray-500">Notizen</p>
+                    <p className="text-xs text-gray-500">{t('common.notes')}</p>
                     <p className="text-gray-300">{viewEquipment.notes}</p>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between rounded-lg bg-white/5 p-4">
-                  <span className="text-sm text-gray-400">Status</span>
+                  <span className="text-sm text-gray-400">{t('admin.rentedProducts.columns.status')}</span>
                   <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
                     viewEquipment.is_active
                       ? 'bg-green-500/20 text-green-400'
                       : 'bg-gray-500/20 text-gray-400'
                   }`}>
-                    {viewEquipment.is_active ? 'Aktiv' : 'Inaktiv'}
+                    {viewEquipment.is_active ? t('admin.rentedProducts.active') : t('admin.rentedProducts.inactive')}
                   </span>
                 </div>
 
                 <div className="text-xs text-gray-500">
-                  <p>Erstellt: {new Date(viewEquipment.created_at).toLocaleString('de-DE')}</p>
-                  <p>Aktualisiert: {new Date(viewEquipment.updated_at).toLocaleString('de-DE')}</p>
+                  <p>{t('admin.rentedProducts.createdAt')}: {new Date(viewEquipment.created_at).toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-GB')}</p>
+                  <p>{t('admin.rentedProducts.updatedAt')}: {new Date(viewEquipment.updated_at).toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-GB')}</p>
                 </div>
               </div>
 
@@ -843,7 +864,7 @@ export function RentedProductsTab() {
                 onClick={closeDetailModal}
                 className="w-full mt-6 btn-secondary"
               >
-                Schließen
+                {t('common.close')}
               </button>
             </div>
           </div>

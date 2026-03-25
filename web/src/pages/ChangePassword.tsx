@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { KeyRound, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export function ChangePassword() {
+    const { t } = useTranslation();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,17 +21,17 @@ export function ChangePassword() {
 
         // Validate passwords
         if (newPassword.length < 6) {
-            setError('Das neue Passwort muss mindestens 6 Zeichen lang sein');
+            setError(t('changePassword.errors.minLength'));
             return;
         }
 
         if (newPassword !== confirmPassword) {
-            setError('Die Passwörter stimmen nicht überein');
+            setError(t('changePassword.errors.mismatch'));
             return;
         }
 
         if (currentPassword === newPassword) {
-            setError('Das neue Passwort muss sich vom aktuellen unterscheiden');
+            setError(t('changePassword.errors.sameAsCurrent'));
             return;
         }
 
@@ -39,7 +41,7 @@ export function ChangePassword() {
             await changePassword(currentPassword, newPassword);
             navigate('/');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Passwortänderung fehlgeschlagen');
+            setError(err instanceof Error ? err.message : t('changePassword.errors.failed'));
         } finally {
             setLoading(false);
         }
@@ -68,9 +70,9 @@ export function ChangePassword() {
                         <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-yellow-400 font-medium">Passwortänderung erforderlich</p>
+                                <p className="text-yellow-400 font-medium">{t('changePassword.forceTitle')}</p>
                                 <p className="text-yellow-400/80 text-sm mt-1">
-                                    Aus Sicherheitsgründen müssen Sie Ihr Passwort ändern, bevor Sie fortfahren können.
+                                    {t('changePassword.forceDescription')}
                                 </p>
                             </div>
                         </div>
@@ -78,7 +80,7 @@ export function ChangePassword() {
 
                     <div className="flex items-center gap-3 mb-6">
                         <KeyRound className="w-6 h-6 text-accent-red" />
-                        <h2 className="text-2xl font-bold text-white">Passwort ändern</h2>
+                        <h2 className="text-2xl font-bold text-white">{t('changePassword.title')}</h2>
                     </div>
 
                     {error && (
@@ -90,7 +92,7 @@ export function ChangePassword() {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
                             <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                                Aktuelles Passwort
+                                {t('changePassword.currentPassword')}
                             </label>
                             <input
                                 id="currentPassword"
@@ -100,14 +102,14 @@ export function ChangePassword() {
                                 required
                                 disabled={loading}
                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent disabled:opacity-50"
-                                placeholder="••••••••"
+                                placeholder={t('changePassword.passwordPlaceholder')}
                                 autoComplete="current-password"
                             />
                         </div>
 
                         <div>
                             <label htmlFor="newPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                                Neues Passwort
+                                {t('changePassword.newPassword')}
                             </label>
                             <input
                                 id="newPassword"
@@ -117,14 +119,14 @@ export function ChangePassword() {
                                 required
                                 disabled={loading}
                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent disabled:opacity-50"
-                                placeholder="Mindestens 6 Zeichen"
+                                placeholder={t('changePassword.newPasswordPlaceholder')}
                                 autoComplete="new-password"
                             />
                         </div>
 
                         <div>
                             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
-                                Neues Passwort bestätigen
+                                {t('changePassword.confirmPassword')}
                             </label>
                             <input
                                 id="confirmPassword"
@@ -134,7 +136,7 @@ export function ChangePassword() {
                                 required
                                 disabled={loading}
                                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent-red focus:border-transparent disabled:opacity-50"
-                                placeholder="Passwort wiederholen"
+                                placeholder={t('changePassword.confirmPasswordPlaceholder')}
                                 autoComplete="new-password"
                             />
                         </div>
@@ -147,12 +149,12 @@ export function ChangePassword() {
                             {loading ? (
                                 <>
                                     <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                    Wird geändert...
+                                    {t('changePassword.changing')}
                                 </>
                             ) : (
                                 <>
                                     <CheckCircle className="w-5 h-5" />
-                                    Passwort ändern
+                                    {t('changePassword.title')}
                                 </>
                             )}
                         </button>
@@ -164,7 +166,7 @@ export function ChangePassword() {
                                 onClick={handleLogout}
                                 className="w-full py-2 text-gray-400 hover:text-white transition-colors text-sm"
                             >
-                                Abmelden und später ändern
+                                {t('changePassword.logoutLater')}
                             </button>
                         </div>
                     )}
@@ -175,7 +177,7 @@ export function ChangePassword() {
                                 onClick={() => navigate('/')}
                                 className="w-full py-2 text-gray-400 hover:text-white transition-colors text-sm"
                             >
-                                Zurück zur Übersicht
+                                {t('changePassword.backToOverview')}
                             </button>
                         </div>
                     )}

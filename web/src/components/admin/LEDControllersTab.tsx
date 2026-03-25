@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ledApi, api, type LEDController, type LEDControllerPayload, type ZoneTypeDefinition } from '../../lib/api';
 import { Plus, Save, X, RefreshCcw, Trash2, Cpu, Settings, RotateCw } from 'lucide-react';
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
@@ -43,6 +44,7 @@ const formatUptime = (seconds?: number): string | null => {
 };
 
 export function LEDControllersTab() {
+  const { t } = useTranslation();
   const [controllers, setControllers] = useState<LEDController[]>([]);
   const [zoneTypes, setZoneTypes] = useState<ZoneTypeDefinition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +76,7 @@ export function LEDControllersTab() {
       setZoneTypes(zoneTypeRes.data);
     } catch (error) {
       console.error('Failed to load controllers:', error);
-      setMessage('Fehler beim Laden der Controller.');
+      setMessage(t('admin.ledControllers.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -117,7 +119,7 @@ export function LEDControllersTab() {
     try {
       return JSON.parse(form.metadata);
     } catch (error) {
-      alert('Ungültiges Metadata JSON: ' + (error as Error).message);
+      alert(t('admin.ledControllers.errors.invalidMetadata') + (error as Error).message);
       throw error;
     }
   };
@@ -147,53 +149,53 @@ export function LEDControllersTab() {
 
       if (editor === 'new') {
         if (!payload.controller_id) {
-          alert('Controller ID ist erforderlich.');
+          alert(t('admin.ledControllers.errors.controllerIdRequired'));
           return;
         }
         if (!payload.display_name) {
-          alert('Anzeigename ist erforderlich.');
+          alert(t('admin.ledControllers.errors.displayNameRequired'));
           return;
         }
         await ledApi.createController(payload);
-        setMessage('✓ Controller angelegt');
+        setMessage(t('admin.ledControllers.messages.created'));
       } else if (typeof editor === 'number') {
         await ledApi.updateController(editor, payload);
-        setMessage('✓ Controller aktualisiert');
+        setMessage(t('admin.ledControllers.messages.updated'));
       }
       resetEditor();
       loadData();
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler: ' + msg);
+      const msg = error.response?.data?.error || error.message || t('admin.ledControllers.errors.unknown');
+      alert(t('admin.ledControllers.errors.prefix') + msg);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Controller deaktivieren? Er wird aus der Liste entfernt und taucht nur wieder auf, wenn er einen neuen Heartbeat sendet.')) return;
+    if (!confirm(t('admin.ledControllers.confirmDeactivate'))) return;
     try {
       // Set is_active to false instead of deleting
       await ledApi.updateController(id, { is_active: false });
-      setMessage('✓ Controller deaktiviert');
+      setMessage(t('admin.ledControllers.messages.deactivated'));
       if (editor === id) {
         resetEditor();
       }
       loadData();
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler: ' + msg);
+      const msg = error.response?.data?.error || error.message || t('admin.ledControllers.errors.unknown');
+      alert(t('admin.ledControllers.errors.prefix') + msg);
     }
   };
 
   const handleHardwareConfig = async () => {
     if (editor === null || editor === 'new') return;
     if (configureLedCount < 1 || configureLedCount > 1200) {
-      alert('LED-Anzahl muss zwischen 1 und 1200 liegen.');
+      alert(t('admin.ledControllers.errors.ledRange'));
       return;
     }
     if (configureDataPin < 0 || configureDataPin > 50) {
-      alert('Data Pin muss zwischen 0 und 50 liegen.');
+      alert(t('admin.ledControllers.errors.pinRange'));
       return;
     }
     try {
@@ -203,32 +205,32 @@ export function LEDControllersTab() {
         data_pin: configureDataPin,
         chipset: configureChipset,
       });
-      setMessage(`✓ Hardware-Konfiguration gesendet.`);
+      setMessage(t('admin.ledControllers.messages.hardwareSent'));
       // Reload after 2 seconds to show updated values
       setTimeout(() => loadData(), 2000);
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler beim Senden der Hardware-Konfiguration: ' + msg);
+      const msg = error.response?.data?.error || error.message || t('admin.ledControllers.errors.unknown');
+      alert(t('admin.ledControllers.errors.hardwareSend') + msg);
     } finally {
       setConfiguring(false);
     }
   };
 
   const handleRestart = async (controllerId: number) => {
-    if (!confirm('ESP32 wirklich neu starten? Der Controller wird für ca. 5-10 Sekunden offline sein.')) return;
+    if (!confirm(t('admin.ledControllers.confirmRestart'))) return;
 
     try {
       setRestarting(controllerId);
       await ledApi.restartController(controllerId);
-      setMessage('✓ Neustart-Befehl gesendet. ESP32 startet in 2 Sekunden neu.');
+      setMessage(t('admin.ledControllers.messages.restartSent'));
       // Reload after 10 seconds to show controller coming back online
       setTimeout(() => {
         loadData();
         setRestarting(null);
       }, 10000);
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler: ' + msg);
+      const msg = error.response?.data?.error || error.message || t('admin.ledControllers.errors.unknown');
+      alert(t('admin.ledControllers.errors.prefix') + msg);
       setRestarting(null);
     }
   };
@@ -241,30 +243,30 @@ export function LEDControllersTab() {
     });
 
     if (offlineControllers.length === 0) {
-      alert('Keine offline Controller gefunden.');
+      alert(t('admin.ledControllers.messages.noOfflineFound'));
       return;
     }
 
-    if (!confirm(`${offlineControllers.length} offline Controller löschen?`)) return;
+    if (!confirm(t('admin.ledControllers.confirmDeleteOffline', { count: offlineControllers.length }))) return;
 
     try {
       await Promise.all(offlineControllers.map(c => ledApi.deleteController(c.id)));
-      setMessage(`✓ ${offlineControllers.length} offline Controller gelöscht`);
+      setMessage(t('admin.ledControllers.messages.offlineDeleted', { count: offlineControllers.length }));
       loadData();
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Unbekannter Fehler';
-      alert('Fehler: ' + msg);
+      const msg = error.response?.data?.error || error.message || t('admin.ledControllers.errors.unknown');
+      alert(t('admin.ledControllers.errors.prefix') + msg);
     }
   };
 
   const controllerStatus = (controller: LEDController) => {
-    if (!controller.last_seen) return { label: 'Offline', className: 'text-gray-400' };
+    if (!controller.last_seen) return { label: t('admin.ledControllers.status.offline'), className: 'text-gray-400' };
     const last = new Date(controller.last_seen).getTime();
     const diff = Date.now() - last;
     if (diff < ONLINE_THRESHOLD_MS) {
-      return { label: 'Online', className: 'text-green-400' };
+      return { label: t('admin.ledControllers.status.online'), className: 'text-green-400' };
     }
-    return { label: 'Offline', className: 'text-gray-400' };
+    return { label: t('admin.ledControllers.status.offline'), className: 'text-gray-400' };
   };
 
   return (
@@ -272,29 +274,30 @@ export function LEDControllersTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-accent-red" /> Mikrocontroller verwalten
+            <Cpu className="w-5 h-5 text-accent-red" /> {t('admin.ledControllers.title')}
           </h2>
-          <p className="text-gray-400 text-sm">Verwalte verbaute Controller, deren Topics und zugehörige Lagerarten.</p>
+          <p className="text-gray-400 text-sm">{t('admin.ledControllers.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleDeleteOffline}
             className="px-3 py-2 bg-red-600/20 text-red-400 rounded-lg flex items-center gap-2 text-sm hover:bg-red-600/30"
-            title="Alle offline Controller löschen"
+            title={t('admin.ledControllers.deleteOffline')}
           >
-            <Trash2 className="w-4 h-4" /> Offline löschen
+            <Trash2 className="w-4 h-4" /> {t('admin.ledControllers.deleteOffline')}
           </button>
           <button
             onClick={loadData}
             className="px-3 py-2 bg-white/10 text-white rounded-lg flex items-center gap-2 text-sm hover:bg-white/20"
+            title={t('admin.ledControllers.reload')}
           >
-            <RefreshCcw className="w-4 h-4" /> Neu laden
+            <RefreshCcw className="w-4 h-4" /> {t('admin.ledControllers.reload')}
           </button>
           <button
             onClick={startNew}
             className="px-4 py-2 bg-accent-red text-white rounded-lg flex items-center gap-2 text-sm hover:bg-accent-red/80"
           >
-            <Plus className="w-4 h-4" /> Neuer Controller
+            <Plus className="w-4 h-4" /> {t('admin.ledControllers.newController')}
           </button>
         </div>
       </div>
@@ -319,12 +322,12 @@ export function LEDControllersTab() {
                 <div className="w-10 h-10 rounded-lg bg-accent-red/20 flex items-center justify-center">
                   <Settings className="w-5 h-5 text-accent-red" />
                 </div>
-                {editor === 'new' ? 'Neuer Controller' : 'Controller bearbeiten'}
+                {editor === 'new' ? t('admin.ledControllers.newController') : t('admin.ledControllers.editController')}
               </h3>
               <button
                 onClick={resetEditor}
                 className="p-2 hover:bg-white/10 rounded-lg transition-all hover:rotate-90 duration-300"
-                title="Schließen"
+                title={t('common.close')}
               >
                 <X className="w-5 h-5 text-gray-400 hover:text-white" />
               </button>
@@ -335,52 +338,56 @@ export function LEDControllersTab() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {editor === 'new' && (
                   <div>
-                    <label className="block text-sm font-semibold text-gray-300 mb-2">Controller ID</label>
+                    <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.controllerId')}</label>
                     <input
                       type="text"
                       className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-accent-red focus:ring-2 focus:ring-accent-red/20 transition-all placeholder-gray-500"
-                      placeholder="z.B. esp-regal-1"
+                      placeholder={t('admin.ledControllers.controllerIdPlaceholder')}
                       value={form.controller_id}
                       onChange={(e) => setForm((prev) => ({ ...prev, controller_id: e.target.value }))}
+                      title={t('admin.ledControllers.controllerId')}
                     />
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Anzeigename</label>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.displayName')}</label>
                   <input
                     type="text"
                     className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-accent-red focus:ring-2 focus:ring-accent-red/20 transition-all placeholder-gray-500"
-                    placeholder="Anzeigename"
+                    placeholder={t('admin.ledControllers.displayName')}
                     value={form.display_name}
                     onChange={(e) => setForm((prev) => ({ ...prev, display_name: e.target.value }))}
+                    title={t('admin.ledControllers.displayName')}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Topic-Suffix (optional)</label>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.topicSuffixOptional')}</label>
                   <input
                     type="text"
                     className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-accent-red focus:ring-2 focus:ring-accent-red/20 transition-all placeholder-gray-500"
-                    placeholder="optional"
+                    placeholder={t('modals.productDependencies.optional')}
                     value={form.topic_suffix}
                     onChange={(e) => setForm((prev) => ({ ...prev, topic_suffix: e.target.value }))}
+                    title={t('admin.ledControllers.topicSuffixOptional')}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-2">Status</label>
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">{t('devices.status')}</label>
                   <label className="flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg cursor-pointer hover:bg-white/10 transition-all">
                     <input
                       type="checkbox"
                       className="w-5 h-5 rounded border-gray-600 text-accent-red focus:ring-accent-red focus:ring-2"
                       checked={form.is_active}
                       onChange={(e) => setForm((prev) => ({ ...prev, is_active: e.target.checked }))}
+                      title={t('admin.ledControllers.active')}
                     />
-                    <span className="text-sm text-gray-300 font-medium">Aktiv</span>
+                    <span className="text-sm text-gray-300 font-medium">{t('admin.ledControllers.active')}</span>
                   </label>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-300">Zuständige Lagerzonen</label>
+                <label className="block text-sm font-semibold text-gray-300">{t('admin.ledControllers.assignedZones')}</label>
                 {selectedZones.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {selectedZones.map((zone) => (
@@ -390,7 +397,7 @@ export function LEDControllersTab() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 italic">Noch keine Zonen zugewiesen.</p>
+                  <p className="text-sm text-gray-500 italic">{t('admin.ledControllers.noZonesAssigned')}</p>
                 )}
                 <select
                   multiple
@@ -400,6 +407,7 @@ export function LEDControllersTab() {
                     handleZoneSelectChange(selected);
                   }}
                   className="w-full rounded-lg bg-white/5 border border-white/10 text-white px-4 py-3 focus:border-accent-red focus:ring-2 focus:ring-accent-red/20 transition-all min-h-[120px]"
+                  title={t('admin.ledControllers.assignedZones')}
                 >
                   {sortedZoneTypes.map((zone) => (
                     <option key={zone.id} value={zone.id} className="py-1">
@@ -408,12 +416,12 @@ export function LEDControllersTab() {
                   ))}
                 </select>
                 <p className="text-xs text-gray-500">
-                  💡 Tipp: Halte <span className="font-semibold text-gray-400">Strg / Cmd</span>, um mehrere Zonen auszuwählen.
+                  {t('admin.ledControllers.zoneHintPrefix')} <span className="font-semibold text-gray-400">Strg / Cmd</span>, {t('admin.ledControllers.zoneHintSuffix')}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">Metadata (JSON)</label>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.metadata')}</label>
                 <textarea
                   className="w-full h-32 rounded-lg bg-white/5 border border-white/10 text-white font-mono text-sm px-4 py-3 focus:border-accent-red focus:ring-2 focus:ring-accent-red/20 transition-all"
                   value={form.metadata}
@@ -429,15 +437,15 @@ export function LEDControllersTab() {
                       <Cpu className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
-                      <h4 className="text-white font-bold">Hardware-Konfiguration</h4>
+                      <h4 className="text-white font-bold">{t('admin.ledControllers.hardwareConfig')}</h4>
                       <p className="text-xs text-gray-400">
-                        ESP32 per MQTT konfigurieren und dauerhaft speichern
+                        {t('admin.ledControllers.hardwareConfigHelp')}
                       </p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Anzahl</label>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.ledCount')}</label>
                       <input
                         type="number"
                         min="1"
@@ -445,11 +453,12 @@ export function LEDControllersTab() {
                         className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                         value={configureLedCount}
                         onChange={(e) => setConfigureLedCount(parseInt(e.target.value) || 0)}
+                        title={t('admin.ledControllers.ledCount')}
                       />
-                      <p className="text-xs text-gray-500 mt-1">1-1200 LEDs</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('admin.ledControllers.ledCountHint')}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-300 mb-2">Data Pin (GPIO)</label>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.dataPin')}</label>
                       <input
                         type="number"
                         min="0"
@@ -457,15 +466,17 @@ export function LEDControllersTab() {
                         className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                         value={configureDataPin}
                         onChange={(e) => setConfigureDataPin(parseInt(e.target.value) || 0)}
+                        title={t('admin.ledControllers.dataPin')}
                       />
-                      <p className="text-xs text-gray-500 mt-1">GPIO 0-50</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('admin.ledControllers.dataPinHint')}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-gray-300 mb-2">LED-Chipset</label>
+                      <label className="block text-sm font-semibold text-gray-300 mb-2">{t('admin.ledControllers.chipset')}</label>
                       <select
                         className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
                         value={configureChipset}
                         onChange={(e) => setConfigureChipset(e.target.value)}
+                        title={t('admin.ledControllers.chipset')}
                       >
                         <option value="SK6812_GRBW">SK6812 GRBW</option>
                         <option value="SK6812_GRB">SK6812 GRB</option>
@@ -473,22 +484,22 @@ export function LEDControllersTab() {
                         <option value="WS2811">WS2811</option>
                         <option value="APA102">APA102</option>
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">LED-Typ</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('admin.ledControllers.chipsetHint')}</p>
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex-1">
                       <p className="text-yellow-300 text-xs">
-                        <strong>⚠️ Hinweis:</strong> Pin/Chipset-Änderungen erfordern ESP32-Neustart
+                        <strong>{t('admin.ledControllers.warning')}:</strong> {t('admin.ledControllers.pinChangeRestart')}
                       </p>
                     </div>
                     <button
                       onClick={handleHardwareConfig}
                       disabled={configuring}
                       className="px-5 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-blue-600 to-blue-500 text-white flex items-center justify-center gap-2 disabled:opacity-50 hover:from-blue-700 hover:to-blue-600 transition-all shadow-lg shadow-blue-500/20 whitespace-nowrap"
-                      title="Hardware-Konfiguration senden"
+                      title={t('admin.ledControllers.sendHardwareConfig')}
                     >
-                      <Save className="w-4 h-4" /> {configuring ? 'Sende...' : 'Hardware speichern'}
+                      <Save className="w-4 h-4" /> {configuring ? t('admin.ledControllers.sending') : t('admin.ledControllers.saveHardware')}
                     </button>
                   </div>
                 </div>
@@ -501,14 +512,14 @@ export function LEDControllersTab() {
                 onClick={resetEditor}
                 className="px-6 py-2.5 rounded-lg text-sm font-bold bg-white/5 border border-white/10 text-gray-300 flex items-center gap-2 hover:bg-white/10 transition-all"
               >
-                <X className="w-4 h-4" /> Abbrechen
+                <X className="w-4 h-4" /> {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="px-6 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-green-600 to-green-500 text-white flex items-center gap-2 disabled:opacity-50 hover:from-green-700 hover:to-green-600 transition-all shadow-lg shadow-green-500/20"
               >
-                <Save className="w-4 h-4" /> {saving ? 'Speichert...' : 'Speichern'}
+                <Save className="w-4 h-4" /> {saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
@@ -517,9 +528,9 @@ export function LEDControllersTab() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="glass rounded-xl p-5 text-center text-gray-400">Lade Controller...</div>
+          <div className="glass rounded-xl p-5 text-center text-gray-400">{t('admin.ledControllers.loading')}</div>
         ) : controllers.length === 0 ? (
-          <div className="glass rounded-xl p-5 text-center text-gray-400">Noch keine Controller registriert.</div>
+          <div className="glass rounded-xl p-5 text-center text-gray-400">{t('admin.ledControllers.empty')}</div>
         ) : (
           controllers
             .filter((c) => {
@@ -550,55 +561,55 @@ export function LEDControllersTab() {
                     <div className="min-w-0 flex-1">
                       <h3 className="text-white font-semibold text-sm sm:text-base flex items-center gap-2 flex-wrap">
                         <span className="truncate">{controller.display_name}</span>
-                        {!controller.is_active && <span className="text-xs text-gray-500 flex-shrink-0">deaktiviert</span>}
+                        {!controller.is_active && <span className="text-xs text-gray-500 flex-shrink-0">{t('admin.ledControllers.deactivated')}</span>}
                       </h3>
                       <p className="text-xs text-gray-400 truncate">
-                        ID: <span className="font-mono">{controller.controller_id}</span> • Topic: <span className="font-mono">{controller.topic_suffix}</span>
+                        {t('admin.ledControllers.id')}: <span className="font-mono">{controller.controller_id}</span> • {t('admin.ledControllers.topic')}: <span className="font-mono">{controller.topic_suffix}</span>
                       </p>
                       <p className={`text-xs ${status.className}`}>{status.label}</p>
                       {controller.zone_types && controller.zone_types.length > 0 && (
                         <p className="text-xs text-gray-400 mt-1">
-                          Lagerarten: {controller.zone_types.map((zt) => zt.label).join(', ')}
+                          {t('admin.ledControllers.zoneTypes')}: {controller.zone_types.map((zt) => zt.label).join(', ')}
                         </p>
                       )}
                       {controller.last_seen && (
-                        <p className="text-xs text-gray-500">Letzter Kontakt: {new Date(controller.last_seen).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">{t('admin.ledControllers.lastSeen')}: {new Date(controller.last_seen).toLocaleString()}</p>
                       )}
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-y-1 text-xs text-gray-400 break-all">
-                        {controller.hostname && <span className="truncate">Hostname: <span className="font-mono text-gray-300">{controller.hostname}</span></span>}
-                        {controller.ip_address && <span className="truncate">IP: <span className="font-mono text-gray-300">{controller.ip_address}</span></span>}
-                        {controller.mac_address && <span className="truncate">MAC: <span className="font-mono text-gray-300">{controller.mac_address}</span></span>}
-                        {controller.firmware_version && <span className="truncate">Firmware: <span className="font-mono text-gray-300">{controller.firmware_version}</span></span>}
-                        {typeof ledCount === 'number' && <span>LEDs: <span className="font-mono text-gray-300">{ledCount}</span></span>}
-                        {wifiRSSI !== undefined && <span>WiFi RSSI: <span className="font-mono text-gray-300">{wifiRSSI} dBm</span></span>}
-                        {uptimeLabel && <span>Uptime: <span className="font-mono text-gray-300">{uptimeLabel}</span></span>}
-                        {heartbeatAt && <span>Heartbeat: <span className="font-mono text-gray-300">{heartbeatAt.toLocaleTimeString()}</span></span>}
+                        {controller.hostname && <span className="truncate">{t('admin.ledControllers.hostname')}: <span className="font-mono text-gray-300">{controller.hostname}</span></span>}
+                        {controller.ip_address && <span className="truncate">{t('admin.ledControllers.ip')}: <span className="font-mono text-gray-300">{controller.ip_address}</span></span>}
+                        {controller.mac_address && <span className="truncate">{t('admin.ledControllers.mac')}: <span className="font-mono text-gray-300">{controller.mac_address}</span></span>}
+                        {controller.firmware_version && <span className="truncate">{t('admin.ledControllers.firmware')}: <span className="font-mono text-gray-300">{controller.firmware_version}</span></span>}
+                        {typeof ledCount === 'number' && <span>{t('admin.ledControllers.leds')}: <span className="font-mono text-gray-300">{ledCount}</span></span>}
+                        {wifiRSSI !== undefined && <span>{t('admin.ledControllers.wifiRssi')}: <span className="font-mono text-gray-300">{wifiRSSI} dBm</span></span>}
+                        {uptimeLabel && <span>{t('admin.ledControllers.uptime')}: <span className="font-mono text-gray-300">{uptimeLabel}</span></span>}
+                        {heartbeatAt && <span>{t('admin.ledControllers.heartbeat')}: <span className="font-mono text-gray-300">{heartbeatAt.toLocaleTimeString()}</span></span>}
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {status.label === 'Online' && (
+                  {status.label === t('admin.ledControllers.status.online') && (
                     <button
                       onClick={() => handleRestart(controller.id)}
                       disabled={restarting === controller.id}
                       className="px-3 py-2 rounded-lg text-sm font-semibold bg-orange-600/20 text-orange-400 hover:bg-orange-600/30 flex items-center gap-2 disabled:opacity-50"
-                      title="ESP32 neu starten"
+                      title={t('admin.ledControllers.restartEsp32')}
                     >
-                      <RotateCw className="w-4 h-4" /> <span className="hidden sm:inline">{restarting === controller.id ? 'Startet...' : 'Neustart'}</span>
+                      <RotateCw className="w-4 h-4" /> <span className="hidden sm:inline">{restarting === controller.id ? t('admin.ledControllers.restarting') : t('admin.ledControllers.restart')}</span>
                     </button>
                   )}
                   <button
                     onClick={() => startEdit(controller)}
                     className="px-3 py-2 rounded-lg text-sm font-semibold bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 flex items-center gap-2"
-                    title="Controller bearbeiten & konfigurieren"
+                    title={t('admin.ledControllers.editAndConfigure')}
                   >
-                    <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Bearbeiten</span>
+                    <Settings className="w-4 h-4" /> <span className="hidden sm:inline">{t('common.edit')}</span>
                   </button>
                   <button
                     onClick={() => handleDelete(controller.id)}
                     className="p-2 rounded-lg text-red-400 hover:bg-white/10"
-                    title="Controller löschen"
+                    title={t('common.delete')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

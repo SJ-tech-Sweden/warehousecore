@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Settings, Users, Layers, Lightbulb, Cpu, FolderTree, Database, Ruler, KeyRound, Tag, Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ZoneTypesTab } from '../components/admin/ZoneTypesTab';
 import { LEDSettingsTab } from '../components/admin/LEDSettingsTab';
 import { RolesTab } from '../components/admin/RolesTab';
@@ -15,18 +16,19 @@ type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'brands' | '
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('zonetypes');
+  const { t } = useTranslation();
 
   const tabs = [
-    { id: 'zonetypes' as TabType, label: 'Lagertypen', icon: Layers },
-    { id: 'led' as TabType, label: 'LED-Verhalten', icon: Lightbulb },
-    { id: 'controllers' as TabType, label: 'ESP-Controller', icon: Cpu },
-    { id: 'categories' as TabType, label: 'Kategorien', icon: FolderTree },
-    { id: 'brands' as TabType, label: 'Marken & Hersteller', icon: Tag },
-    { id: 'counttypes' as TabType, label: 'Mess-Einheiten', icon: Ruler },
-    { id: 'roles' as TabType, label: 'Rollen & Benutzer', icon: Users },
-    { id: 'apisettings' as TabType, label: 'API-Einstellungen', icon: Database },
-    { id: 'apikeys' as TabType, label: 'API-Keys', icon: KeyRound },
-    { id: 'export' as TabType, label: 'CSV-Export', icon: Download },
+    { id: 'zonetypes' as TabType, label: t('admin.tabs.zoneTypes'), icon: Layers },
+    { id: 'led' as TabType, label: t('admin.tabs.led'), icon: Lightbulb },
+    { id: 'controllers' as TabType, label: t('admin.tabs.controllers'), icon: Cpu },
+    { id: 'categories' as TabType, label: t('admin.tabs.categories'), icon: FolderTree },
+    { id: 'brands' as TabType, label: t('admin.tabs.brands'), icon: Tag },
+    { id: 'counttypes' as TabType, label: t('admin.tabs.countTypes'), icon: Ruler },
+    { id: 'roles' as TabType, label: t('admin.tabs.roles'), icon: Users },
+    { id: 'apisettings' as TabType, label: t('admin.tabs.apiSettings'), icon: Database },
+    { id: 'apikeys' as TabType, label: t('admin.tabs.apiKeys'), icon: KeyRound },
+    { id: 'export' as TabType, label: t('admin.tabs.export'), icon: Download },
   ];
 
   return (
@@ -35,8 +37,8 @@ export function AdminPage() {
       <div className="flex items-center gap-3">
         <Settings className="w-8 h-8 text-accent-red" />
         <div>
-          <h1 className="text-3xl font-bold text-white">Admin-Dashboard</h1>
-          <p className="text-gray-400">Systemeinstellungen verwalten</p>
+          <h1 className="text-3xl font-bold text-white">{t('admin.title')}</h1>
+          <p className="text-gray-400">{t('admin.subtitle')}</p>
         </div>
       </div>
 
