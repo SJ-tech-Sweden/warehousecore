@@ -4,15 +4,15 @@ import "time"
 
 // ProductPackage represents a package of products with a fixed price
 type ProductPackage struct {
-	PackageID   int         `json:"package_id" db:"package_id"`
-	ProductID   int         `json:"product_id" db:"product_id"` // Links to products table
-	PackageCode string      `json:"package_code" db:"package_code"`
-	Name        string      `json:"name" db:"name"`
-	Description JSONString  `json:"description" db:"description"`
-	Price       JSONFloat64 `json:"price" db:"price"`
-	WebsiteVisible bool     `json:"website_visible" db:"website_visible"`
-	CreatedAt   time.Time   `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at" db:"updated_at"`
+	PackageID      int         `json:"package_id" db:"package_id"`
+	ProductID      int         `json:"product_id" db:"product_id"` // Links to products table
+	PackageCode    string      `json:"package_code" db:"package_code"`
+	Name           string      `json:"name" db:"name"`
+	Description    JSONString  `json:"description" db:"description"`
+	Price          JSONFloat64 `json:"price" db:"price"`
+	WebsiteVisible bool        `json:"website_visible" db:"website_visible"`
+	CreatedAt      time.Time   `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at" db:"updated_at"`
 }
 
 // ProductPackageItem represents the relationship between a package and a product

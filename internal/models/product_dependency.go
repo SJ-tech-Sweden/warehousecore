@@ -33,8 +33,8 @@ type ProductDependencyWithDetails struct {
 
 // CreateProductDependencyRequest represents a request to create a dependency
 type CreateProductDependencyRequest struct {
-	DependencyProductID int      `json:"dependency_product_id" binding:"required"`
-	IsOptional          bool     `json:"is_optional"`
-	DefaultQuantity     float64  `json:"default_quantity"`
-	Notes               *string  `json:"notes,omitempty"`
+	DependencyProductID int     `json:"dependency_product_id" binding:"required"`
+	IsOptional          bool    `json:"is_optional"`
+	DefaultQuantity     float64 `json:"default_quantity"`
+	Notes               *string `json:"notes,omitempty"`
 }

@@ -15,30 +15,30 @@ import (
 
 // RentalEquipment represents a product rented from an external supplier
 type RentalEquipment struct {
-	EquipmentID   int        `json:"equipment_id"`
-	ProductName   string     `json:"product_name"`
-	SupplierName  string     `json:"supplier_name"`
-	RentalPrice   float64    `json:"rental_price"`
-	CustomerPrice float64    `json:"customer_price"`
-	Category      *string    `json:"category"`
-	Description   *string    `json:"description"`
-	Notes         *string    `json:"notes"`
-	IsActive      bool       `json:"is_active"`
-	CreatedBy     *int       `json:"created_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	EquipmentID   int       `json:"equipment_id"`
+	ProductName   string    `json:"product_name"`
+	SupplierName  string    `json:"supplier_name"`
+	RentalPrice   float64   `json:"rental_price"`
+	CustomerPrice float64   `json:"customer_price"`
+	Category      *string   `json:"category"`
+	Description   *string   `json:"description"`
+	Notes         *string   `json:"notes"`
+	IsActive      bool      `json:"is_active"`
+	CreatedBy     *int      `json:"created_by"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // RentalEquipmentCreateRequest represents the request to create rental equipment
 type RentalEquipmentCreateRequest struct {
-	ProductName   string   `json:"product_name"`
-	SupplierName  string   `json:"supplier_name"`
-	RentalPrice   float64  `json:"rental_price"`
-	CustomerPrice float64  `json:"customer_price"`
-	Category      *string  `json:"category"`
-	Description   *string  `json:"description"`
-	Notes         *string  `json:"notes"`
-	IsActive      *bool    `json:"is_active"`
+	ProductName   string  `json:"product_name"`
+	SupplierName  string  `json:"supplier_name"`
+	RentalPrice   float64 `json:"rental_price"`
+	CustomerPrice float64 `json:"customer_price"`
+	Category      *string `json:"category"`
+	Description   *string `json:"description"`
+	Notes         *string `json:"notes"`
+	IsActive      *bool   `json:"is_active"`
 }
 
 // GetRentalEquipment retrieves all rental equipment with optional filtering
