@@ -1,0 +1,68 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["patch"],
+  "schedule": ["every weekend"],
+  "packageRules": [
+    {
+      "description": "Group all Go module updates into one PR",
+      "matchManagers": ["gomod"],
+      "groupName": "Go modules",
+      "labels": ["patch"]
+    },
+    {
+      "description": "Group all npm updates into one PR",
+      "matchManagers": ["npm"],
+      "groupName": "npm dependencies",
+      "labels": ["patch"]
+    },
+    {
+      "description": "Group all GitHub Actions updates into one PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "labels": ["patch"]
+    },
+    {
+      "description": "Minor Go module updates need explicit approval",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor"],
+      "labels": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "Major Go module updates need explicit approval",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"],
+      "labels": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Minor npm updates need explicit approval",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor"],
+      "labels": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "Major npm updates need explicit approval",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "labels": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Auto-merge patch-level updates for Go, npm, and Actions",
+      "matchManagers": ["gomod", "npm", "github-actions"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Group all Docker base image updates into one PR, labelled minor",
+      "matchManagers": ["dockerfile"],
+      "groupName": "Docker base images",
+      "labels": ["minor"]
+    }
+  ]
+}
