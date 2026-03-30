@@ -9,8 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
 	"warehousecore/internal/repository"
+
+	"github.com/gorilla/mux"
 )
 
 // UTF-8 BOM for Excel compatibility
@@ -360,18 +361,18 @@ func exportAllDevices() ([]byte, error) {
 		SELECT
 			d.deviceID,
 			p.name as product_name,
-			d.serial_number,
+			d.serialnumber,
 			d.status,
-			d.purchase_date,
-			d.purchase_price,
-			d.last_maintenance_date,
+			d.purchasedate,
+			NULL::numeric AS purchase_price,
+			d.lastmaintenance,
 			d.notes,
 			z.name as zone_name,
 			c.name as case_name
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
-		LEFT JOIN cases c ON d.case_id = c.caseid
+		LEFT JOIN cases c ON d.current_case_id = c.caseid
 		ORDER BY d.deviceID
 	`
 

@@ -31,6 +31,7 @@
     "settings": "Settings",
     "language": "Language",
     "changeLanguage": "Change language"
+    ,"name": "Name"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -450,7 +451,7 @@
       "title": "Manage Rental Products",
       "newItem": "New Rental Product",
       "editItem": "Edit Rental Product",
-      "items": "rental products",
+      "items": "Rental products",
       "loadedCount": "{{count}} rental products loaded",
       "filtersActive": "- filters active",
       "searchPlaceholder": "Search (name, supplier, description ...)",

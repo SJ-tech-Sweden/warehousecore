@@ -977,7 +977,7 @@ func (s *Service) lookupZoneTypeID(zoneCode string, caches *controllerCaches) (i
 	}
 	if err := db.Table("storage_zones").
 		Select("zone_types.id AS zone_type_id").
-		Joins("LEFT JOIN zone_types ON zone_types.key = storage_zones.type").
+		Joins("LEFT JOIN zone_types ON zone_types.key = storage_zones.type::text").
 		Where("storage_zones.code = ?", zoneCode).
 		Scan(&result).Error; err != nil {
 		return 0, err

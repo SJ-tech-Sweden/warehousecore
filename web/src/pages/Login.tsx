@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,16 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
-  const companyName = (window as any).__APP_CONFIG__?.companyName || 'RentalCore';
+  const [companyName, setCompanyName] = useState<string>(
+    (window as any).__APP_CONFIG__?.companyName || 'RentalCore'
+  );
+
+  useEffect(() => {
+    fetch('/api/v1/config')
+      .then(res => res.json())
+      .then(cfg => { if (cfg?.companyName) setCompanyName(cfg.companyName); })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

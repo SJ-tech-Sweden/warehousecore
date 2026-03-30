@@ -1,9 +1,9 @@
 -- Add website visibility and image selection for products
 ALTER TABLE products
-  ADD COLUMN website_visible TINYINT(1) NOT NULL DEFAULT 0 AFTER price_per_unit,
-  ADD COLUMN website_thumbnail VARCHAR(255) NULL AFTER website_visible,
-  ADD COLUMN website_images_json JSON NULL AFTER website_thumbnail;
+  ADD COLUMN IF NOT EXISTS website_visible BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS website_thumbnail VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS website_images_json JSONB NULL;
 
 -- Add website visibility for packages (product packages table)
 ALTER TABLE product_packages
-  ADD COLUMN website_visible TINYINT(1) NOT NULL DEFAULT 0 AFTER description;
+  ADD COLUMN IF NOT EXISTS website_visible BOOLEAN NOT NULL DEFAULT FALSE;

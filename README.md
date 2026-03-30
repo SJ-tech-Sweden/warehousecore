@@ -1,5 +1,7 @@
 # WarehouseCore
 
+Fork from [https://git.server-nt.de/ntielmann/warehousecore](https://git.server-nt.de/ntielmann/warehousecore)
+
 **Physical Warehouse Management System for RentalCore Deployments**
 
 Version: 5.7

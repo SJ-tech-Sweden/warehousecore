@@ -766,7 +766,11 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 		devices = append(devices, resp)
 	}
 
-	respondJSON(w, http.StatusOK, devices)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(devices); err != nil {
+		log.Printf("Error encoding devices response: %v", err)
+	}
 }
 
 // GetDevice returns a single device by ID
@@ -1215,6 +1219,11 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 func GetZoneProducts(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	zoneID := vars["id"]
+	zoneIDInt, err := strconv.Atoi(zoneID)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid zone id"})
+		return
+	}
 
 	db := repository.GetSQLDB()
 
@@ -1237,10 +1246,15 @@ func GetZoneProducts(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		WHERE pl.zone_id = $1 AND pl.quantity > 0
 		ORDER BY p.name
-	`, zoneID)
+	`, zoneIDInt)
 
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		log.Printf("GetZoneProducts query error for zone %d: %v", zoneIDInt, err)
+		if strings.Contains(strings.ToLower(err.Error()), "product_locations") && strings.Contains(strings.ToLower(err.Error()), "does not exist") {
+			respondJSON(w, http.StatusOK, []ProductInZone{})
+			return
+		}
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load zone products"})
 		return
 	}
 	defer rows.Close()

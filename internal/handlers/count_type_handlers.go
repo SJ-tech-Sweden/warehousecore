@@ -122,7 +122,7 @@ func UpdateCountType(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 	result, err := db.Exec(
-		"UPDATE count_types SET name = ?, abbreviation = ?, is_active = ? WHERE count_type_id = ?",
+		"UPDATE count_types SET name = $1, abbreviation = $2, is_active = $3 WHERE count_type_id = $4",
 		req.Name, req.Abbreviation, isActive, id,
 	)
 	if err != nil {
@@ -149,7 +149,7 @@ func DeleteCountType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
-	result, err := db.Exec("DELETE FROM count_types WHERE count_type_id = ?", id)
+	result, err := db.Exec("DELETE FROM count_types WHERE count_type_id = $1", id)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete measurement unit"})
 		return

@@ -146,6 +146,17 @@ func main() {
 	// Health check (public)
 	api.HandleFunc("/health", handlers.HealthCheck).Methods("GET")
 
+	// App config (public - returns live branding info)
+	api.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		name := "RentalCore"
+		if brandingService != nil {
+			name = brandingService.CompanyName()
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		fmt.Fprintf(w, `{"companyName":%q}`, name)
+	}).Methods("GET")
+
 	// Public product pictures (must be accessible without headers for IMG tags)
 	api.HandleFunc("/public/products/{id}/pictures/{filename}", handlers.DownloadProductPicture).Methods("GET", "HEAD")
 

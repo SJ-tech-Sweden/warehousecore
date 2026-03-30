@@ -88,8 +88,8 @@ func (j *JSONMap) Scan(value interface{}) error {
 type AppSetting struct {
 	ID        int       `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 	Scope     string    `json:"scope" gorm:"column:scope;type:enum('global','warehousecore');not null"`
-	Key       string    `json:"key" gorm:"column:k;not null"`
-	Value     JSONMap   `json:"value" gorm:"column:v;type:json;not null"`
+	Key       string    `json:"key" gorm:"column:key;not null"`
+	Value     JSONMap   `json:"value" gorm:"column:value;type:jsonb;not null"`
 	CreatedAt time.Time `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt time.Time `json:"updated_at" gorm:"column:updated_at"`
 }

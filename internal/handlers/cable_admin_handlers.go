@@ -79,44 +79,50 @@ func GetAllCables(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var args []interface{}
+	paramCount := 0
 
 	if search != "" {
-		query += " AND (c.name LIKE ? OR cc1.name LIKE ? OR cc2.name LIKE ? OR ct.name LIKE ?)"
-		searchPattern := "%" + search + "%"
-		args = append(args, searchPattern, searchPattern, searchPattern, searchPattern)
+		paramCount++
+		query += fmt.Sprintf(" AND (c.name ILIKE $%[1]d OR cc1.name ILIKE $%[1]d OR cc2.name ILIKE $%[1]d OR ct.name ILIKE $%[1]d)", paramCount)
+		args = append(args, "%"+search+"%")
 	}
 
 	if connector1Str != "" {
 		if id, err := strconv.Atoi(connector1Str); err == nil {
-			query += " AND c.connector1 = ?"
+			paramCount++
+			query += fmt.Sprintf(" AND c.connector1 = $%d", paramCount)
 			args = append(args, id)
 		}
 	}
 
 	if connector2Str != "" {
 		if id, err := strconv.Atoi(connector2Str); err == nil {
-			query += " AND c.connector2 = ?"
+			paramCount++
+			query += fmt.Sprintf(" AND c.connector2 = $%d", paramCount)
 			args = append(args, id)
 		}
 	}
 
 	if typeStr != "" {
 		if id, err := strconv.Atoi(typeStr); err == nil {
-			query += " AND c.typ = ?"
+			paramCount++
+			query += fmt.Sprintf(" AND c.typ = $%d", paramCount)
 			args = append(args, id)
 		}
 	}
 
 	if lengthMinStr != "" {
 		if val, err := strconv.ParseFloat(lengthMinStr, 64); err == nil {
-			query += " AND c.length >= ?"
+			paramCount++
+			query += fmt.Sprintf(" AND c.length >= $%d", paramCount)
 			args = append(args, val)
 		}
 	}
 
 	if lengthMaxStr != "" {
 		if val, err := strconv.ParseFloat(lengthMaxStr, 64); err == nil {
-			query += " AND c.length <= ?"
+			paramCount++
+			query += fmt.Sprintf(" AND c.length <= $%d", paramCount)
 			args = append(args, val)
 		}
 	}
@@ -194,7 +200,7 @@ func GetCable(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN cable_connectors cc1 ON c.connector1 = cc1.cable_connectorsID
 		LEFT JOIN cable_connectors cc2 ON c.connector2 = cc2.cable_connectorsID
 		LEFT JOIN cable_types ct ON c.typ = ct.cable_typesID
-		WHERE c.cableID = ?
+		WHERE c.cableID = $1
 	`
 
 	var cable Cable
@@ -311,28 +317,35 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 	updates := []string{}
 	args := []interface{}{}
 
+	paramCount := 0
 	if input.Name != nil {
-		updates = append(updates, "name = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("name = $%d", paramCount))
 		args = append(args, input.Name)
 	}
 	if input.Connector1 != nil {
-		updates = append(updates, "connector1 = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("connector1 = $%d", paramCount))
 		args = append(args, *input.Connector1)
 	}
 	if input.Connector2 != nil {
-		updates = append(updates, "connector2 = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("connector2 = $%d", paramCount))
 		args = append(args, *input.Connector2)
 	}
 	if input.Typ != nil {
-		updates = append(updates, "typ = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("typ = $%d", paramCount))
 		args = append(args, *input.Typ)
 	}
 	if input.Length != nil {
-		updates = append(updates, "length = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("length = $%d", paramCount))
 		args = append(args, *input.Length)
 	}
 	if input.MM2 != nil {
-		updates = append(updates, "mm2 = ?")
+		paramCount++
+		updates = append(updates, fmt.Sprintf("mm2 = $%d", paramCount))
 		args = append(args, *input.MM2)
 	}
 
@@ -341,7 +354,8 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := fmt.Sprintf("UPDATE cables SET %s WHERE cableID = ?", strings.Join(updates, ", "))
+	paramCount++
+	query := fmt.Sprintf("UPDATE cables SET %s WHERE cableID = $%d", strings.Join(updates, ", "), paramCount)
 	args = append(args, id)
 
 	result, err := db.Exec(query, args...)
@@ -376,8 +390,7 @@ func DeleteCable(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 
-	query := "DELETE FROM cables WHERE cableID = ?"
-	result, err := db.Exec(query, id)
+	result, err := db.Exec("DELETE FROM cables WHERE cableID = $1", id)
 	if err != nil {
 		log.Printf("Error deleting cable: %v", err)
 		http.Error(w, "Failed to delete cable", http.StatusInternalServerError)

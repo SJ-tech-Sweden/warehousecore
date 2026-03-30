@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -81,12 +82,20 @@ func GenerateBarcode(w http.ResponseWriter, r *http.Request) {
 func GetLabelTemplates(w http.ResponseWriter, r *http.Request) {
 	templates, err := labelService.GetAllTemplates()
 	if err != nil {
+		log.Printf("Error fetching label templates: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Ensure templates is never nil for JSON encoding (client expects array)
+	if templates == nil {
+		templates = []models.LabelTemplate{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(templates)
+	if err := json.NewEncoder(w).Encode(templates); err != nil {
+		log.Printf("Error encoding label templates: %v", err)
+	}
 }
 
 // GetLabelTemplate retrieves a specific template

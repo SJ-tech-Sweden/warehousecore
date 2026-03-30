@@ -12,9 +12,9 @@ export function ProductsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('products');
 
   const tabs = [
-    { id: 'products' as TabType, label: 'Produkte', icon: Package },
-    { id: 'packages' as TabType, label: 'Produktpakete', icon: Box },
-    { id: 'rented' as TabType, label: 'Mietprodukte', icon: Building2 },
+    { id: 'products' as TabType, label: t('products.title'), icon: Package },
+    { id: 'packages' as TabType, label: t('admin.productPackages.title'), icon: Box },
+    { id: 'rented' as TabType, label: t('admin.rentedProducts.items'), icon: Building2 },
   ];
 
   return (

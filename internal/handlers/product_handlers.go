@@ -985,13 +985,31 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if product has required fields for device ID generation trigger
+	manualIDMode := false
+	manualPrefix := ""
+
+	if req.Prefix != nil && strings.TrimSpace(*req.Prefix) != "" {
+		upperPrefix := strings.ToUpper(strings.TrimSpace(*req.Prefix))
+		manualPrefix = strings.Map(func(r rune) rune {
+			if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+				return r
+			}
+			return -1
+		}, upperPrefix)
+		if manualPrefix != "" {
+			manualIDMode = true
+		}
+	}
+
+	// Fallback for legacy products without subcategory abbreviation:
+	// generate device IDs in application code instead of relying on DB trigger.
 	if !abbreviation.Valid || abbreviation.String == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "Product missing required subcategory",
-			"message": "Product must have a subcategory with an abbreviation to create devices",
-		})
-		return
+		if !manualIDMode {
+			manualPrefix = fmt.Sprintf("P%d", req.ProductID)
+			manualIDMode = true
+		}
+		log.Printf("[DEVICE CREATE WARNING] Product %d (%s) has no subcategory abbreviation, using manual device IDs with prefix %s",
+			req.ProductID, productName, manualPrefix)
 	}
 
 	// Log warning if pos_in_category is NULL but allow device creation
@@ -1007,30 +1025,71 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 			req.Quantity, req.ProductID, productName, abbreviation.String, posInCategory.Int64)
 	}
 
-	// Optional prefix: PostgreSQL doesn't support session variables like MySQL
-	// The prefix is logged but not used with PostgreSQL triggers
-	if req.Prefix != nil && *req.Prefix != "" {
-		upperPrefix := strings.ToUpper(*req.Prefix)
-		log.Printf("[DEVICE CREATE] Custom prefix requested: %s (note: PostgreSQL triggers may not use this)", upperPrefix)
+	if manualIDMode {
+		log.Printf("[DEVICE CREATE] Manual ID mode enabled with prefix: %s", manualPrefix)
+	} else if req.Prefix != nil && strings.TrimSpace(*req.Prefix) != "" {
+		upperPrefix := strings.ToUpper(strings.TrimSpace(*req.Prefix))
+		log.Printf("[DEVICE CREATE] Custom prefix requested: %s (note: PostgreSQL trigger mode ignores custom prefix)", upperPrefix)
 	}
 
-	existingIDs := make(map[string]struct{})
+	existingIDsBefore := make(map[string]struct{})
 	rows, err := db.Query("SELECT deviceID FROM devices WHERE productID = $1", req.ProductID)
 	if err == nil {
 		defer rows.Close()
 		var id string
 		for rows.Next() {
 			if err := rows.Scan(&id); err == nil {
-				existingIDs[id] = struct{}{}
+				existingIDsBefore[id] = struct{}{}
 			}
 		}
 	}
 
-	log.Printf("[DEVICE CREATE] Found %d existing devices for product %d", len(existingIDs), req.ProductID)
+	log.Printf("[DEVICE CREATE] Found %d existing devices for product %d", len(existingIDsBefore), req.ProductID)
+
+	usedIDs := make(map[string]struct{}, len(existingIDsBefore))
+	for id := range existingIDsBefore {
+		usedIDs[id] = struct{}{}
+	}
 
 	// Create devices one by one and track failures
 	failedCount := 0
+	nextManualCounter := 1
+	if req.StartingNumber != nil && *req.StartingNumber > 0 {
+		nextManualCounter = *req.StartingNumber
+	}
+
 	for i := 0; i < req.Quantity; i++ {
+		if manualIDMode {
+			inserted := false
+			for attempt := 0; attempt < 1000; attempt++ {
+				candidateID := fmt.Sprintf("%s%03d", manualPrefix, nextManualCounter)
+				nextManualCounter++
+
+				if _, exists := usedIDs[candidateID]; exists {
+					continue
+				}
+
+				if _, err := db.Exec("INSERT INTO devices (deviceID, productID, status) VALUES ($1, $2, 'free')", candidateID, req.ProductID); err != nil {
+					if strings.Contains(strings.ToLower(err.Error()), "duplicate key") {
+						usedIDs[candidateID] = struct{}{}
+						continue
+					}
+					log.Printf("[DEVICE CREATE ERROR] Failed to create device %d/%d for product %d: %v", i+1, req.Quantity, req.ProductID, err)
+					failedCount++
+					break
+				}
+
+				usedIDs[candidateID] = struct{}{}
+				inserted = true
+				break
+			}
+
+			if !inserted {
+				failedCount++
+			}
+			continue
+		}
+
 		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES ($1, 'free')", req.ProductID); err != nil {
 			log.Printf("[DEVICE CREATE ERROR] Failed to create device %d/%d for product %d: %v", i+1, req.Quantity, req.ProductID, err)
 			failedCount++
@@ -1053,7 +1112,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Failed to scan device id: %v", err)
 				continue
 			}
-			if _, existed := existingIDs[id]; !existed {
+			if _, existed := existingIDsBefore[id]; !existed {
 				createdDeviceIDs = append(createdDeviceIDs, id)
 			}
 		}

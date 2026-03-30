@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gorm.io/gorm"
 	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
+
+	"gorm.io/gorm"
 )
 
 // AdminService handles admin-related operations
@@ -74,7 +75,7 @@ func (s *AdminService) DeleteZoneType(id int) error {
 // GetSetting retrieves a setting by scope and key
 func (s *AdminService) GetSetting(scope, key string) (*models.AppSetting, error) {
 	var setting models.AppSetting
-	err := s.db.Where("scope = ? AND k = ?", scope, key).First(&setting).Error
+	err := s.db.Where("scope = ? AND key = ?", scope, key).First(&setting).Error
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func (s *AdminService) SetSetting(scope, key string, value interface{}) error {
 
 	// Upsert setting
 	var setting models.AppSetting
-	err := s.db.Where("scope = ? AND k = ?", scope, key).First(&setting).Error
+	err := s.db.Where("scope = ? AND key = ?", scope, key).First(&setting).Error
 
 	if err == gorm.ErrRecordNotFound {
 		// Create new

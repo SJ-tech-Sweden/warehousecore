@@ -18,7 +18,7 @@ func GetAPILimit(settingKey string, defaultLimit int) int {
 	}
 
 	var setting models.AppSetting
-	if err := db.Where("scope = ? AND k = ?", "warehousecore", settingKey).First(&setting).Error; err != nil {
+	if err := db.Where("scope = ? AND key = ?", "warehousecore", settingKey).First(&setting).Error; err != nil {
 		log.Printf("[SETTINGS] Setting %s not found, using default limit: %d", settingKey, defaultLimit)
 		return defaultLimit
 	}
@@ -72,7 +72,7 @@ func UpdateAPILimit(settingKey string, limit int) error {
 
 	// Check if setting exists
 	var setting models.AppSetting
-	err := db.Where("scope = ? AND k = ?", "warehousecore", settingKey).First(&setting).Error
+	err := db.Where("scope = ? AND key = ?", "warehousecore", settingKey).First(&setting).Error
 
 	limitValue := models.JSONMap{"limit": limit}
 

@@ -68,10 +68,11 @@ export default function LabelDesignerPage() {
   const loadTemplates = async () => {
     try {
       const { data } = await labelsApi.getTemplates();
-      setTemplates(data);
+      const safeTemplates = Array.isArray(data) ? data : [];
+      setTemplates(safeTemplates);
 
       // Load default template if exists
-      const defaultTemplate = data.find((t) => t.is_default);
+      const defaultTemplate = safeTemplates.find((t) => t.is_default);
       if (defaultTemplate) {
         loadTemplate(defaultTemplate);
       }
@@ -85,8 +86,15 @@ export default function LabelDesignerPage() {
     setLabelWidth(template.width);
     setLabelHeight(template.height);
     setTemplateName(template.name);
-    const parsed = JSON.parse(template.template_json);
-    setElements(parsed.map((e: LabelElement, i: number) => ({ ...e, id: `elem-${i}` })));
+    try {
+      const raw = template.template_json?.trim();
+      const parsed = raw ? JSON.parse(raw) : [];
+      const safeElements = Array.isArray(parsed) ? parsed : [];
+      setElements(safeElements.map((e: LabelElement, i: number) => ({ ...e, id: `elem-${i}` })));
+    } catch (error) {
+      console.error('Invalid template_json, loading empty design:', error);
+      setElements([]);
+    }
   };
 
   const createNewTemplate = () => {

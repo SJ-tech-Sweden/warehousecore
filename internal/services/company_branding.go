@@ -31,7 +31,7 @@ type CompanyBrandingService struct {
 func NewCompanyBrandingService(db *gorm.DB) *CompanyBrandingService {
 	return &CompanyBrandingService{
 		db:  db,
-		ttl: 5 * time.Minute,
+		ttl: 30 * time.Second,
 	}
 }
 

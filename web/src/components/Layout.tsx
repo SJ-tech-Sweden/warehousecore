@@ -17,7 +17,16 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const { t } = useTranslation();
-  const companyName = (window as any).__APP_CONFIG__?.companyName || 'RentalCore';
+  const [companyName, setCompanyName] = useState<string>(
+    (window as any).__APP_CONFIG__?.companyName || 'RentalCore'
+  );
+
+  useEffect(() => {
+    fetch('/api/v1/config')
+      .then(res => res.json())
+      .then(cfg => { if (cfg?.companyName) setCompanyName(cfg.companyName); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -171,10 +180,10 @@ export function Layout({ children }: LayoutProps) {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitcher />
             <div className="text-xs sm:text-sm text-gray-400 hidden sm:block">
               {companyName}
             </div>
+            <LanguageSwitcher />
           </div>
         </div>
       </header>
