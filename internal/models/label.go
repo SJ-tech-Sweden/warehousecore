@@ -9,9 +9,9 @@ type LabelTemplate struct {
 	ID          int       `json:"id" gorm:"primaryKey;column:id"`
 	Name        string    `json:"name" gorm:"column:name;size:255;not null"`
 	Description string    `json:"description" gorm:"column:description;type:text"`
-	Width       float64   `json:"width" gorm:"column:width;not null"` // in mm
-	Height      float64   `json:"height" gorm:"column:height;not null"` // in mm
-	TemplateJSON string   `json:"template_json" gorm:"column:template_json;type:longtext;not null"` // JSON with elements
+	Width       float64   `json:"width" gorm:"column:width_mm;not null"` // in mm (DB column: width_mm)
+	Height      float64   `json:"height" gorm:"column:height_mm;not null"` // in mm (DB column: height_mm)
+	TemplateJSON string   `json:"template_json" gorm:"column:template_content;type:longtext;not null"` // JSON with elements (DB column: template_content)
 	IsDefault   bool      `json:"is_default" gorm:"column:is_default;default:false"`
 	CreatedAt   time.Time `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"column:updated_at"`
