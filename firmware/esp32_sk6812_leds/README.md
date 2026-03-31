@@ -112,7 +112,7 @@ Go to Sketch → Include Library → Manage Libraries, then install:
 Example: weidelbach/esp-a1b2c3/cmd
 ```
 
-> `TOPIC_SUFFIX` = `controller_id` (auto) unless overridden in `secrets.h`. Each ESP32 listens on its own topic so that WarehouseCore can route zone-spezifische Befehle.
+> `TOPIC_SUFFIX` = `controller_id` (auto) unless overridden in `secrets.h`. Each ESP32 listens on its own topic so that WarehouseCore can route zone-specific commands.
 
 Receives JSON commands from WarehouseCore:
 
@@ -189,13 +189,13 @@ Last Will Testament (offline):
 
 ### Controller Heartbeat
 
-Jeder ESP32 veröffentlicht seinen Status ausschließlich über MQTT auf
+Each ESP32 publishes its status exclusively via MQTT to
 
 ```
 {TOPIC_PREFIX}/{CONTROLLER_ID}/status
 ```
 
-Die JSON-Nutzlast entspricht dem oben gezeigten Beispiel (`status`, `wifi_rssi`, `uptime_seconds`, …). WarehouseCore lauscht auf diesen Topics, legt fehlende Controller automatisch an und aktualisiert `last_seen`, `is_active`, IP, Firmware-Version usw.
+The JSON payload matches the example shown above (`status`, `wifi_rssi`, `uptime_seconds`, …). WarehouseCore listens on these topics, automatically creates missing controllers, and updates `last_seen`, `is_active`, IP, firmware version, etc.
 
 ## LED Patterns
 
@@ -207,11 +207,11 @@ Die JSON-Nutzlast entspricht dem oben gezeigten Beispiel (`status`, `wifi_rssi`,
 
 ### Controller Identity & Topics
 
-`secrets.h` steuert, wie sich der Controller meldet:
+`secrets.h` controls how the controller identifies itself:
 
-- `CONTROLLER_ID_PREFIX`: Präfix für automatisch generierte IDs (`esp-<macsuffix>`). Gleiche Firmware kann so auf beliebig viele Boards geflasht werden.
-- Optional `CONTROLLER_ID`: Erzwingt eine feste ID (z. B. `esp-regal-1`).
-- Optional `TOPIC_SUFFIX`: Überschreibt das Topic (Default = Controller-ID). Kommandos werden an `{TOPIC_PREFIX}/{TOPIC_SUFFIX}/cmd` gesendet.
+- `CONTROLLER_ID_PREFIX`: Prefix for auto-generated IDs (`esp-<macsuffix>`). The same firmware can thus be flashed to any number of boards.
+- Optional `CONTROLLER_ID`: Forces a fixed ID (e.g., `esp-shelf-1`).
+- Optional `TOPIC_SUFFIX`: Overrides the topic (default = controller ID). Commands are sent to `{TOPIC_PREFIX}/{TOPIC_SUFFIX}/cmd`.
 
 ### LED Strip Settings
 
