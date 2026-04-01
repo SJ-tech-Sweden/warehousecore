@@ -30,8 +30,8 @@
     "stop": "Stop",
     "settings": "Einstellungen",
     "language": "Sprache",
-    "changeLanguage": "Sprache wechseln"
-    ,"name": "Name"
+    "changeLanguage": "Sprache wechseln",
+    "name": "Name"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -113,7 +113,8 @@
       "defective": "Defekt",
       "in_repair": "In Reparatur",
       "retired": "Ausgemustert"
-    }
+    },
+    "rfid": "RFID"
   },
   "products": {
     "title": "Produkte",
@@ -671,7 +672,10 @@
         "defective": "Defekt",
         "maintenance": "Wartung",
         "retired": "Ausgemustert"
-      }
+      },
+      "retireDate": "Außerdienststellungsdatum",
+      "warrantyEndDate": "Garantieende",
+      "deviceIdHint": "Geräte-ID ändern, um ein vorhandenes Etikett zu verwenden. Vorsicht – dies aktualisiert auch alle Verweise."
     },
     "cases": {
       "title": "Cases-Verwaltung",
@@ -991,14 +995,45 @@
     "scanCode": "Code scannen",
     "manualEntry": "Manuelle Eingabe",
     "action": "Aktion",
-    "actions": {
-      "intake": "Einlagerung",
-      "outtake": "Auslagerung",
-      "transfer": "Umlagerung",
-      "check": "Prüfung"
+    "zoneTitle": "Lagerplatz Scannen",
+    "scannerTitle": "Barcode Scanner",
+    "zoneSubtitle": "Scanne den Barcode des Lagerplatzes",
+    "scannerSubtitle": "Gerät scannen oder Code eingeben",
+    "steps": {
+      "device": "Gerät",
+      "zone": "Lagerplatz"
     },
+    "placeholders": {
+      "zone": "Lagerplatz-Barcode / Code",
+      "device": "Barcode / QR-Code / Geräte-ID"
+    },
+    "actions": {
+      "intake": "Einlagern",
+      "outtake": "Auslagern",
+      "transfer": "Umlagerung",
+      "check": "Prüfen"
+    },
+    "scanning": "Scannen...",
+    "scanZone": "Lagerplatz Scannen",
+    "scanDevice": "Gerät Scannen",
+    "prompts": {
+      "intakeQuantity": "Menge zum Einlagern ({{unit}}):",
+      "outtakeQuantity": "Menge zum Auslagern ({{unit}}):"
+    },
+    "invalidQuantity": "Ungültige Menge eingegeben",
     "scanSuccess": "Erfolgreich gescannt",
-    "scanError": "Scan-Fehler"
+    "scanError": "Scan fehlgeschlagen",
+    "result": {
+      "device": "Gerät:",
+      "id": "ID:",
+      "status": "Status:"
+    },
+    "ledModal": {
+      "title": "LED-Licht aktivieren?",
+      "description": "Das LED-Licht ist aktuell ausgeschaltet. Möchtest du es aktivieren, um die Job-Geräte zu markieren?",
+      "cancel": "Nein, direkt zum Job",
+      "confirm": "Ja, LED aktivieren"
+    }
   },
   "auth": {
     "login": "Anmelden",
@@ -1010,7 +1045,6 @@
     "loginError": "Anmeldung fehlgeschlagen",
     "loginSuccess": "Erfolgreich angemeldet"
   },
-
   "login": {
     "tagline": "Die Zukunft der Vermietungsverwaltung",
     "secure_footer": "Sichere Anmeldung mit verschlüsselten Passwörtern & Passkeys",
@@ -1209,52 +1243,6 @@
       "type": "Typ",
       "quantity": "Menge",
       "unit": "Einheit"
-    }
-  },
-  "scan": {
-    "title": "Gerät scannen",
-    "subtitle": "Scannen Sie Barcodes oder QR-Codes",
-    "scanCode": "Code scannen",
-    "manualEntry": "Manuelle Eingabe",
-    "action": "Aktion",
-    "zoneTitle": "Lagerplatz Scannen",
-    "scannerTitle": "Barcode Scanner",
-    "zoneSubtitle": "Scanne den Barcode des Lagerplatzes",
-    "scannerSubtitle": "Gerät scannen oder Code eingeben",
-    "steps": {
-      "device": "Gerät",
-      "zone": "Lagerplatz"
-    },
-    "placeholders": {
-      "zone": "Lagerplatz-Barcode / Code",
-      "device": "Barcode / QR-Code / Geräte-ID"
-    },
-    "actions": {
-      "intake": "Einlagern",
-      "outtake": "Auslagern",
-      "transfer": "Umlagerung",
-      "check": "Prüfen"
-    },
-    "scanning": "Scannen...",
-    "scanZone": "Lagerplatz Scannen",
-    "scanDevice": "Gerät Scannen",
-    "prompts": {
-      "intakeQuantity": "Menge zum Einlagern ({{unit}}):",
-      "outtakeQuantity": "Menge zum Auslagern ({{unit}}):"
-    },
-    "invalidQuantity": "Ungültige Menge eingegeben",
-    "scanSuccess": "Erfolgreich gescannt",
-    "scanError": "Scan fehlgeschlagen",
-    "result": {
-      "device": "Gerät:",
-      "id": "ID:",
-      "status": "Status:"
-    },
-    "ledModal": {
-      "title": "LED-Licht aktivieren?",
-      "description": "Das LED-Licht ist aktuell ausgeschaltet. Möchtest du es aktivieren, um die Job-Geräte zu markieren?",
-      "cancel": "Nein, direkt zum Job",
-      "confirm": "Ja, LED aktivieren"
     }
   },
   "jobsPage": {

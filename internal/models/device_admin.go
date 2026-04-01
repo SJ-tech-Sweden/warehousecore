@@ -5,6 +5,7 @@ type DeviceCreateInput struct {
 	ProductID         int      `json:"product_id"`
 	Status            string   `json:"status,omitempty"`
 	SerialNumber      *string  `json:"serial_number,omitempty"`
+	RFID              *string  `json:"rfid,omitempty"`
 	Barcode           *string  `json:"barcode,omitempty"`
 	QRCode            *string  `json:"qr_code,omitempty"`
 	CurrentLocation   *string  `json:"current_location,omitempty"`
@@ -12,6 +13,8 @@ type DeviceCreateInput struct {
 	ConditionRating   *float64 `json:"condition_rating,omitempty"`
 	UsageHours        *float64 `json:"usage_hours,omitempty"`
 	PurchaseDate      *string  `json:"purchase_date,omitempty"`
+	RetireDate        *string  `json:"retire_date,omitempty"`
+	WarrantyEndDate   *string  `json:"warranty_end_date,omitempty"`
 	LastMaintenance   *string  `json:"last_maintenance,omitempty"`
 	NextMaintenance   *string  `json:"next_maintenance,omitempty"`
 	Notes             *string  `json:"notes,omitempty"`
@@ -26,9 +29,11 @@ type DeviceCreateInput struct {
 
 // DeviceUpdateInput represents the payload for updating an existing device.
 type DeviceUpdateInput struct {
+	NewDeviceID     Optional[string]  `json:"new_device_id"`
 	ProductID       Optional[int]     `json:"product_id"`
 	Status          Optional[string]  `json:"status"`
 	SerialNumber    Optional[string]  `json:"serial_number"`
+	RFID            Optional[string]  `json:"rfid"`
 	Barcode         Optional[string]  `json:"barcode"`
 	QRCode          Optional[string]  `json:"qr_code"`
 	CurrentLocation Optional[string]  `json:"current_location"`
@@ -36,6 +41,8 @@ type DeviceUpdateInput struct {
 	ConditionRating Optional[float64] `json:"condition_rating"`
 	UsageHours      Optional[float64] `json:"usage_hours"`
 	PurchaseDate    Optional[string]  `json:"purchase_date"`
+	RetireDate      Optional[string]  `json:"retire_date"`
+	WarrantyEndDate Optional[string]  `json:"warranty_end_date"`
 	LastMaintenance Optional[string]  `json:"last_maintenance"`
 	NextMaintenance Optional[string]  `json:"next_maintenance"`
 	Notes           Optional[string]  `json:"notes"`

@@ -340,7 +340,7 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 	}, movement, nil
 }
 
-// findDeviceByScan looks up a device by barcode or QR code
+// findDeviceByScan looks up a device by barcode, QR code, device ID, serial number, or RFID
 func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) {
 	var device models.Device
 	err := s.db.QueryRow(`
@@ -348,8 +348,9 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 		       current_location, zone_id, condition_rating, usage_hours
 		FROM devices
 		WHERE barcode = $1 OR qr_code = $2 OR deviceID = $3
+		   OR serialnumber = $4 OR rfid = $5
 		LIMIT 1
-	`, scanCode, scanCode, scanCode).Scan(
+	`, scanCode, scanCode, scanCode, scanCode, scanCode).Scan(
 		&device.DeviceID, &device.ProductID, &device.SerialNumber,
 		&device.Barcode, &device.QRCode, &device.Status,
 		&device.CurrentLocation, &device.ZoneID, &device.ConditionRating, &device.UsageHours,

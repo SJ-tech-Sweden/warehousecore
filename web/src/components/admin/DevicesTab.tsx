@@ -32,9 +32,11 @@ interface Zone {
 }
 
 interface DeviceFormData {
+  new_device_id: string;
   product_id?: number;
   status: string;
   serial_number: string;
+  rfid: string;
   barcode: string;
   qr_code: string;
   current_location: string;
@@ -42,6 +44,8 @@ interface DeviceFormData {
   condition_rating?: number;
   usage_hours?: number;
   purchase_date: string;
+  retire_date: string;
+  warranty_end_date: string;
   last_maintenance: string;
   next_maintenance: string;
   notes: string;
@@ -55,8 +59,10 @@ interface DeviceFormData {
 }
 
 const initialFormData: DeviceFormData = {
+  new_device_id: '',
   status: 'free',
   serial_number: '',
+  rfid: '',
   barcode: '',
   qr_code: '',
   current_location: '',
@@ -65,6 +71,8 @@ const initialFormData: DeviceFormData = {
   device_prefix: '',
   increment_serial: false,
   purchase_date: '',
+  retire_date: '',
+  warranty_end_date: '',
   last_maintenance: '',
   next_maintenance: '',
   auto_generate_label: true,
@@ -161,6 +169,7 @@ export function DevicesTab() {
       device.product_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.product_category?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.serial_number?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      device.rfid?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.barcode?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.notes?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
@@ -186,9 +195,11 @@ export function DevicesTab() {
   const openEditModal = (device: Device) => {
     setEditingDevice(device.device_id);
     setFormData({
+      new_device_id: device.device_id,
       product_id: device.product_id,
       status: device.status || 'free',
       serial_number: device.serial_number || '',
+      rfid: device.rfid || '',
       barcode: device.barcode || '',
       qr_code: device.qr_code || '',
       current_location: device.current_location || '',
@@ -196,6 +207,8 @@ export function DevicesTab() {
       condition_rating: device.condition_rating,
       usage_hours: device.usage_hours,
       purchase_date: device.purchase_date || '',
+      retire_date: device.retire_date || '',
+      warranty_end_date: device.warranty_end_date || '',
       last_maintenance: device.last_maintenance || '',
       next_maintenance: device.next_maintenance || '',
       notes: device.notes || '',
@@ -235,6 +248,7 @@ export function DevicesTab() {
           product_id: formData.product_id,
           status: formData.status,
           serial_number: formData.serial_number || undefined,
+          rfid: formData.rfid || undefined,
           barcode: formData.barcode || undefined,
           qr_code: formData.qr_code || undefined,
           current_location: formData.current_location || undefined,
@@ -243,9 +257,16 @@ export function DevicesTab() {
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
           purchase_date: formData.purchase_date || undefined,
+          retire_date: formData.retire_date || undefined,
+          warranty_end_date: formData.warranty_end_date || undefined,
           last_maintenance: formData.last_maintenance || undefined,
           next_maintenance: formData.next_maintenance || undefined,
         };
+
+        // Include new device ID if changed
+        if (formData.new_device_id && formData.new_device_id !== editingDevice) {
+          updateData.new_device_id = formData.new_device_id;
+        }
 
         if (formData.regenerate_codes) {
           updateData.regenerate_codes = true;
@@ -264,6 +285,7 @@ export function DevicesTab() {
           product_id: formData.product_id!,
           status: formData.status,
           serial_number: formData.serial_number || undefined,
+          rfid: formData.rfid || undefined,
           barcode: formData.barcode || undefined,
           qr_code: formData.qr_code || undefined,
           current_location: formData.current_location || undefined,
@@ -272,6 +294,8 @@ export function DevicesTab() {
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
           purchase_date: formData.purchase_date || undefined,
+          retire_date: formData.retire_date || undefined,
+          warranty_end_date: formData.warranty_end_date || undefined,
           last_maintenance: formData.last_maintenance || undefined,
           next_maintenance: formData.next_maintenance || undefined,
           quantity: formData.quantity,
@@ -681,6 +705,23 @@ export function DevicesTab() {
                 </select>
               </div>
 
+              {/* Device ID (only when editing – allows renaming) */}
+              {editingDevice && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('devices.deviceId')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.new_device_id}
+                    onChange={(e) => setFormData({ ...formData, new_device_id: e.target.value })}
+                    className="input-field w-full"
+                    title={t('devices.deviceId')}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{t('admin.devices.deviceIdHint')}</p>
+                </div>
+              )}
+
               {/* Quantity (only for new devices) */}
               {!editingDevice && (
                 <div className="grid grid-cols-2 gap-4">
@@ -818,6 +859,20 @@ export function DevicesTab() {
                 </div>
               </div>
 
+              {/* RFID */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  {t('devices.rfid')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.rfid}
+                  onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
+                  className="input-field w-full"
+                  title={t('devices.rfid')}
+                />
+              </div>
+
               {/* Location and Condition */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -866,6 +921,30 @@ export function DevicesTab() {
                     onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                     className="input-field w-full"
                     title={t('admin.devices.purchaseDate')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('admin.devices.warrantyEndDate')}
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.warranty_end_date}
+                    onChange={(e) => setFormData({ ...formData, warranty_end_date: e.target.value })}
+                    className="input-field w-full"
+                    title={t('admin.devices.warrantyEndDate')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('admin.devices.retireDate')}
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.retire_date}
+                    onChange={(e) => setFormData({ ...formData, retire_date: e.target.value })}
+                    className="input-field w-full"
+                    title={t('admin.devices.retireDate')}
                   />
                 </div>
                 <div>
@@ -1059,6 +1138,10 @@ export function DevicesTab() {
                   <p className="text-white font-semibold">{viewDevice.serial_number || '-'}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-400">{t('devices.rfid')}</p>
+                  <p className="text-white font-semibold">{viewDevice.rfid || '-'}</p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-400">{t('devices.barcode')}</p>
                   <p className="text-white font-semibold">{viewDevice.barcode || '-'}</p>
                 </div>
@@ -1093,6 +1176,22 @@ export function DevicesTab() {
                     <p className="text-sm text-gray-400">{t('admin.devices.purchaseDate')}</p>
                     <p className="text-white font-semibold">
                       {viewDevice.purchase_date}
+                    </p>
+                  </div>
+                )}
+                {viewDevice.warranty_end_date && (
+                  <div>
+                    <p className="text-sm text-gray-400">{t('admin.devices.warrantyEndDate')}</p>
+                    <p className="text-white font-semibold">
+                      {viewDevice.warranty_end_date}
+                    </p>
+                  </div>
+                )}
+                {viewDevice.retire_date && (
+                  <div>
+                    <p className="text-sm text-gray-400">{t('admin.devices.retireDate')}</p>
+                    <p className="text-white font-semibold">
+                      {viewDevice.retire_date}
                     </p>
                   </div>
                 )}
