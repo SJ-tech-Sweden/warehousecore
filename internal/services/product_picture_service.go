@@ -194,14 +194,22 @@ func (s *ProductPictureService) DownloadPictureWithVariant(productName, fileName
 		return s.DownloadPicture(productName, fileName)
 	}
 	maxDim := 0
+	normalizedVariant := strings.ToLower(variant)
 	var variantDir string
-	switch strings.ToLower(variant) {
+	var legacyDir string // legacy cache dir for alias variants (backward compat)
+	switch normalizedVariant {
 	case "thumb", "thumbnail":
 		maxDim = 480
 		variantDir = "thumb"
+		if normalizedVariant == "thumbnail" {
+			legacyDir = "thumbnail"
+		}
 	case "preview", "medium":
 		maxDim = 1200
 		variantDir = "preview"
+		if normalizedVariant == "medium" {
+			legacyDir = "medium"
+		}
 	default:
 		return s.DownloadPicture(productName, fileName)
 	}
@@ -233,6 +241,13 @@ func (s *ProductPictureService) DownloadPictureWithVariant(productName, fileName
 	cachePath := filepath.Join(s.cacheDir, variantDir, sanitizeFolderName(productName), safeFile+fileExt)
 	if cached, err := os.Open(cachePath); err == nil {
 		return cached, contentType, nil
+	}
+	// Also check legacy cache directories for alias variants to preserve backward compatibility.
+	if legacyDir != "" {
+		legacyCachePath := filepath.Join(s.cacheDir, legacyDir, sanitizeFolderName(productName), safeFile+fileExt)
+		if cached, err := os.Open(legacyCachePath); err == nil {
+			return cached, contentType, nil
+		}
 	}
 
 	orig, origContentType, err := s.DownloadPicture(productName, safeFile)
