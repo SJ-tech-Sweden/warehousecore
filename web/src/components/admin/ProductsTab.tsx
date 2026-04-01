@@ -160,7 +160,11 @@ function useDebouncedValue<T>(value: T, delay: number) {
   return debounced;
 }
 
-export function ProductsTab() {
+interface ProductsTabProps {
+  onOpenDevicesTab?: (productId: number) => void;
+}
+
+export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -387,6 +391,10 @@ export function ProductsTab() {
   };
 
   const handleOpenDevicesModal = useCallback(async (productId: number, productName: string) => {
+    if (onOpenDevicesTab) {
+      onOpenDevicesTab(productId);
+      return;
+    }
     setDevicesModal({ productId, productName });
     setLoadingDevicesModal(true);
     try {
@@ -398,7 +406,7 @@ export function ProductsTab() {
     } finally {
       setLoadingDevicesModal(false);
     }
-  }, []);
+  }, [onOpenDevicesTab]);
 
   const closeDevicesModal = useCallback(() => {
     setDevicesModal(null);

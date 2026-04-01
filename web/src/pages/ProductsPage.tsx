@@ -11,6 +11,7 @@ type TabType = 'products' | 'packages' | 'rented' | 'devices';
 export function ProductsPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('products');
+  const [devicesProductFilter, setDevicesProductFilter] = useState<number | undefined>(undefined);
 
   const tabs = [
     { id: 'products' as TabType, label: t('products.title'), icon: Package },
@@ -18,6 +19,18 @@ export function ProductsPage() {
     { id: 'rented' as TabType, label: t('admin.rentedProducts.items'), icon: Building2 },
     { id: 'devices' as TabType, label: t('productManagement.devicesTabLabel'), icon: Cpu },
   ];
+
+  const handleOpenDevicesTab = (productId: number) => {
+    setDevicesProductFilter(productId);
+    setActiveTab('devices');
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    if (tab !== 'devices') {
+      setDevicesProductFilter(undefined);
+    }
+    setActiveTab(tab);
+  };
 
   return (
     <div className="space-y-6">
@@ -37,7 +50,7 @@ export function ProductsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap flex-shrink-0 ${activeTab === tab.id
                     ? 'bg-accent-red text-white shadow-lg'
                     : 'text-gray-400 hover:bg-white/5 hover:text-white'
@@ -54,10 +67,10 @@ export function ProductsPage() {
 
       {/* Tab Content */}
       <div className="glass-dark rounded-2xl p-6">
-        {activeTab === 'products' && <ProductsTab />}
+        {activeTab === 'products' && <ProductsTab onOpenDevicesTab={handleOpenDevicesTab} />}
         {activeTab === 'packages' && <ProductPackagesTab />}
         {activeTab === 'rented' && <RentedProductsTab />}
-        {activeTab === 'devices' && <DevicesTab />}
+        {activeTab === 'devices' && <DevicesTab initialProductFilter={devicesProductFilter} key={devicesProductFilter} />}
       </div>
     </div>
   );

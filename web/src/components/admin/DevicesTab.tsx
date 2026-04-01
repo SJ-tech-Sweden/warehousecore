@@ -91,7 +91,11 @@ function useDebouncedValue<T>(value: T, delay: number) {
   return debounced;
 }
 
-export function DevicesTab() {
+interface DevicesTabProps {
+  initialProductFilter?: number;
+}
+
+export function DevicesTab({ initialProductFilter }: DevicesTabProps) {
   const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
@@ -106,7 +110,7 @@ export function DevicesTab() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [productFilter, setProductFilter] = useState<number | ''>('');
+  const [productFilter, setProductFilter] = useState<number | ''>(initialProductFilter ?? '');
   const [zoneFilter, setZoneFilter] = useState<number | ''>('');
   const [refreshing, setRefreshing] = useState(false);
 
