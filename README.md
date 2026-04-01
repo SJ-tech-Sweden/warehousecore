@@ -50,7 +50,7 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
    - Track current location (zone, case, job)
    - Status management with history
    - Movement audit trail
-   - Produktzentrierte Geräteübersicht mit Schnellaktionen (Fach aufleuchten, Zone öffnen)
+   - Product-centric device overview with quick actions (illuminate bin, open zone)
    - **Admin CRUD UI** - Full device management with create, edit, delete, QR/barcode generation
 
 2. **Cable Management**
@@ -84,7 +84,7 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
    - Designed for OCR integration in RentalCore job creation
    - **Admin CRUD UI** - Complete package management with product selection
 
-5. **Rental Equipment (Mietprodukte)** NEW
+5. **Rental Equipment** NEW
    - Manage products rented from external suppliers
    - Track rental price (cost to you) vs. customer price (what customer pays)
    - Automatic profit margin calculation
@@ -94,7 +94,7 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
    - Category and description support
    - Internal notes for supplier contacts, delivery times, etc.
    - Table and card view modes
-   - Full CRUD interface in "Mietprodukte" tab under Products page
+   - Full CRUD interface in "Rental Equipment" tab under Products page
    - Public API endpoints for RentalCore integration
    - **Admin CRUD UI** - Complete rental equipment management
 
@@ -126,66 +126,66 @@ WarehouseCore manages the physical warehouse operations alongside RentalCore (th
      - Jobs with complete information
    - **Admin UI** - Accessible via CSV-Export tab in Admin Dashboard
 
-## Admin-Dashboard & Rollen
+## Admin Dashboard & Roles
 
-- Admin: verwaltet Zonentypen, LED-Defaults, Rollen; CSV-Export; sieht Profilseite.
-- Manager: darf Zonentypen lesen/listen; CSV-Export; keine Änderungen/Löschungen.
-- Worker/Viewer: kein Zugriff auf Admin-Routen.
+- Admin: manages zone types, LED defaults, roles; CSV export; sees profile page.
+- Manager: can read/list zone types; CSV export; no changes/deletions.
+- Worker/Viewer: no access to admin routes.
 
-API Endpoints (unter `\`/api/v1\``):
+API Endpoints (under `/api/v1`):
 - `GET /admin/zone-types` (admin|manager), `POST/PUT/DELETE /admin/zone-types/:id` (admin)
 - `GET /admin/led/single-bin-default` (admin|manager), `PUT /admin/led/single-bin-default` (admin)
 - `GET /admin/roles` (admin|manager), `GET /admin/users` (admin|manager)
 - `GET /admin/users/:id/roles` (admin|manager), `PUT /admin/users/:id/roles` (admin)
 - `GET /profile/me`, `PUT /profile/me`
 
-RBAC Matrix (vereinfacht):
-- admin: Vollzugriff
-- manager: Lesen (ZoneTypes, Rollenliste/Benutzerliste)
-- worker/viewer: kein Adminzugriff
+RBAC Matrix (simplified):
+- admin: full access
+- manager: read (ZoneTypes, role list/user list)
+- worker/viewer: no admin access
 
 Auto-Admin Seed:
 - ENV `ADMIN_NAME_MATCH` (Default: `N. Thielmann`)
-- Beim Start werden Benutzer, deren Name/Username/Email diesen String enthält, automatisch mit der Rolle `admin` versehen.
+- On startup, users whose name/username/email contains this string are automatically assigned the `admin` role.
 
 Cross-Links Navbar:
-- Domains werden via Backend in `window.__APP_CONFIG__` injiziert.
-- ENV: `RENTALCORE_DOMAIN`, `WAREHOUSECORE_DOMAIN` (ohne Protokoll/Port).
+- Domains are injected via backend into `window.__APP_CONFIG__`.
+- ENV: `RENTALCORE_DOMAIN`, `WAREHOUSECORE_DOMAIN` (without protocol/port).
 
 ### Product Pictures
 
-- Mehrfach-Uploads direkt im Produkt-Detailmodal
-- Speicherung im gemeinsamen Nextcloud-Dateipool von RentalCore (`NEXTCLOUD_WEBDAV_*` in `.env` setzen)
-- Pfadstruktur wird automatisch erstellt: `<BASE_PATH>/warehousecore/pictures/<Productname>/<Datei>`
-- Unterstützte Typen: JPG, PNG, GIF, WEBP, HEIC bis 10 MB je Datei
-- Optionaler JPEG-Thumbnail-Cache (`PICTURE_CACHE_DIR`, Default `/tmp/warehousecore/pictures_cache`) beschleunigt Admin-Ansicht; Lightbox nutzt weiter das Original.
-- Website-Feed: Produkte lassen sich mit „Auf Website anzeigen“ markieren; Bildauswahl + Thumbnail im Produkt-Detailmodal. Öffentlicher Feed liefert nur freigegebene Produkte/Bilder.
+- Multiple uploads directly in the product detail modal
+- Storage in the shared Nextcloud file pool from RentalCore (set `NEXTCLOUD_WEBDAV_*` in `.env`)
+- Path structure is automatically created: `<BASE_PATH>/warehousecore/pictures/<Productname>/<File>`
+- Supported types: JPG, PNG, GIF, WEBP, HEIC up to 10 MB per file
+- Optional JPEG thumbnail cache (`PICTURE_CACHE_DIR`, default `/tmp/warehousecore/pictures_cache`) speeds up admin view; lightbox still uses the original.
+- Website feed: Products can be marked with "Show on website"; image selection + thumbnail in the product detail modal. Public feed only delivers approved products/images.
 
-Screens (Beschreibung):
-- Admin > Zonentypen: Tabelle mit CRUD für Key/Label/Beschreibung; LED-Defaults werden auf der LED-Seite gepflegt.
-- Admin > LED-Verhalten: Globale Defaults, Job-Highlight-Modus (Farben/Pattern/Speed) inkl. Live-Vorschau, zonentypspezifische Einstellungen und JSON-Mapping-Editor mit Validierung
-- Admin > Rollen: Benutzerliste, Rollen-Chips, Speichern
-- Profil: Avatar-URL, Anzeigename, UI-Prefs (dark-mode default on)
-- Sidebar: Profilseite wird ausschließlich über den Username im Benutzerbereich geöffnet, kein separater Menüeintrag.
+Screens (description):
+- Admin > Zone Types: Table with CRUD for key/label/description; LED defaults are managed on the LED page.
+- Admin > LED Behavior: Global defaults, job highlight mode (colors/pattern/speed) incl. live preview, zone-type-specific settings, and JSON mapping editor with validation
+- Admin > Roles: User list, role chips, save
+- Profile: Avatar URL, display name, UI preferences (dark mode default on)
+- Sidebar: Profile page is opened exclusively via the username in the user area, no separate menu entry.
 
 LED Single-Bin Defaults:
 - Setting Key: `app_settings(scope='warehousecore', k='led.single_bin.default')`
-- JSON Beispiel: `{ "color": "#FF7A00", "pattern": "breathe", "intensity": 180 }`
-- Fallback bei fehlender Einstellung: Orange `#FF7A00`, `breathe`, Intensität `180`.
+- JSON Example: `{ "color": "#FF7A00", "pattern": "breathe", "intensity": 180 }`
+- Fallback when setting is missing: Orange `#FF7A00`, `breathe`, intensity `180`.
 
 Migrations
-- Siehe Ordner `migrations/`:
+- See folder `migrations/`:
   - `007_rbac_system.sql` (+ down) – Zone Types, App Settings, User Profiles, WH-RBAC Seeds
-  - `008_assign_auto_admin.sql` – initialer Auto-Admin (Thielmann)
-  - `009_update_led_defaults.sql` (+ down) – LED-Default Orange/Breathe/180
-  - `022_add_website_fields.sql` – Website-Flags/Thumbnail/Imagelist für Produkte, Website-Flag für Packages
+  - `008_assign_auto_admin.sql` – initial auto-admin (Thielmann)
+  - `009_update_led_defaults.sql` (+ down) – LED default orange/breathe/180
+  - `022_add_website_fields.sql` – website flags/thumbnail/image list for products, website flag for packages
 
 4. **Job Integration**
    - Real-time job assignment
    - Device packing status
    - Missing item detection
    - Job completion workflow
-   - Job-Code Scans (`JOB000123`) laden Aufträge direkt in den Pack-Workflow
+   - Job-code scans (`JOB000123`) load jobs directly into the packing workflow
 
 5. **Maintenance Engine**
    - Defect reporting with severity
@@ -251,10 +251,10 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 
 ### Key Features
 
-- **Unlimited ESP Controllers**: Jede ESP32-Firmware erzeugt automatisch eine eindeutige `controller_id` und erhält ein eigenes MQTT-Topic. Zone-Typen lassen sich pro Controller routen.
-- **Zero-Touch Discovery**: Sobald ein Controller sein MQTT-Status-Topic abonniert und eine Heartbeat-Nachricht sendet, legt WarehouseCore ihn automatisch in der Datenbank an – ganz ohne zusätzliche Firmware-Konfiguration oder manuelle Stammdatenpflege.
-- **Admin ESP-Dashboard**: Neuer Tab „ESP-Controller“ zeigt IP, Hostname, Firmware, RSSI und Uptime an, erlaubt freundliche Namen und Mehrfach-Zonentypzuweisungen über ein komfortables Multi-Select-Dropdown.
-- **Telemetry Heartbeats**: MQTT + REST Heartbeat (`/api/v1/led/controllers/{id}/heartbeat`) halten Statusdaten im Backend aktuell – inklusive LED-Anzahl, WiFi-RSSI, Firmwarestand.
+- **Unlimited ESP Controllers**: Each ESP32 firmware automatically generates a unique `controller_id` and receives its own MQTT topic. Zone types can be routed per controller.
+- **Zero-Touch Discovery**: As soon as a controller subscribes to its MQTT status topic and sends a heartbeat message, WarehouseCore automatically registers it in the database – without any additional firmware configuration or manual master data management.
+- **Admin ESP Dashboard**: New tab "ESP Controllers" shows IP, hostname, firmware, RSSI and uptime, allows friendly names and multiple zone type assignments via a convenient multi-select dropdown.
+- **Telemetry Heartbeats**: MQTT + REST heartbeat (`/api/v1/led/controllers/{id}/heartbeat`) keeps status data up to date in the backend – including LED count, WiFi RSSI, firmware version.
 - **No Port Forwarding Required**: ESP32 uses outbound MQTT connection, works from any network
 - **Cloud-Ready**: WarehouseCore can run on external servers, ESP32 connects via internet
 - **Multiple LEDs per Bin**: Support for 2-4 LEDs per storage compartment
@@ -273,8 +273,8 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 - `mqtt_publisher.go` - MQTT client with TLS support, reconnect logic
 - `service.go` - Business logic (Job → Bins → Pixels mapping)
 - `handlers/led_handlers.go` - REST API endpoints
-- `services/led_controller_service.go` - Verwaltung mehrerer LED-Controller inkl. Telemetrie & Zonenzuweisung
-- `handlers/led_controller_handlers.go` - Admin-CRUD & Heartbeat-Endpunkte für ESP-Controller
+- `services/led_controller_service.go` - Management of multiple LED controllers incl. telemetry & zone assignment
+- `handlers/led_controller_handlers.go` - Admin CRUD & heartbeat endpoints for ESP controllers
 
 **Endpoints:**
 - `GET /api/v1/led/status` - MQTT connection status
@@ -285,21 +285,21 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 - `GET /api/v1/led/mapping` - Get current mapping config
 - `PUT /api/v1/led/mapping` - Update mapping config
 - `POST /api/v1/led/mapping/validate` - Validate mapping JSON
-- `POST /api/v1/led/controllers/{controller_id}/heartbeat` - Telemetrie-Heartbeat (öffentlich, keine Auth)
-- `GET /api/v1/admin/led/controllers` - Liste registrierter Controller (Admin/Manager)
-- `POST /api/v1/admin/led/controllers` - Controller manuell anlegen (Admin)
-- `PUT /api/v1/admin/led/controllers/{id}` - Eigenschaften & Zonentypen pflegen (Admin)
-- `DELETE /api/v1/admin/led/controllers/{id}` - Controller löschen (Admin)
+- `POST /api/v1/led/controllers/{controller_id}/heartbeat` - Telemetry heartbeat (public, no auth)
+- `GET /api/v1/admin/led/controllers` - List of registered controllers (Admin/Manager)
+- `POST /api/v1/admin/led/controllers` - Manually create controller (Admin)
+- `PUT /api/v1/admin/led/controllers/{id}` - Manage properties & zone types (Admin)
+- `DELETE /api/v1/admin/led/controllers/{id}` - Delete controller (Admin)
 
 #### 2. Frontend (React/TypeScript)
 
 **Location:** `web/src/pages/JobsPage.tsx`, `web/src/components/admin/LEDControllersTab.tsx`, `web/src/lib/api.ts`
 
-- Toggle button in Job Panel: "Fächer hervorheben"
+- Toggle button in Job Panel: "Highlight Bins"
 - Visual indicators: MQTT connection status, bin count
 - Auto-clear LEDs when exiting job
 - Real-time status updates
-- Admin > „ESP-Controller“: Übersicht mit Telemetriedaten, Namensvergabe, Topic-Suffix und Zonentyp-Zuordnung
+- Admin > "ESP Controllers": Overview with telemetry data, name assignment, topic suffix, and zone type assignment
 
 #### 3. ESP32 Firmware (Arduino C++)
 
@@ -311,7 +311,7 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 
 **Multi-ESP32 Quick Start:**
 
-> 📖 **Für eine detaillierte Anleitung mit Hardware-Anforderungen, Verkabelung, Troubleshooting und mehr, siehe [MULTI_ESP32_GUIDE.md](MULTI_ESP32_GUIDE.md)**
+> 📖 **For detailed instructions with hardware requirements, wiring, troubleshooting and more, see [MULTI_ESP32_GUIDE.md](MULTI_ESP32_GUIDE.md)**
 
 1. **Flash Firmware** (same firmware on all ESP32s):
    - Follow detailed instructions in [firmware/esp32_sk6812_leds/README.md](firmware/esp32_sk6812_leds/README.md)
@@ -331,23 +331,23 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
    - Multiple ESP32s can control different warehouse areas independently
 
 
-> Heartbeats laufen ausschließlich über MQTT – stelle sicher, dass `TOPIC_PREFIX`, `WAREHOUSE_ID` und die Broker-Zugangsdaten in `secrets.h` zum WarehouseCore-Setup passen. Sobald ein Controller seinen Status auf `<prefix>/<controller>/status` veröffentlicht, wird er automatisch erkannt und im Admin-Panel angezeigt.
+> Heartbeats run exclusively via MQTT – make sure that `TOPIC_PREFIX`, `WAREHOUSE_ID` and the broker credentials in `secrets.h` match the WarehouseCore setup. As soon as a controller publishes its status to `<prefix>/<topic_suffix>/status` (with `topic_suffix` defaulting to `controller_id` unless overridden), it is automatically recognized and displayed in the admin panel.
 
-#### 4. Controller-Registry & Heartbeat
+#### 4. Controller Registry & Heartbeat
 
-- **Admin > ESP-Controller**: Kartenansicht mit Online-Status, IP, Hostname, Firmware, WiFi-RSSI, Uptime. Zonentypen lassen sich per Checkbox zuweisen; Anzeigename/Topic können editiert werden.
-- Jeder Controller verwaltet:
-  - `controller_id` – automatisch generiert (`<PREFIX>-<macsuffix>`) oder manuell überschreibbar
-  - `topic_suffix` – Ziel-Topic für Kommandos (`<LED_MQTT_TOPIC_PREFIX>/<suffix>/cmd`)
-  - `zone_types` – definieren, für welche Lagerbereiche der Controller leuchtet
+- **Admin > ESP Controllers**: Card view with online status, IP, hostname, firmware, WiFi RSSI, uptime. Zone types can be assigned via checkbox; display name/topic can be edited.
+- Each controller manages:
+  - `controller_id` – automatically generated (`<PREFIX>-<macsuffix>`) or manually overridable
+  - `topic_suffix` – target topic for commands (`<LED_MQTT_TOPIC_PREFIX>/<suffix>/cmd`)
+  - `zone_types` – define which storage areas the controller illuminates
 - **Heartbeat Workflow**:
-  - ESP sendet alle 15 s `POST /api/v1/led/controllers/{controller_id}/heartbeat` (ohne Auth) mit JSON-Payload
-  - Unbekannte IDs werden automatisch angelegt (Displayname = ID, Topic = ID)
-  - Telemetriedaten (RSSI, Uptime, LED-Länge, Firmware, IP, Hostname, MAC) werden persistiert (`status_data`)
-- LED-Kommandos werden auf Basis des Zonen-Typs automatisch zum passenden Controller geroutet; fällt keiner zu, nutzt das System das globale Warehouse-Topic (`LED_WAREHOUSE_ID`).
-- Locate-/Preview-/Job-Highlights berücksichtigen Controller-Zuordnung, sodass nur relevanten Streifen angesprochen werden.
+  - ESP sends `POST /api/v1/led/controllers/{controller_id}/heartbeat` every 15 s (without auth) with JSON payload
+  - Unknown IDs are automatically created (display name = ID, topic = ID)
+  - Telemetry data (RSSI, uptime, LED length, firmware, IP, hostname, MAC) are persisted (`status_data`)
+- LED commands are automatically routed to the appropriate controller based on zone type; if none matches, the system uses the global warehouse topic (`LED_WAREHOUSE_ID`).
+- Locate/preview/job highlights respect controller assignment so that only relevant strips are addressed.
 
-**Heartbeat Payload Beispiel**
+**Heartbeat Payload Example**
 
 ```json
 {
@@ -363,8 +363,8 @@ Flow: Job Selected → Publish to cloud broker → ESP32 subscribes → Show LED
 }
 ```
 
-- HTTP-Heartbeat funktioniert über HTTP oder HTTPS (Empfehlung: TLS aktivieren). Bei Kommunikationsverlust markiert das Backend den Controller automatisch als offline (`last_seen` + `is_active`).
-- Zonen-Typen in WarehouseCore (`storage_zones.type`) müssen einem Controller zugewiesen sein, damit Highlights / Locate-Befehle ankommen.
+- HTTP heartbeat works via HTTP or HTTPS (recommendation: enable TLS). If communication is lost, the backend automatically marks the controller as offline (`last_seen` + `is_active`).
+- Zone types in WarehouseCore (`storage_zones.type`) must be assigned to a controller for highlights / locate commands to arrive.
 
 **Features:**
 - WiFi auto-reconnect
@@ -617,7 +617,7 @@ Edit `internal/led/config/led_mapping.json`:
 **IMPORTANT:** The `bin_id` must match the `code` from your `storage_zones` table in the database!
 
 Example:
-- Database has zone with `code = "WDL-RG-01-F-01"` (Weidelbach, Regal 01, Fach 01)
+- Database has zone with `code = "WDL-RG-01-F-01"` (Weidelbach, Rack 01, Bin 01)
 - LED Mapping has `"bin_id": "WDL-RG-01-F-01"`
 - When a device in that zone is part of a job, the LEDs will light up
 
@@ -664,7 +664,7 @@ ESP32 GND   → SK6812 GND (common ground!)
 ### User Workflow
 
 1. **Navigate to Jobs** → Select open job
-2. **Click "Fächer hervorheben"** button (Lightbulb icon)
+2. **Click "Highlight Bins"** button (Lightbulb icon)
 3. **LEDs illuminate** warehouse bins containing job devices
 4. **Pick devices** from highlighted bins
 5. **Scan each device** to mark as collected
@@ -1078,7 +1078,7 @@ docker tag nobentie/warehousecore:1.56 nobentie/warehousecore:latest
 
 **Migrations**
 - **030_device_id_trigger.sql** - PostgreSQL trigger function for automatic device ID generation
-- **022_add_website_fields.sql** - Website-Flags/Thumbnail/Bildauswahl für Produkte & Packages
+- **022_add_website_fields.sql** - Website flags/thumbnail/image selection for products & packages
 
 **Push to Docker Hub:**
 ```bash
@@ -1109,14 +1109,14 @@ docker pull nobentie/warehousecore:latest
 
 **Recent Changes:**
 - 3.36: PostgreSQL trigger for automatic device ID generation - fixes null deviceID constraint violations
-- 3.35: Produktbilder laden deutlich schneller dank gecachter JPEG-Thumbnails + Admin-UI nutzt die kleinen Varianten
-- 2.71: Gerätebaum als zusätzliche Ansicht direkt in „Produkte“ (View-Toggle)
-- 2.70: Sidebar navigation order aligned with RentalCore (Dashboard, Scan, Produktmanagement, Cases, Lagerbereiche, Aufträge, Admin)
+- 3.35: Product images load significantly faster thanks to cached JPEG thumbnails + admin UI uses the small variants
+- 2.71: Device tree as an additional view directly in "Products" (view toggle)
+- 2.70: Sidebar navigation order aligned with RentalCore (Dashboard, Scan, Product Management, Cases, Storage Areas, Jobs, Admin)
 - 2.69: Full device management in product edit modal - add/remove devices, view device list with status
 - 2.68: UI Consistency - Product modal placement standardization with ModalPortal
 - 2.62: Product packages gain package codes, OCR alias management UI, and alias-map API
-- 2.61: Haupt-Kabeltabelle gruppiert nach Typ/Stecker/Länge mit Inline-Details
-- 2.60: Kabelübersicht gruppiert nach Stecker1/Stecker2/Länge und zeigt Gesamtanzahl pro Kombination
+- 2.61: Main cable table grouped by type/connector/length with inline details
+- 2.60: Cable overview grouped by connector1/connector2/length and shows total count per combination
 
 **Run with docker-compose (local development):**
 ```bash
@@ -1212,20 +1212,20 @@ psql -h db.example.com -U warehouse_user -d rentalcore < migrations/XXX_new_feat
 
 - **Tags:**
 - `latest` - Latest stable build
-- `3.28` - Website-Feed: sichtbare Produkte/Packages + Bildauswahl/Thumbnail, öffentliche Feeds, Admin-UI für Website-Flags
+- `3.28` - Website feed: visible products/packages + image selection/thumbnail, public feeds, admin UI for website flags
 - `3.07` - Modal scroll behavior fix: prevent background scrolling when modals open
 - `3.06` - Product dependencies system
-- `1.62` - LED-Befehle aufcontroller-spezifische Topics geroutet (Zonentyp-Zuordnung)
-- `1.61` - Admin-Tab „Mikrocontroller“ + Heartbeat-Registry
-- `1.60` - Bin-Vorschau zielt exakt auf das gewählte Fach
-- `1.59` - Einzelvorschau beleuchtet nur das gewählte Fach (kein Clear)
-- `1.58` - Preview sendet keine Clear-Kommandos mehr
-- `1.57` - Vorschau lässt LEDs an; Clear-Befehl entfällt
-- `1.55` - Vorschau mit Fachcode hält übrige Bins aktiv (Job-Highlight-Verhalten)
-- `1.54` - Vorschau nutzt Job-Highlight-Logik (optional mit gezieltem Fachcode + Fehlerfeedback)
-- `1.53` - Admin-UI bietet Fachauswahl für LED-Vorschau (Datalist + Eingabefeld)
-- `1.52` - LED Vorschau nutzt optionalen `LED_PREVIEW_BIN_ID` und Gerätekarte bietet Detail-Button
-- `1.51` - Geräte-Liste öffnet wieder Detailmodal per Klick
+- `1.62` - LED commands routed to controller-specific topics (zone type assignment)
+- `1.61` - Admin tab "Microcontrollers" + heartbeat registry
+- `1.60` - Bin preview targets exactly the selected bin
+- `1.59` - Single preview illuminates only the selected bin (no clear)
+- `1.58` - Preview no longer sends clear commands
+- `1.57` - Preview keeps LEDs on; clear command removed
+- `1.55` - Preview with bin code keeps remaining bins active (job highlight behavior)
+- `1.54` - Preview uses job highlight logic (optional with targeted bin code + error feedback)
+- `1.53` - Admin UI offers bin selection for LED preview (datalist + input field)
+- `1.52` - LED preview uses optional `LED_PREVIEW_BIN_ID` and device card offers detail button
+- `1.51` - Device list opens detail modal again on click
 - `1.50` - Admin LED preview always lights the first bin
 - `1.49` - Device detail modal inside legacy /devices page (now merged into Products tab)
 - `1.48` - Device detail modal with orange breathe LED locate
@@ -1242,15 +1242,15 @@ psql -h db.example.com -U warehouse_user -d rentalcore < migrations/XXX_new_feat
 
 ## Website Feed
 
-- Öffentliche Endpoints:
-  - `GET /api/v1/public/products` – alle Produkte mit `website_visible = true` inkl. ausgewählter Bilder/Thumbnail
-  - `GET /api/v1/public/packages` – alle Packages mit `website_visible = true` inkl. Items und Package-Bildern (vom verknüpften Produkt)
-  - `GET /api/v1/public/products/{id}/pictures/{filename}` – Bild-Download für Website
-  - Schutz via API-Key (`X-API-Key` oder `?api_key=`)
+- Public Endpoints:
+  - `GET /api/v1/public/products` – all products with `website_visible = true` incl. selected images/thumbnail
+  - `GET /api/v1/public/packages` – all packages with `website_visible = true` incl. items and package images (from the linked product)
+  - `GET /api/v1/public/products/{id}/pictures/{filename}` – image download for website
+  - Protected via API key (`X-API-Key` or `?api_key=`)
 - Admin:
-  - Im Produkt-Detailmodal: Toggle „Auf Website anzeigen“, Bilder auswählen, Thumbnail setzen
-  - Bei Packages: Flag `website_visible` setzen (Bilder/Thumb aus dem verknüpften Produkt)
-  - API-Keys verwalten: `/api/v1/admin/api-keys` (listen), `POST /api/v1/admin/api-keys` (erstellen, Key wird einmalig im Response geliefert), `PUT /api/v1/admin/api-keys/{id}/status` (aktiv/deaktiv), `DELETE /api/v1/admin/api-keys/{id}`
+  - In the product detail modal: Toggle "Show on website", select images, set thumbnail
+  - For packages: Set `website_visible` flag (images/thumbnail from the linked product)
+  - Manage API keys: `/api/v1/admin/api-keys` (list), `POST /api/v1/admin/api-keys` (create, key is delivered once in response), `PUT /api/v1/admin/api-keys/{id}/status` (active/inactive), `DELETE /api/v1/admin/api-keys/{id}`
 
 ---
 - `1.35` - Frontend with LED control button
@@ -1348,13 +1348,13 @@ For issues or questions:
 ## Changelog
 
 ### Version 2.71 (2025-11-21)
-- **Gerätebaum als Ansicht auf der Produktseite**
-  - Device Tree ist nun ein weiterer View-Toggle direkt unter „Produkte“ (neben Tabelle/Karten), kein eigener Tab mehr
-  - Ermöglicht schnellen Wechsel zwischen Tabellen-, Karten- und Gerätebaum-Ansicht ohne Kontextwechsel
+- **Device Tree as a View on the Products Page**
+  - Device Tree is now an additional view toggle directly under "Products" (alongside table/cards), no longer a separate tab
+  - Enables quick switching between table, card, and device tree views without changing context
 
 ### Version 2.70 (2025-11-21)
 - **Sidebar order aligned with RentalCore**
-  - Navigation reordered to: Dashboard, Scan, Produktmanagement (with product submenu), Cases, Lagerbereiche, Aufträge, Admin
+  - Navigation reordered to: Dashboard, Scan, Product Management (with product submenu), Cases, Storage Areas, Jobs, Admin
   - Keeps admin visibility role-gated while mirroring RentalCore theming and grouping
 
 ### Version 2.69 (2025-11-15)
@@ -1457,31 +1457,31 @@ For issues or questions:
   - Full device management within cases from admin interface
 
 ### Version 2.61 (2025-11-14)
-- **Feature: Kabel-Kombinationsübersicht in Haupttabelle**
-  - The cables dashboard now groups the main table by cable type + Stecker 1 + Stecker 2 + Länge so each combination appears exactly once with an `Anzahl` column.
-  - Rows expand inline to show the underlying Einzelkabel inklusive aller Aktionen (Details, Bearbeiten, Löschen); the cards view mirrors the grouped layout.
-  - Summary metadata (Anzahl Kombinationen und Gesamtbestand) updates live after CRUD actions.
+- **Feature: Cable Combination Overview in Main Table**
+  - The cables dashboard now groups the main table by cable type + Connector 1 + Connector 2 + Length so each combination appears exactly once with a `Count` column.
+  - Rows expand inline to show the underlying individual cables including all actions (details, edit, delete); the cards view mirrors the grouped layout.
+  - Summary metadata (number of combinations and total stock) updates live after CRUD actions.
 
 ### Version 2.60 (2025-11-14)
-- **Feature: Kabel-Kombinationsübersicht**
-  - Added the first “Einzigartige Kombinationen” summary, laying the groundwork for the grouped workflow.
+- **Feature: Cable Combination Overview**
+  - Added the first "Unique Combinations" summary, laying the groundwork for the grouped workflow.
   - Summary strings follow the `Audio (XLR 3P - XLR 3P) • 1.00 m` pattern and display a global count for easier audits.
 
 ### Version 2.59 (2025-11-14)
-- **Feature: Kabeltypen-Bestand**
+- **Feature: Cable Type Inventory**
   - Admin endpoint `/admin/cable-types` now includes `count` per type derived directly from the DB, so downstream tools can display accurate totals.
   - Cables UI surfaces the counts in the summary (deprecated by 2.60’s combination view, but still available for downstream integrations).
 
 ### Version 2.58 (2025-11-14)
 - **UX: Filtered connector pairing in cables view**
-  - Selecting a value in the Stecker 1 filter now limits Stecker 2 options to combinations that exist in the database.
+  - Selecting a value in the Connector 1 filter now limits Connector 2 options to combinations that exist in the database.
   - Connector dropdowns show explicit gender labels (male/female) alongside names/abbreviations for instant clarity.
-  - Invalid Stecker-2 selections reset automatically when Stecker 1 changes, preventing empty result sets.
+  - Invalid Connector 2 selections reset automatically when Connector 1 changes, preventing empty result sets.
   - Applies to both the list filters and connector displays in tables/cards/modals to keep terminology aligned.
 
 ### Version 2.57 (2025-11-14)
 - **Feature: Unified Products + Devices Tree** ✨ **[Issue #17]**
-  - Added a third “Gerätebaum” tab to the Products page, mirroring the former /devices view without duplicate layouts.
+  - Added a third "Device Tree" tab to the Products page, mirroring the former /devices view without duplicate layouts.
   - Device tree retains advanced search, LED locate button, zone navigation, and per-device detail/product modals directly inside the products workspace.
   - Removed the standalone `/devices` route, sidebar entry, and page to avoid divergent UX paths.
   - README and navigation instructions updated to point admins to the consolidated entry point.
@@ -1816,7 +1816,7 @@ For issues or questions:
 ### Version 2.0 (2025-10-24)
 - **Major Feature: Unified Label Generation for Devices & Cases** ✨
   - Label Designer now generates labels for BOTH devices and cases with single button
-  - "Alle Labels Generieren" creates labels for entire inventory at once
+  - "Generate All Labels" creates labels for entire inventory at once
   - Cases use same template as devices for consistent appearance
   - Automatic field mapping: device_id → CASE-{id}, product_name → case.name
   - Button shows breakdown: "(X Devices + Y Cases)"
@@ -1917,12 +1917,12 @@ For issues or questions:
   - Changed logic from `status == "on_job" || pack_status == "issued"` to `status == "on_job"`
 
 ### Version 1.89 (2025-10-24)
-- **UI Update: Renamed "Zonen" to "Lager"** 🎨 **[Issue #10]**
-  - Renamed all occurrences of "Zonen" to "Lager" throughout the app
-  - Updated navigation menu: "Zonen" → "Lager"
-  - Updated admin panel: "Zonentypen" → "Lagertypen"
-  - Updated LED settings: "Zonentyp" → "Lagertyp"
-  - Updated controllers: "Zonenarten" → "Lagerarten"
+- **UI Update: Renamed "Zones" to "Storage"** 🎨 **[Issue #10]**
+  - Renamed all occurrences of "Zones" to "Storage" throughout the app
+  - Updated navigation menu: "Zones" → "Storage"
+  - Updated admin panel: "Zone Types" → "Storage Types"
+  - Updated LED settings: "Zone Type" → "Storage Type"
+  - Updated controllers: "Zone Types" → "Storage Types"
   - Updated page titles and breadcrumbs
   - Updated search placeholders and user-facing text
   - Consistent terminology throughout the entire application
@@ -1930,7 +1930,7 @@ For issues or questions:
 ### Version 1.88 (2025-10-24)
 - **Feature: Cases CRUD Operations** ✨ **[Issue #9]**
   - Added full Create, Update, Delete operations for cases
-  - New "Neues Case" button to create cases in WarehouseCore
+  - New "New Case" button to create cases in WarehouseCore
   - Edit button on each case card for inline editing
   - Delete button with confirmation and validation (prevents deletion if case contains devices)
   - Comprehensive form modal with all case fields:
@@ -2055,7 +2055,7 @@ For issues or questions:
   - Automatically loads default label template when device details are opened
   - Canvas rendering of device-specific label with QR codes, barcodes, and text
   - Download button to save individual device label as PNG
-  - Label section appears below LED controls with "Geräte-Label" heading
+  - Label section appears below LED controls with "Device Label" heading
   - Uses same rendering logic as Label Designer for consistency
   - Loading state while template and label are being generated
   - Integrates seamlessly with existing device detail modal design
@@ -2152,17 +2152,17 @@ For issues or questions:
   - Smart LED integration with automatic status detection
   - If LED connected: Auto-highlight job devices and navigate to job
   - If LED disconnected: Shows modal asking user if they want to enable LED
-  - Modal options: "Ja, LED aktivieren" or "Nein, direkt zum Job"
+  - Modal options: "Yes, activate LED" or "No, go directly to job"
   - Seamless navigation to job details page after scan
   - Fixes GitLab Issue #3: Missing job-code scan function
 
 ### Version 1.54 (2025-10-19)
 - **Feature: LED Control Improvements** 💡
-  - Added manual "Ausschalten" button to turn off orange locate LEDs
+  - Added manual "Turn Off" button to turn off orange locate LEDs
   - LEDs automatically turn off when closing device detail modal
   - Improved UX with visual feedback for LED state
-  - Dual-button layout: "Fach beleuchten" (orange) and "Ausschalten" (red)
-  - Disabled "Fach beleuchten" button while LEDs are active
+  - Dual-button layout: "Illuminate Bin" (orange) and "Turn Off" (red)
+  - Disabled "Illuminate Bin" button while LEDs are active
 
 ### Version 1.53 (2025-10-19)
 - **Enhancement: Synchronous LED Breathe Effect** 🎨
@@ -2195,7 +2195,7 @@ For issues or questions:
 - **Feature: Device Detail Modal on Devices Page** 📱
   - Click any device on /devices page to open detail modal
   - Same full device information popup as on zone detail page
-  - "Fach beleuchten" button with orange breathe LED
+  - "Illuminate Bin" button with orange breathe LED
   - Consistent UX across all device views
 - **User Experience:**
   - Device cards now clickable on main devices page
@@ -2210,7 +2210,7 @@ For issues or questions:
     - Product name, status, condition rating
     - Location (zone name and code)
     - Usage hours, case assignment, job number
-  - **"Fach beleuchten" button**: Highlights device's bin with orange breathe pattern
+  - **"Illuminate Bin" button**: Highlights device's bin with orange breathe pattern
   - Orange breathe LED makes finding devices easy
   - Modal accessible from zone detail page device list
 - **Backend Enhancement:**
@@ -2316,7 +2316,7 @@ For issues or questions:
 - **Frontend Update: LED Control Button Now Visible** 💡
   - Rebuilt frontend with LED control button in Jobs page
   - LED toggle button appears when job is selected
-  - Shows "Fächer hervorheben" / "Fächer hervorgehoben"
+  - Shows "Highlight Bins" / "Bins Highlighted"
   - Visual indicators for MQTT connection status
   - Green/gray styling based on LED state
   - Button includes lightbulb icons for clarity
@@ -2326,7 +2326,7 @@ For issues or questions:
   - Button located above scan interface in job detail view
   - One-click toggle to turn LEDs on/off
   - Real-time feedback when LED state changes
-  - Connection status: "MQTT verbunden" or "Dry-Run Modus"
+  - Connection status: "MQTT connected" or "Dry-Run Mode"
   - No page reload needed - instant LED control
 
 ### Version 1.34 (2025-10-18)
@@ -2582,7 +2582,7 @@ For issues or questions:
   - JSON schemas for LED commands and mapping configuration
   - Validation endpoint for mapping configuration
 - **Frontend LED Controls:**
-  - Toggle button "Fächer hervorheben" in Jobs page
+  - Toggle button "Highlight Bins" in Jobs page
   - Visual indicators: MQTT connection status, active bin count
   - Auto-clear LEDs when navigating away from job
   - Real-time status updates with LED state
@@ -2634,7 +2634,7 @@ For issues or questions:
   - `LED_MQTT_PASS` - MQTT password
   - `LED_TOPIC_PREFIX` - Topic namespace
   - `WAREHOUSE_ID` - Warehouse identifier
-  - `LED_PREVIEW_BIN_ID` - Optional bin code for Admin-Preview (z. B. `WDL-06-RG-02-F-01`)
+  - `LED_PREVIEW_BIN_ID` - Optional bin code for admin preview (e.g. `WDL-06-RG-02-F-01`)
 - **Testing:**
   - Dry-run mode logs commands without sending
   - Status endpoint shows connection state
@@ -2712,9 +2712,9 @@ For issues or questions:
   - Added `max-w-full overflow-x-hidden` to root container to prevent horizontal scroll
   - Changed button container to `flex flex-wrap items-center gap-2 sm:gap-3` for proper wrapping
   - Implemented responsive button text: Full text on desktop, icons only on mobile
-  - Delete button: Shows "Löschen" on desktop, "🗑️" emoji on mobile
-  - Shelf creation button: Shows "Fächer erstellen" on desktop, "Fächer" on mobile
-  - Subzone creation button: Shows "Unterzone erstellen" on desktop, "Unterzone" on mobile
+  - Delete button: Shows "Delete" on desktop, "🗑️" emoji on mobile
+  - Shelf creation button: Shows "Create Bins" on desktop, "Bins" on mobile
+  - Subzone creation button: Shows "Create Subzone" on desktop, "Subzone" on mobile
   - Added `whitespace-nowrap` to all buttons to prevent text wrapping within buttons
 - **Breadcrumb Navigation:**
   - Added `overflow-x-auto` with horizontal scroll support
@@ -2834,7 +2834,7 @@ For issues or questions:
 - **Inspection Management:**
   - View all inspection schedules with filtering
   - Filter by: All, Overdue, Upcoming (next 30 days)
-  - Visual indicators for overdue inspections (red border, "ÜBERFÄLLIG" badge)
+  - Visual indicators for overdue inspections (red border, "OVERDUE" badge)
   - Display inspection type, interval days, last/next inspection dates
   - Support for both device-specific and product-wide inspections
   - Active/inactive inspection status
@@ -2863,7 +2863,7 @@ For issues or questions:
   - New TypeScript interfaces: Defect, Inspection, MaintenanceStats
   - Added maintenanceApi with getStats(), getDefects(), createDefect(), updateDefect(), getInspections()
 - **Navigation:**
-  - New "Wartung" (Maintenance) menu item with Wrench icon
+  - New "Maintenance" menu item with Wrench icon
   - Route: /maintenance
 - **Database Integration:**
   - Uses existing tables: defect_reports, inspection_schedules
@@ -2871,14 +2871,14 @@ For issues or questions:
   - Full audit trail with timestamps
 - **User Workflow:**
   - Defect Reporting:
-    1. Navigate to Wartung → Defects tab
-    2. Click "Neuer Defekt" to create report
+    1. Navigate to Maintenance → Defects tab
+    2. Click "New Defect" to create report
     3. Enter device ID, select severity, add title and description
     4. Submit → Device automatically marked as defective
     5. Track repair progress with status updates
     6. Mark as repaired → Device automatically returns to in_storage
   - Inspection Management:
-    1. Navigate to Wartung → Inspections tab
+    1. Navigate to Maintenance → Inspections tab
     2. View all scheduled inspections
     3. Filter by overdue or upcoming
     4. See visual indicators for priority
@@ -2942,9 +2942,9 @@ For issues or questions:
 ### Version 1.13 (2025-10-14)
 - **Feature: Recursive Device Count for Parent Zones**
   - Zone device counts now include all devices in subzones recursively
-  - When viewing a parent zone (e.g., Lager or Regal), device count shows total across all child zones
+  - When viewing a parent zone (e.g., a warehouse or rack zone), device count shows total across all child zones
   - Implemented using PostgreSQL recursive CTE (Common Table Expression) for efficient querying
-  - Example: Lager Weidelbach shows total of all devices in all Regale and all Fächer within
+  - Example: Lager Weidelbach shows total of all devices in all racks and all bins within
 - **Backend Enhancements:**
   - New function `getDeviceCountRecursive` in ZoneService
   - Uses `WITH RECURSIVE` query to build complete zone tree
@@ -2959,10 +2959,10 @@ For issues or questions:
 
 ### Version 1.12 (2025-10-14)
 - **Feature: Two-Step Intake Workflow with Zone Selection**
-  - Implemented multi-step barcode scanning for device intake (Einlagerung)
+  - Implemented multi-step barcode scanning for device intake
   - Step 1: Scan device barcode/QR code to verify device exists
   - Step 2: Scan storage location (zone) barcode to specify exact placement
-  - Visual step indicator shows progress (Gerät → Lagerplatz)
+  - Visual step indicator shows progress (Device → Storage Location)
   - Automatic zone lookup by barcode or zone code
 - **Backend Enhancements:**
   - New endpoint: `GET /api/v1/zones/scan?scan_code={code}` - Find zone by barcode/code
@@ -3009,21 +3009,21 @@ For issues or questions:
   - Fixed duplicate entry errors when creating multiple shelves at once
   - Changed from parallel (Promise.all) to sequential creation
   - Prevents multiple shelves from reading the same count and generating duplicate codes
-  - Example: Creating 5 shelves now correctly generates Fach 01-05 instead of all trying to create Fach 01
+  - Example: Creating 5 shelves now correctly generates Bin 01-05 instead of all trying to create Bin 01
 - **Improved Error Handling:**
   - Eliminated 500 Internal Server errors during bulk operations
   - Consistent shelf numbering without gaps
 
 ### Version 1.8 (2025-10-14)
-- **Automatic Shelf (Fach) Creation:**
-  - Added 📚 **Fach** (shelf) as a 4th zone type for Regalen
-  - Automatic name generation (Fach 01, Fach 02, etc.) based on existing shelves in parent rack
+- **Automatic Bin (Fach) Creation:**
+  - Added 📚 **Bin** (Fach) as a 4th zone type for racks
+  - Automatic name generation (Bin 01, Bin 02, etc.) based on existing bins in parent rack
   - Automatic barcode generation (FACH-%08d format) after creation
-  - No manual name input required for shelf creation
-- **Bulk Shelf Creation:**
-  - "Fächer erstellen" button in rack detail view
-  - Create multiple shelves at once with a single action
-  - Default capacity of 10 per shelf
+  - No manual name input required for bin creation
+- **Bulk Bin Creation:**
+  - "Create Bins" button in rack detail view
+  - Create multiple bins at once with a single action
+  - Default capacity of 10 per bin
 - **Navigation Improvements:**
   - Fixed subzone creation to stay in parent zone context instead of redirecting to /zones
   - Maintains workflow continuity when creating hierarchical structures
@@ -3031,31 +3031,31 @@ For issues or questions:
   - Added barcode column to storage_zones table (006_add_zone_barcode.sql)
   - Index on barcode for efficient lookups
 - **Backend Enhancements:**
-  - GenerateShelfName function in ZoneService for automatic naming
-  - Updated CreateZone handler to support optional Name field for shelves
+  - `GenerateShelfName` function in ZoneService for automatic bin naming
+  - Updated CreateZone handler to support optional Name field for bins
   - Barcode generation logic after zone insertion
 - **Example Usage:**
-  - Create Lager Weidelbach (WDB)
-  - Create Regal A (WDB-RG-01)
-  - Click "Fächer erstellen" → Enter "5" → Creates Fach 01 through Fach 05 automatically
-  - Each Fach gets codes like WDB-RG-01-F-01 and barcodes like FACH-00000014
+  - Create storage zone Weidelbach (WDB)
+  - Create Rack A (WDB-RG-01)
+  - Click "Create Bins" → Enter "5" → Creates Bin 01 through Bin 05 automatically
+  - Each bin gets codes like WDB-RG-01-F-01 and barcodes like FACH-00000014
 
 ### Version 1.7 (2025-10-14)
 - **Simplified Zone Types:** Reduced to 3 types only
-  - 🏭 **Lager** (warehouse) - Main storage facility
-  - 🗄️ **Regal** (rack) - Shelving units
-  - 📦 **Gitterbox** (gitterbox) - Wire mesh containers
+  - 🏭 **Warehouse** (Lager) - Main storage facility
+  - 🗄️ **Rack** (Regal) - Shelving units
+  - 📦 **Wire Mesh Box** (Gitterbox) - Wire mesh containers
 - **Delete Functionality:**
   - Delete button on zone cards (hover to reveal)
   - Delete button in zone detail view
   - Safety checks: prevents deletion if zone contains devices or subzones
   - Confirmation dialog before deletion
 - **Updated Code Generation:**
-  - Warehouse prefix: LGR (Lager)
-  - Rack prefix: RG (Regal)
-  - Gitterbox prefix: GB (Gitterbox)
+  - Warehouse prefix: LGR
+  - Rack prefix: RG
+  - Gitterbox prefix: GB
 - **Example Hierarchy:**
-  - Weidelbach (WDL) → Regal A (WDL-RG-01) → Gitterbox 01 (WDL-RG-01-GB-01)
+  - Weidelbach (WDL) → Rack A (WDL-RG-01) → Gitterbox 01 (WDL-RG-01-GB-01)
 - **Database Migration:** Updated ENUM type to support gitterbox
 
 ### Version 1.6 (2025-10-14)
