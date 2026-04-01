@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Wrench, AlertTriangle } from 'lucide-react';
+import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Wrench, AlertTriangle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { scansApi, zonesApi, jobsApi, ledApi, maintenanceApi } from '../lib/api';
-import type { ScanResponse } from '../lib/api';
+import type { Device, ScanResponse } from '../lib/api';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
+import { DeviceDetailModal } from '../components/DeviceDetailModal';
 
 type ScanStep = 'device' | 'zone';
 
@@ -25,6 +26,9 @@ export function ScanPage() {
   const [showLEDModal, setShowLEDModal] = useState(false);
   const [scannedJobId, setScannedJobId] = useState<number | null>(null);
 
+  // Device detail modal state
+  const [viewDevice, setViewDevice] = useState<Device | null>(null);
+
   // Service modal states
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [serviceForm, setServiceForm] = useState({
@@ -37,8 +41,8 @@ export function ScanPage() {
   const [serviceSuccess, setServiceSuccess] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
 
-  // Block body scroll when LED modal or service modal is open
-  useBlockBodyScroll(showLEDModal || showServiceModal);
+  // Block body scroll when LED modal, service modal, or device detail modal is open
+  useBlockBodyScroll(showLEDModal || showServiceModal || viewDevice !== null);
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -405,6 +409,14 @@ export function ScanPage() {
                   <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2">
                     <button
                       type="button"
+                      onClick={() => setViewDevice(result.device!)}
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 transition-all"
+                    >
+                      <Info className="w-4 h-4 flex-shrink-0" />
+                      {t('scan.serviceActions.moreInfo')}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openServiceModal(result.device!.device_id, 'medium')}
                       className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30 transition-all"
                     >
@@ -588,6 +600,13 @@ export function ScanPage() {
           </div>
         )}
       </div>
+
+      {/* Device Detail Modal */}
+      <DeviceDetailModal
+        device={viewDevice}
+        isOpen={viewDevice !== null}
+        onClose={() => setViewDevice(null)}
+      />
     </div>
   );
 }

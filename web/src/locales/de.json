@@ -1036,6 +1036,7 @@
       "confirm": "Ja, LED aktivieren"
     },
     "serviceActions": {
+      "moreInfo": "Mehr Info",
       "reportIssue": "Problem melden",
       "markProblematic": "Als problematisch markieren"
     },

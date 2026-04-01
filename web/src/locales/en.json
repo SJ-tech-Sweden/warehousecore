@@ -1036,6 +1036,7 @@
       "confirm": "Yes, enable LED"
     },
     "serviceActions": {
+      "moreInfo": "More Info",
       "reportIssue": "Report Issue",
       "markProblematic": "Mark Problematic"
     },
