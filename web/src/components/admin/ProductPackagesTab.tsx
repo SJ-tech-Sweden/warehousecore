@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface ProductPackage {
   package_id: number;
@@ -766,10 +767,10 @@ export function ProductPackagesTab() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   {t('products.category')}
                 </label>
-                <select
-                  value={formData.category_id}
-                  onChange={(e) => {
-                    const value = e.target.value ? Number(e.target.value) : '';
+                <SearchableSelect
+                  value={formData.category_id ? String(formData.category_id) : ''}
+                  onChange={(v) => {
+                    const value = v ? Number(v) : '';
                     setFormData({
                       ...formData,
                       category_id: value,
@@ -777,69 +778,67 @@ export function ProductPackagesTab() {
                       subbiercategory_id: '',
                     });
                   }}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                  options={[
+                    { value: '', label: t('admin.productPackages.noCategory') },
+                    ...categories.map((cat) => ({
+                      value: String(cat.category_id),
+                      label: cat.name,
+                    })),
+                  ]}
+                  className="w-full"
                   title={t('products.category')}
-                >
-                  <option value="">{t('admin.productPackages.noCategory')}</option>
-                  {categories.map((cat) => (
-                    <option key={cat.category_id} value={cat.category_id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   {t('admin.productPackages.subcategory')}
                 </label>
-                <select
-                  value={formData.subcategory_id}
-                  onChange={(e) => {
-                    const value = e.target.value;
+                <SearchableSelect
+                  value={formData.subcategory_id ? String(formData.subcategory_id) : ''}
+                  onChange={(v) => {
                     setFormData({
                       ...formData,
-                      subcategory_id: value,
+                      subcategory_id: v,
                       subbiercategory_id: '',
                     });
                   }}
+                  options={[
+                    { value: '', label: t('admin.productPackages.noSubcategory') },
+                    ...filteredSubcategories.map((sub) => ({
+                      value: String(sub.subcategory_id),
+                      label: sub.name,
+                    })),
+                  ]}
                   disabled={!formData.category_id}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full"
                   title={t('admin.productPackages.subcategory')}
-                >
-                  <option value="">{t('admin.productPackages.noSubcategory')}</option>
-                  {filteredSubcategories.map((sub) => (
-                    <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                      {sub.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   {t('admin.productPackages.subSubcategory')}
                 </label>
-                <select
-                  value={formData.subbiercategory_id}
-                  onChange={(e) => {
-                    const value = e.target.value;
+                <SearchableSelect
+                  value={formData.subbiercategory_id ? String(formData.subbiercategory_id) : ''}
+                  onChange={(v) => {
                     setFormData({
                       ...formData,
-                      subbiercategory_id: value,
+                      subbiercategory_id: v,
                     });
                   }}
+                  options={[
+                    { value: '', label: t('admin.productPackages.noSubSubcategory') },
+                    ...filteredSubbiercategories.map((subbier) => ({
+                      value: String(subbier.subbiercategory_id),
+                      label: subbier.name,
+                    })),
+                  ]}
                   disabled={!formData.subcategory_id}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full"
                   title={t('admin.productPackages.subSubcategory')}
-                >
-                  <option value="">{t('admin.productPackages.noSubSubcategory')}</option>
-                  {filteredSubbiercategories.map((subbier) => (
-                    <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
-                      {subbier.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <div className="border-t border-gray-700 pt-4">
@@ -907,19 +906,21 @@ export function ProductPackagesTab() {
 
                 {/* Add Item Section */}
                 <div className="flex gap-2 mb-4">
-                  <select
-                    value={selectedProduct}
-                    onChange={(e) => setSelectedProduct(Number(e.target.value))}
-                    className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-accent-red"
+                  <SearchableSelect
+                    value={selectedProduct ? String(selectedProduct) : ''}
+                    onChange={(v) => setSelectedProduct(v ? Number(v) : 0)}
+                    options={[
+                      { value: '', label: t('admin.devices.selectProduct') },
+                      ...products.map((product) => ({
+                        value: String(product.product_id),
+                        label: product.category_name
+                          ? `${product.name} (${product.category_name})`
+                          : product.name,
+                      })),
+                    ]}
+                    className="flex-1"
                     title={t('products.title')}
-                  >
-                    <option value="">{t('admin.devices.selectProduct')}</option>
-                    {products.map((product) => (
-                      <option key={product.product_id} value={product.product_id}>
-                        {product.name} {product.category_name ? `(${product.category_name})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  />
                   <input
                     type="number"
                     min="1"

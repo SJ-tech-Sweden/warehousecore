@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { cablesAdminApi } from '../../lib/api';
 import type { Cable as CableType, CableConnector, CableType as CableTypeData, CableCreateInput, CableUpdateInput } from '../../lib/api';
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface CableFormData {
   name: string;
@@ -411,49 +412,49 @@ export function CablesTab() {
           </div>
 
           {/* Connector 1 Filter */}
-          <select
-            value={connector1Filter}
-            onChange={(e) => setConnector1Filter(e.target.value ? Number(e.target.value) : '')}
-            className="input-field"
+          <SearchableSelect
+            value={connector1Filter === '' ? '' : String(connector1Filter)}
+            onChange={(v) => setConnector1Filter(v ? Number(v) : '')}
+            options={[
+              { value: '', label: t('admin.cables.filters.allConnector1') },
+              ...connectors.map((connector) => ({
+                value: String(connector.connector_id),
+                label: formatConnectorLabel(connector),
+              })),
+            ]}
+            className="input-field p-0 border-0"
             title={t('admin.cables.connector1')}
-          >
-            <option value="">{t('admin.cables.filters.allConnector1')}</option>
-            {connectors.map((connector) => (
-              <option key={connector.connector_id} value={connector.connector_id}>
-                {formatConnectorLabel(connector)}
-              </option>
-            ))}
-          </select>
+          />
 
           {/* Connector 2 Filter */}
-          <select
-            value={connector2Filter}
-            onChange={(e) => setConnector2Filter(e.target.value ? Number(e.target.value) : '')}
-            className="input-field"
+          <SearchableSelect
+            value={connector2Filter === '' ? '' : String(connector2Filter)}
+            onChange={(v) => setConnector2Filter(v ? Number(v) : '')}
+            options={[
+              { value: '', label: t('admin.cables.filters.allConnector2') },
+              ...connector2FilterOptions.map((connector) => ({
+                value: String(connector.connector_id),
+                label: formatConnectorLabel(connector),
+              })),
+            ]}
+            className="input-field p-0 border-0"
             title={t('admin.cables.connector2')}
-          >
-            <option value="">{t('admin.cables.filters.allConnector2')}</option>
-            {connector2FilterOptions.map((connector) => (
-              <option key={connector.connector_id} value={connector.connector_id}>
-                {formatConnectorLabel(connector)}
-              </option>
-            ))}
-          </select>
+          />
 
           {/* Type Filter */}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value ? Number(e.target.value) : '')}
-            className="input-field"
+          <SearchableSelect
+            value={typeFilter === '' ? '' : String(typeFilter)}
+            onChange={(v) => setTypeFilter(v ? Number(v) : '')}
+            options={[
+              { value: '', label: t('admin.cables.filters.allTypes') },
+              ...cableTypes.map((type) => ({
+                value: String(type.cable_type_id),
+                label: type.name,
+              })),
+            ]}
+            className="input-field p-0 border-0"
             title={t('admin.cables.type')}
-          >
-            <option value="">{t('admin.cables.filters.allTypes')}</option>
-            {cableTypes.map((type) => (
-              <option key={type.cable_type_id} value={type.cable_type_id}>
-                {type.name}
-              </option>
-            ))}
-          </select>
+          />
 
           {/* Length Min */}
           <input

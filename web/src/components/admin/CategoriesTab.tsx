@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../lib/api';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface Category {
   category_id: number;
@@ -231,17 +232,16 @@ export function CategoriesTab() {
 
           <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
             <div className="text-sm font-semibold text-white">{t('admin.categories.filterByCategory')}</div>
-            <select
-              value={subcategoryFilter}
-              onChange={(e) => setSubcategoryFilter(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
-              className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+            <SearchableSelect
+              value={subcategoryFilter === '' ? '' : String(subcategoryFilter)}
+              onChange={(v) => setSubcategoryFilter(v === '' ? '' : parseInt(v, 10))}
+              options={[
+                { value: '', label: t('admin.categories.allCategories') },
+                ...categories.map(cat => ({ value: String(cat.category_id), label: cat.name })),
+              ]}
+              className="w-full sm:w-64"
               title={t('admin.categories.filterByCategory')}
-            >
-              <option value="">{t('admin.categories.allCategories')}</option>
-              {categories.map(cat => (
-                <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
-              ))}
-            </select>
+            />
           </div>
 
           {editing && (
@@ -263,17 +263,16 @@ export function CategoriesTab() {
                 className="w-full px-3 py-2 rounded-lg glass text-white"
                 title={t('admin.categories.abbreviation')}
               />
-              <select
-                value={formData.category_id || ''}
-                onChange={(e) => setFormData({ ...formData, category_id: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 rounded-lg glass text-white"
+              <SearchableSelect
+                value={String(formData.category_id || '')}
+                onChange={(v) => setFormData({ ...formData, category_id: v ? parseInt(v) : undefined })}
+                options={[
+                  { value: '', label: t('admin.categories.chooseCategory') },
+                  ...categories.map(cat => ({ value: String(cat.category_id), label: cat.name })),
+                ]}
+                className="w-full"
                 title={t('products.category')}
-              >
-                <option value="">{t('admin.categories.chooseCategory')}</option>
-                {categories.map(cat => (
-                  <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
-                ))}
-              </select>
+              />
               <div className="flex gap-2">
                 <button onClick={handleSaveSubcategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" />
@@ -323,22 +322,22 @@ export function CategoriesTab() {
 
           <div className="glass rounded-xl p-3 sm:p-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border border-white/10">
             <div className="text-sm font-semibold text-white">{t('admin.categories.filterBySubcategory')}</div>
-            <select
-              value={subbiercategoryFilter}
-              onChange={(e) => setSubbiercategoryFilter(e.target.value === '' ? '' : e.target.value)}
-              className="w-full sm:w-64 px-3 py-2 rounded-lg glass text-white"
+            <SearchableSelect
+              value={subbiercategoryFilter === '' ? '' : String(subbiercategoryFilter)}
+              onChange={(v) => setSubbiercategoryFilter(v === '' ? '' : v)}
+              options={[
+                { value: '', label: t('admin.categories.allSubcategories') },
+                ...subcategories.map(subcat => {
+                  const parentCategory = categories.find(c => c.category_id === subcat.category_id);
+                  return {
+                    value: subcat.subcategory_id,
+                    label: parentCategory ? `${subcat.name} (${parentCategory.name})` : subcat.name,
+                  };
+                }),
+              ]}
+              className="w-full sm:w-64"
               title={t('admin.categories.filterBySubcategory')}
-            >
-              <option value="">{t('admin.categories.allSubcategories')}</option>
-              {subcategories.map(subcat => {
-                const parentCategory = categories.find(c => c.category_id === subcat.category_id);
-                return (
-                  <option key={subcat.subcategory_id} value={subcat.subcategory_id}>
-                    {subcat.name}{parentCategory ? ` (${parentCategory.name})` : ''}
-                  </option>
-                );
-              })}
-            </select>
+            />
           </div>
 
           {editing && (
@@ -360,17 +359,16 @@ export function CategoriesTab() {
                 className="w-full px-3 py-2 rounded-lg glass text-white"
                 title={t('admin.categories.abbreviation')}
               />
-              <select
+              <SearchableSelect
                 value={formData.subcategory_id || ''}
-                onChange={(e) => setFormData({ ...formData, subcategory_id: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg glass text-white"
+                onChange={(v) => setFormData({ ...formData, subcategory_id: v })}
+                options={[
+                  { value: '', label: t('admin.categories.chooseSubcategory') },
+                  ...subcategories.map(subcat => ({ value: subcat.subcategory_id, label: subcat.name })),
+                ]}
+                className="w-full"
                 title={t('admin.categories.levels.subcategories')}
-              >
-                <option value="">{t('admin.categories.chooseSubcategory')}</option>
-                {subcategories.map(subcat => (
-                  <option key={subcat.subcategory_id} value={subcat.subcategory_id}>{subcat.name}</option>
-                ))}
-              </select>
+              />
               <div className="flex gap-2">
                 <button onClick={handleSaveSubbiercategory} className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg flex items-center justify-center gap-2">
                   <Save className="w-4 h-4" />
