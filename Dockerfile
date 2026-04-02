@@ -21,7 +21,12 @@ FROM golang:1.25-alpine AS backend-builder
 # Install build dependencies (CGO still needed for webp image processing)
 RUN apk add --no-cache git gcc musl-dev
 
-WORKDIR /app
+# Ensure Go modules are enabled inside the build container and set GOPATH
+ENV GO111MODULE=on
+ENV GOPATH=/go
+
+# Build inside GOPATH so local module imports resolve
+WORKDIR /go/src/warehousecore
 
 # Copy go mod files
 COPY go.mod go.sum* ./
@@ -33,7 +38,8 @@ RUN go mod tidy || true
 COPY . .
 
 # Build the application with CGO enabled (needed for webp library)
-RUN CGO_ENABLED=1 GOOS=linux go build -a -o warehousecore ./cmd/server
+# Output binary to /app so final stage can copy from that path
+RUN CGO_ENABLED=1 GOOS=linux go build -a -o /app/warehousecore ./cmd/server
 
 # Stage 3: Final Image
 FROM alpine:latest
@@ -60,14 +66,14 @@ WORKDIR /root/
 COPY --from=backend-builder /app/warehousecore .
 
 # Copy migrations
-COPY --from=backend-builder /app/migrations ./migrations
+COPY --from=backend-builder /go/src/warehousecore/migrations ./migrations
 
 # Copy LED configuration files
-COPY --from=backend-builder /app/internal/led/config ./internal/led/config
-COPY --from=backend-builder /app/internal/led/schema ./internal/led/schema
+COPY --from=backend-builder /go/src/warehousecore/internal/led/config ./internal/led/config
+COPY --from=backend-builder /go/src/warehousecore/internal/led/schema ./internal/led/schema
 
 # Copy HTML template for label rendering
-COPY --from=backend-builder /app/internal/services/label_template.html ./internal/services/
+COPY --from=backend-builder /go/src/warehousecore/internal/services/label_template.html ./internal/services/
 
 # Copy frontend build from frontend builder
 COPY --from=frontend-builder /app/web/dist ./web/dist
