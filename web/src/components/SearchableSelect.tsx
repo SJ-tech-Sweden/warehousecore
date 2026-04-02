@@ -207,14 +207,25 @@ export function SearchableSelect({
           <span className="truncate">{selectedOption ? selectedOption.label : (placeholder ?? t('common.select'))}</span>
           <span className="ml-2 flex shrink-0 items-center gap-1">
             {value && !disabled && (
-              <button
-                type="button"
-                onClick={handleClear}
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={event => {
+                  event.stopPropagation();
+                  handleClear();
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleClear();
+                  }
+                }}
                 className="p-0 text-gray-400 hover:text-white"
                 aria-label={t('common.clear')}
               >
                 <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
+              </span>
             )}
             <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
           </span>
