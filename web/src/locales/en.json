@@ -113,7 +113,8 @@
       "defective": "Defective",
       "in_repair": "In Repair",
       "retired": "Retired"
-    }
+    },
+    "rfid": "RFID"
   },
   "products": {
     "title": "Products",
@@ -326,7 +327,8 @@
       "brands": "Brands & Manufacturers",
       "countTypes": "Units of Measure",
       "apiKeys": "API Keys",
-      "export": "CSV Export"
+      "export": "CSV Export",
+      "devices": "Devices"
     },
     "apiSettings": {
       "title": "API Limits",
@@ -671,7 +673,10 @@
         "defective": "Defective",
         "maintenance": "Maintenance",
         "retired": "Retired"
-      }
+      },
+      "retireDate": "Retire date",
+      "warrantyEndDate": "Warranty end date",
+      "deviceIdHint": "Change the device ID to use an existing label. Be careful – this also updates all references."
     },
     "cases": {
       "title": "Case Management",
@@ -1031,6 +1036,7 @@
       "confirm": "Yes, enable LED"
     },
     "serviceActions": {
+      "moreInfo": "More Info",
       "reportIssue": "Report Issue",
       "markProblematic": "Mark Problematic"
     },
@@ -1473,7 +1479,8 @@
     "productsTitle": "Product Catalog",
     "productsSubtitle": "Manage product definitions and rental metadata.",
     "cablesTitle": "Cable Catalog",
-    "cablesSubtitle": "Maintain cable types and assignments."
+    "cablesSubtitle": "Maintain cable types and assignments.",
+    "devicesTabLabel": "Devices"
   },
   "roleGuard": {
     "loading": "Loading permissions...",

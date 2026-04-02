@@ -19,6 +19,7 @@ export interface Device {
   barcode?: string;
   qr_code?: string;
   serial_number?: string;
+  rfid?: string;
   status: string;
   current_location?: string;
   zone_id?: number;
@@ -32,6 +33,8 @@ export interface Device {
   usage_hours?: number;
   label_path?: string;
   purchase_date?: string;
+  retire_date?: string;
+  warranty_end_date?: string;
   last_maintenance?: string;
   next_maintenance?: string;
   notes?: string;
@@ -45,6 +48,7 @@ export interface DeviceTreeDevice {
   barcode?: string;
   qr_code?: string;
   serial_number?: string;
+  rfid?: string;
   zone_id?: number;
   zone_name?: string;
   zone_code?: string;
@@ -56,6 +60,8 @@ export interface DeviceTreeDevice {
   usage_hours?: number;
   label_path?: string;
   purchase_date?: string;
+  retire_date?: string;
+  warranty_end_date?: string;
   last_maintenance?: string;
   next_maintenance?: string;
   notes?: string;
@@ -251,6 +257,7 @@ export interface DeviceCreateInput {
   product_id: number;
   status?: string;
   serial_number?: string;
+  rfid?: string;
   barcode?: string;
   qr_code?: string;
   current_location?: string;
@@ -258,6 +265,8 @@ export interface DeviceCreateInput {
   condition_rating?: number;
   usage_hours?: number;
   purchase_date?: string;
+  retire_date?: string;
+  warranty_end_date?: string;
   last_maintenance?: string;
   next_maintenance?: string;
   notes?: string;
@@ -271,9 +280,11 @@ export interface DeviceCreateInput {
 }
 
 export interface DeviceUpdateInput {
+  new_device_id?: string;
   product_id?: number;
   status?: string;
   serial_number?: string;
+  rfid?: string;
   barcode?: string;
   qr_code?: string;
   current_location?: string;
@@ -281,6 +292,8 @@ export interface DeviceUpdateInput {
   condition_rating?: number;
   usage_hours?: number;
   purchase_date?: string;
+  retire_date?: string;
+  warranty_end_date?: string;
   last_maintenance?: string;
   next_maintenance?: string;
   notes?: string;

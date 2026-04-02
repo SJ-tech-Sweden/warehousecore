@@ -340,7 +340,7 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 	}, movement, nil
 }
 
-// findDeviceByScan looks up a device by barcode or QR code
+// findDeviceByScan looks up a device by barcode, QR code, device ID, serial number, or RFID
 func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) {
 	var device models.Device
 	err := s.db.QueryRow(`
@@ -348,8 +348,9 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 		       current_location, zone_id, condition_rating, usage_hours
 		FROM devices
 		WHERE barcode = $1 OR qr_code = $2 OR deviceID = $3
+		   OR serialnumber = $4 OR rfid = $5
 		LIMIT 1
-	`, scanCode, scanCode, scanCode).Scan(
+	`, scanCode, scanCode, scanCode, scanCode, scanCode).Scan(
 		&device.DeviceID, &device.ProductID, &device.SerialNumber,
 		&device.Barcode, &device.QRCode, &device.Status,
 		&device.CurrentLocation, &device.ZoneID, &device.ConditionRating, &device.UsageHours,
@@ -372,12 +373,15 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 func (s *ScanService) getDeviceWithDetails(deviceID string) *models.DeviceWithDetails {
 	var device models.DeviceWithDetails
 	err := s.db.QueryRow(`
-		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
+		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id, d.condition_rating, d.usage_hours,
+		       d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       d.lastmaintenance, d.nextmaintenance, d.notes, d.label_path,
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(z.name, '') as zone_name,
+		       COALESCE(z.code, '') as zone_code,
 		       COALESCE(c.name, '') as case_name,
-		       COALESCE(CAST(j.jobID AS CHAR), '') as job_number
+		       COALESCE(CAST(j.jobID AS TEXT), '') as job_number
 		FROM devices d
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
@@ -389,9 +393,11 @@ func (s *ScanService) getDeviceWithDetails(deviceID string) *models.DeviceWithDe
 		LIMIT 1
 	`, deviceID).Scan(
 		&device.DeviceID, &device.ProductID, &device.SerialNumber,
-		&device.Barcode, &device.QRCode, &device.Status,
+		&device.RFID, &device.Barcode, &device.QRCode, &device.Status,
 		&device.CurrentLocation, &device.ZoneID, &device.ConditionRating, &device.UsageHours,
-		&device.ProductName, &device.ZoneName, &device.CaseName, &device.JobNumber,
+		&device.PurchaseDate, &device.RetireDate, &device.WarrantyEndDate,
+		&device.LastMaintenance, &device.NextMaintenance, &device.Notes, &device.LabelPath,
+		&device.ProductName, &device.ZoneName, &device.ZoneCode, &device.CaseName, &device.JobNumber,
 	)
 	if err != nil {
 		log.Printf("Error fetching device details: %v", err)

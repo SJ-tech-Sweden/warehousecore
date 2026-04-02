@@ -113,7 +113,8 @@
       "defective": "Defekt",
       "in_repair": "In Reparatur",
       "retired": "Ausgemustert"
-    }
+    },
+    "rfid": "RFID"
   },
   "products": {
     "title": "Produkte",
@@ -326,7 +327,8 @@
       "brands": "Marken & Hersteller",
       "countTypes": "Mess-Einheiten",
       "apiKeys": "API-Keys",
-      "export": "CSV-Export"
+      "export": "CSV-Export",
+      "devices": "Geräte"
     },
     "apiSettings": {
       "title": "API-Limits",
@@ -671,7 +673,10 @@
         "defective": "Defekt",
         "maintenance": "Wartung",
         "retired": "Ausgemustert"
-      }
+      },
+      "retireDate": "Außerdienststellungsdatum",
+      "warrantyEndDate": "Garantieende",
+      "deviceIdHint": "Geräte-ID ändern, um ein vorhandenes Etikett zu verwenden. Vorsicht – dies aktualisiert auch alle Verweise."
     },
     "cases": {
       "title": "Cases-Verwaltung",
@@ -1031,6 +1036,7 @@
       "confirm": "Ja, LED aktivieren"
     },
     "serviceActions": {
+      "moreInfo": "Mehr Info",
       "reportIssue": "Problem melden",
       "markProblematic": "Als problematisch markieren"
     },
@@ -1473,7 +1479,8 @@
     "productsTitle": "Produktkatalog",
     "productsSubtitle": "Produktstammdaten verwalten.",
     "cablesTitle": "Kabelverwaltung",
-    "cablesSubtitle": "Kabeltypen und Zuordnungen pflegen."
+    "cablesSubtitle": "Kabeltypen und Zuordnungen pflegen.",
+    "devicesTabLabel": "Geräte"
   },
   "roleGuard": {
     "loading": "Lade Berechtigungen...",

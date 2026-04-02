@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import { api, devicesAdminApi, labelsApi } from '../../lib/api';
 import type { Device, DeviceCreateInput, DeviceUpdateInput, LabelTemplate } from '../../lib/api';
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
+import { ModalPortal } from '../ModalPortal';
+import { DeviceInfoModal } from '../DeviceInfoModal';
 
 interface Product {
   product_id: number;
@@ -32,9 +34,11 @@ interface Zone {
 }
 
 interface DeviceFormData {
+  new_device_id: string;
   product_id?: number;
   status: string;
   serial_number: string;
+  rfid: string;
   barcode: string;
   qr_code: string;
   current_location: string;
@@ -42,6 +46,8 @@ interface DeviceFormData {
   condition_rating?: number;
   usage_hours?: number;
   purchase_date: string;
+  retire_date: string;
+  warranty_end_date: string;
   last_maintenance: string;
   next_maintenance: string;
   notes: string;
@@ -55,8 +61,10 @@ interface DeviceFormData {
 }
 
 const initialFormData: DeviceFormData = {
+  new_device_id: '',
   status: 'free',
   serial_number: '',
+  rfid: '',
   barcode: '',
   qr_code: '',
   current_location: '',
@@ -65,6 +73,8 @@ const initialFormData: DeviceFormData = {
   device_prefix: '',
   increment_serial: false,
   purchase_date: '',
+  retire_date: '',
+  warranty_end_date: '',
   last_maintenance: '',
   next_maintenance: '',
   auto_generate_label: true,
@@ -83,7 +93,13 @@ function useDebouncedValue<T>(value: T, delay: number) {
   return debounced;
 }
 
-export function DevicesTab() {
+interface DevicesTabProps {
+  initialProductFilter?: number;
+  initialEditDeviceId?: string;
+  onEditComplete?: () => void;
+}
+
+export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditComplete }: DevicesTabProps) {
   const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
@@ -98,12 +114,12 @@ export function DevicesTab() {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [productFilter, setProductFilter] = useState<number | ''>('');
+  const [productFilter, setProductFilter] = useState<number | ''>(initialProductFilter ?? '');
   const [zoneFilter, setZoneFilter] = useState<number | ''>('');
   const [refreshing, setRefreshing] = useState(false);
 
   // Block body scroll when any modal is open
-  useBlockBodyScroll(modalOpen || viewDevice !== null);
+  useBlockBodyScroll(modalOpen);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
@@ -139,6 +155,17 @@ export function DevicesTab() {
   useEffect(() => {
     fetchDevices();
     loadMetadata();
+    if (initialEditDeviceId) {
+      // open edit modal for device navigated from scan page
+      (async () => {
+        try {
+          const { data } = await devicesAdminApi.getById(initialEditDeviceId);
+          openEditModal(data);
+        } catch (err) {
+          console.error('Failed to open device for editing:', err);
+        }
+      })();
+    }
   }, [fetchDevices, loadMetadata]);
 
   const handleRefresh = useCallback(async () => {
@@ -161,6 +188,7 @@ export function DevicesTab() {
       device.product_name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.product_category?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.serial_number?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      device.rfid?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.barcode?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       device.notes?.toLowerCase().includes(debouncedSearch.toLowerCase());
 
@@ -186,9 +214,11 @@ export function DevicesTab() {
   const openEditModal = (device: Device) => {
     setEditingDevice(device.device_id);
     setFormData({
+      new_device_id: device.device_id,
       product_id: device.product_id,
       status: device.status || 'free',
       serial_number: device.serial_number || '',
+      rfid: device.rfid || '',
       barcode: device.barcode || '',
       qr_code: device.qr_code || '',
       current_location: device.current_location || '',
@@ -196,6 +226,8 @@ export function DevicesTab() {
       condition_rating: device.condition_rating,
       usage_hours: device.usage_hours,
       purchase_date: device.purchase_date || '',
+      retire_date: device.retire_date || '',
+      warranty_end_date: device.warranty_end_date || '',
       last_maintenance: device.last_maintenance || '',
       next_maintenance: device.next_maintenance || '',
       notes: device.notes || '',
@@ -235,6 +267,7 @@ export function DevicesTab() {
           product_id: formData.product_id,
           status: formData.status,
           serial_number: formData.serial_number || undefined,
+          rfid: formData.rfid || undefined,
           barcode: formData.barcode || undefined,
           qr_code: formData.qr_code || undefined,
           current_location: formData.current_location || undefined,
@@ -243,9 +276,16 @@ export function DevicesTab() {
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
           purchase_date: formData.purchase_date || undefined,
+          retire_date: formData.retire_date || undefined,
+          warranty_end_date: formData.warranty_end_date || undefined,
           last_maintenance: formData.last_maintenance || undefined,
           next_maintenance: formData.next_maintenance || undefined,
         };
+
+        // Include new device ID if changed
+        if (formData.new_device_id && formData.new_device_id !== editingDevice) {
+          updateData.new_device_id = formData.new_device_id;
+        }
 
         if (formData.regenerate_codes) {
           updateData.regenerate_codes = true;
@@ -264,6 +304,7 @@ export function DevicesTab() {
           product_id: formData.product_id!,
           status: formData.status,
           serial_number: formData.serial_number || undefined,
+          rfid: formData.rfid || undefined,
           barcode: formData.barcode || undefined,
           qr_code: formData.qr_code || undefined,
           current_location: formData.current_location || undefined,
@@ -272,6 +313,8 @@ export function DevicesTab() {
           usage_hours: formData.usage_hours,
           notes: formData.notes || undefined,
           purchase_date: formData.purchase_date || undefined,
+          retire_date: formData.retire_date || undefined,
+          warranty_end_date: formData.warranty_end_date || undefined,
           last_maintenance: formData.last_maintenance || undefined,
           next_maintenance: formData.next_maintenance || undefined,
           quantity: formData.quantity,
@@ -292,6 +335,14 @@ export function DevicesTab() {
 
       setModalOpen(false);
       setFormData({ ...initialFormData, label_template_id: undefined });
+
+      // If an onEditComplete callback is provided (navigated here from Scan), call it
+      // instead of fetching devices (component may unmount after navigation).
+      if (onEditComplete) {
+        onEditComplete();
+        return;
+      }
+
       await fetchDevices();
     } catch (error: unknown) {
       console.error('Failed to save device:', error);
@@ -317,13 +368,6 @@ export function DevicesTab() {
 
   const downloadBarcode = (deviceId: string) => {
     window.open(devicesAdminApi.downloadBarcode(deviceId), '_blank');
-  };
-
-  const openLabel = (labelPath?: string) => {
-    if (!labelPath) {
-      return;
-    }
-    window.open(labelPath, '_blank');
   };
 
   return (
@@ -639,6 +683,7 @@ export function DevicesTab() {
 
       {/* Create/Edit Modal */}
       {modalOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
           <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
@@ -680,6 +725,23 @@ export function DevicesTab() {
                   ))}
                 </select>
               </div>
+
+              {/* Device ID (only when editing – allows renaming) */}
+              {editingDevice && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('devices.deviceId')}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.new_device_id}
+                    onChange={(e) => setFormData({ ...formData, new_device_id: e.target.value })}
+                    className="input-field w-full"
+                    title={t('devices.deviceId')}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{t('admin.devices.deviceIdHint')}</p>
+                </div>
+              )}
 
               {/* Quantity (only for new devices) */}
               {!editingDevice && (
@@ -818,6 +880,20 @@ export function DevicesTab() {
                 </div>
               </div>
 
+              {/* RFID */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  {t('devices.rfid')}
+                </label>
+                <input
+                  type="text"
+                  value={formData.rfid}
+                  onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
+                  className="input-field w-full"
+                  title={t('devices.rfid')}
+                />
+              </div>
+
               {/* Location and Condition */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -866,6 +942,30 @@ export function DevicesTab() {
                     onChange={(e) => setFormData({ ...formData, purchase_date: e.target.value })}
                     className="input-field w-full"
                     title={t('admin.devices.purchaseDate')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('admin.devices.warrantyEndDate')}
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.warranty_end_date}
+                    onChange={(e) => setFormData({ ...formData, warranty_end_date: e.target.value })}
+                    className="input-field w-full"
+                    title={t('admin.devices.warrantyEndDate')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    {t('admin.devices.retireDate')}
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.retire_date}
+                    onChange={(e) => setFormData({ ...formData, retire_date: e.target.value })}
+                    className="input-field w-full"
+                    title={t('admin.devices.retireDate')}
                   />
                 </div>
                 <div>
@@ -1016,162 +1116,16 @@ export function DevicesTab() {
             </form>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       {/* View Device Modal */}
-      {viewDevice && (
-        <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
-          <div className="glass-dark rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-white">{t('modals.deviceDetail.title')}</h3>
-              <button
-                onClick={() => setViewDevice(null)}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                aria-label={t('common.close')}
-                title={t('common.close')}
-              >
-                <X className="w-6 h-6 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.deviceId')}</p>
-                  <p className="text-white font-semibold">{viewDevice.device_id}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('zoneDetail.columns.product')}</p>
-                  <p className="text-white font-semibold">{viewDevice.product_name || '-'}</p>
-                </div>
-                {viewDevice.product_category && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('admin.tabs.categories')}</p>
-                    <p className="text-white font-semibold">{viewDevice.product_category}</p>
-                  </div>
-                )}
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.status')}</p>
-                  <p className="text-white font-semibold">{statusLabel(viewDevice.status)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.serialNumber')}</p>
-                  <p className="text-white font-semibold">{viewDevice.serial_number || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.barcode')}</p>
-                  <p className="text-white font-semibold">{viewDevice.barcode || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('labels.qrCode')}</p>
-                  <p className="text-white font-semibold">{viewDevice.qr_code || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.zone')}</p>
-                  <p className="text-white font-semibold">
-                    {viewDevice.zone_code ? `${viewDevice.zone_code} - ${viewDevice.zone_name}` : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('admin.devices.location')}</p>
-                  <p className="text-white font-semibold">{viewDevice.current_location || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.condition')}</p>
-                  <p className="text-white font-semibold">
-                    {viewDevice.condition_rating ? `${viewDevice.condition_rating}/10` : '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">{t('devices.usageHours')}</p>
-                  <p className="text-white font-semibold">
-                    {viewDevice.usage_hours ? `${viewDevice.usage_hours}h` : '-'}
-                  </p>
-                </div>
-                {viewDevice.purchase_date && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('admin.devices.purchaseDate')}</p>
-                    <p className="text-white font-semibold">
-                      {viewDevice.purchase_date}
-                    </p>
-                  </div>
-                )}
-                {viewDevice.last_maintenance && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('admin.devices.lastMaintenance')}</p>
-                    <p className="text-white font-semibold">
-                      {viewDevice.last_maintenance}
-                    </p>
-                  </div>
-                )}
-                {viewDevice.next_maintenance && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('admin.devices.nextMaintenance')}</p>
-                    <p className="text-white font-semibold">
-                      {viewDevice.next_maintenance}
-                    </p>
-                  </div>
-                )}
-                {viewDevice.case_name && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('devices.case')}</p>
-                    <p className="text-white font-semibold">{viewDevice.case_name}</p>
-                  </div>
-                )}
-                {viewDevice.job_number && (
-                  <div>
-                    <p className="text-sm text-gray-400">{t('devices.job')}</p>
-                    <p className="text-white font-semibold">{viewDevice.job_number}</p>
-                  </div>
-                )}
-              </div>
-
-              {viewDevice.notes && (
-                <div className="border border-white/10 rounded-xl p-4 text-sm text-gray-300 bg-white/5">
-                  <p className="font-semibold text-white mb-1">{t('modals.productDependencies.notes')}</p>
-                  <p className="whitespace-pre-line">{viewDevice.notes}</p>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-3 pt-4">
-                <button
-                  onClick={() => downloadQR(viewDevice.device_id)}
-                  className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
-                >
-                  <QrCode className="w-5 h-5" />
-                  {t('labels.qrCode')}
-                </button>
-                <button
-                  onClick={() => downloadBarcode(viewDevice.device_id)}
-                  className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Download className="w-5 h-5" />
-                  {t('devices.barcode')}
-                </button>
-                {viewDevice.label_path && (
-                  <button
-                    onClick={() => openLabel(viewDevice.label_path)}
-                    className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-semibold text-gray-300 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Download className="w-5 h-5" />
-                    {t('nav.labels')}
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setViewDevice(null);
-                    openEditModal(viewDevice);
-                  }}
-                  className="flex-1 btn-primary flex items-center justify-center gap-2"
-                >
-                  <Pencil className="w-5 h-5" />
-                  {t('common.edit')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeviceInfoModal
+        device={viewDevice}
+        isOpen={viewDevice !== null}
+        onClose={() => setViewDevice(null)}
+        onEdit={(device) => openEditModal(device)}
+      />
     </div>
   );
 }
