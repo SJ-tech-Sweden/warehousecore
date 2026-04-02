@@ -606,6 +606,10 @@ export function ScanPage() {
         device={viewDevice}
         isOpen={viewDevice !== null}
         onClose={() => setViewDevice(null)}
+        onEdit={(device) => {
+          setViewDevice(null);
+          navigate('/products', { state: { openEditDeviceId: device.device_id } });
+        }}
       />
     </div>
   );

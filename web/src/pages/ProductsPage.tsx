@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, Box, Building2, Cpu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductsTab } from '../components/admin/ProductsTab';
@@ -12,6 +13,19 @@ export function ProductsPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('products');
   const [devicesProductFilter, setDevicesProductFilter] = useState<number | undefined>(undefined);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const state = (location.state || {}) as any;
+  const initialEditDeviceId = state?.openEditDeviceId as string | undefined;
+
+  useEffect(() => {
+    if (initialEditDeviceId) {
+      setDevicesProductFilter(undefined);
+      setActiveTab('devices');
+    }
+    // only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tabs = [
     { id: 'products' as TabType, label: t('products.title'), icon: Package },
@@ -70,7 +84,14 @@ export function ProductsPage() {
         {activeTab === 'products' && <ProductsTab onOpenDevicesTab={handleOpenDevicesTab} />}
         {activeTab === 'packages' && <ProductPackagesTab />}
         {activeTab === 'rented' && <RentedProductsTab />}
-        {activeTab === 'devices' && <DevicesTab initialProductFilter={devicesProductFilter} key={devicesProductFilter} />}
+        {activeTab === 'devices' && (
+          <DevicesTab
+            initialProductFilter={devicesProductFilter}
+            key={devicesProductFilter}
+            initialEditDeviceId={initialEditDeviceId}
+            onEditComplete={() => navigate('/scan')}
+          />
+        )}
       </div>
     </div>
   );

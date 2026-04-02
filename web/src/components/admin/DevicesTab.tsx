@@ -95,9 +95,11 @@ function useDebouncedValue<T>(value: T, delay: number) {
 
 interface DevicesTabProps {
   initialProductFilter?: number;
+  initialEditDeviceId?: string;
+  onEditComplete?: () => void;
 }
 
-export function DevicesTab({ initialProductFilter }: DevicesTabProps) {
+export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditComplete }: DevicesTabProps) {
   const { t } = useTranslation();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
@@ -153,6 +155,17 @@ export function DevicesTab({ initialProductFilter }: DevicesTabProps) {
   useEffect(() => {
     fetchDevices();
     loadMetadata();
+    if (initialEditDeviceId) {
+      // open edit modal for device navigated from scan page
+      (async () => {
+        try {
+          const { data } = await devicesAdminApi.getById(initialEditDeviceId);
+          openEditModal(data);
+        } catch (err) {
+          console.error('Failed to open device for editing:', err);
+        }
+      })();
+    }
   }, [fetchDevices, loadMetadata]);
 
   const handleRefresh = useCallback(async () => {
@@ -322,6 +335,14 @@ export function DevicesTab({ initialProductFilter }: DevicesTabProps) {
 
       setModalOpen(false);
       setFormData({ ...initialFormData, label_template_id: undefined });
+
+      // If an onEditComplete callback is provided (navigated here from Scan), call it
+      // instead of fetching devices (component may unmount after navigation).
+      if (onEditComplete) {
+        onEditComplete();
+        return;
+      }
+
       await fetchDevices();
     } catch (error: unknown) {
       console.error('Failed to save device:', error);
