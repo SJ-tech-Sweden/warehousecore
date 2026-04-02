@@ -1,21 +1,50 @@
-import { useState } from 'react';
-import { Package, Box, Building2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Package, Box, Building2, Cpu } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ProductsTab } from '../components/admin/ProductsTab';
 import { ProductPackagesTab } from '../components/admin/ProductPackagesTab';
 import { RentedProductsTab } from '../components/admin/RentedProductsTab';
+import { DevicesTab } from '../components/admin/DevicesTab';
 
-type TabType = 'products' | 'packages' | 'rented';
+type TabType = 'products' | 'packages' | 'rented' | 'devices';
 
 export function ProductsPage() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabType>('products');
+  const [devicesProductFilter, setDevicesProductFilter] = useState<number | undefined>(undefined);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const state = (location.state || {}) as any;
+  const initialEditDeviceId = state?.openEditDeviceId as string | undefined;
+
+  useEffect(() => {
+    if (initialEditDeviceId) {
+      setDevicesProductFilter(undefined);
+      setActiveTab('devices');
+    }
+    // only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tabs = [
     { id: 'products' as TabType, label: t('products.title'), icon: Package },
     { id: 'packages' as TabType, label: t('admin.productPackages.title'), icon: Box },
     { id: 'rented' as TabType, label: t('admin.rentedProducts.items'), icon: Building2 },
+    { id: 'devices' as TabType, label: t('productManagement.devicesTabLabel'), icon: Cpu },
   ];
+
+  const handleOpenDevicesTab = (productId: number) => {
+    setDevicesProductFilter(productId);
+    setActiveTab('devices');
+  };
+
+  const handleTabChange = (tab: TabType) => {
+    if (tab !== 'devices') {
+      setDevicesProductFilter(undefined);
+    }
+    setActiveTab(tab);
+  };
 
   return (
     <div className="space-y-6">
@@ -35,7 +64,7 @@ export function ProductsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap flex-shrink-0 ${activeTab === tab.id
                     ? 'bg-accent-red text-white shadow-lg'
                     : 'text-gray-400 hover:bg-white/5 hover:text-white'
@@ -52,9 +81,17 @@ export function ProductsPage() {
 
       {/* Tab Content */}
       <div className="glass-dark rounded-2xl p-6">
-        {activeTab === 'products' && <ProductsTab />}
+        {activeTab === 'products' && <ProductsTab onOpenDevicesTab={handleOpenDevicesTab} />}
         {activeTab === 'packages' && <ProductPackagesTab />}
         {activeTab === 'rented' && <RentedProductsTab />}
+        {activeTab === 'devices' && (
+          <DevicesTab
+            initialProductFilter={devicesProductFilter}
+            key={devicesProductFilter}
+            initialEditDeviceId={initialEditDeviceId}
+            onEditComplete={() => navigate('/scan')}
+          />
+        )}
       </div>
     </div>
   );

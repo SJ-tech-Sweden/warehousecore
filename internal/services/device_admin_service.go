@@ -80,20 +80,24 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO devices (
-				productID, serialnumber, status, current_location, zone_id,
-				condition_rating, usage_hours, purchaseDate, lastmaintenance, nextmaintenance,
+				productID, serialnumber, rfid, status, current_location, zone_id,
+				condition_rating, usage_hours, purchaseDate, retire_date, warranty_end_date,
+				lastmaintenance, nextmaintenance,
 				notes, barcode, qr_code
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		`,
 			input.ProductID,
 			nullableString(serialValue),
+			nullableString(trimPtr(input.RFID)),
 			status,
 			nullableString(trimPtr(input.CurrentLocation)),
 			nullableInt(input.ZoneID),
 			nullableFloat(input.ConditionRating),
 			nullableFloat(input.UsageHours),
 			parseDatePtr(input.PurchaseDate),
+			parseDatePtr(input.RetireDate),
+			parseDatePtr(input.WarrantyEndDate),
 			parseDatePtr(input.LastMaintenance),
 			parseDatePtr(input.NextMaintenance),
 			nullableText(input.Notes),
@@ -108,7 +112,7 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		err = tx.QueryRowContext(ctx, `
 			SELECT deviceID
 			FROM devices
-			WHERE productID = ?
+			WHERE productID = $1
 			ORDER BY deviceID DESC
 			LIMIT 1
 		`, input.ProductID).Scan(&deviceID)
@@ -169,124 +173,150 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 		_ = tx.Rollback()
 	}()
 
-	setClauses := make([]string, 0, 12)
-	args := make([]interface{}, 0, 12)
+	setClauses := make([]string, 0, 16)
+	args := make([]interface{}, 0, 16)
+
+	addArg := func(clause string, value interface{}) {
+		args = append(args, value)
+		setClauses = append(setClauses, fmt.Sprintf(clause, len(args)))
+	}
 
 	if input.ProductID.Set {
-		setClauses = append(setClauses, "productID = ?")
 		if input.ProductID.Valid {
-			args = append(args, input.ProductID.Value)
+			addArg("productID = $%d", input.ProductID.Value)
 		} else {
-			args = append(args, nil)
+			addArg("productID = $%d", nil)
 		}
 	}
 
 	if input.Status.Set {
-		setClauses = append(setClauses, "status = ?")
 		if input.Status.Valid {
-			args = append(args, strings.TrimSpace(input.Status.Value))
+			addArg("status = $%d", strings.TrimSpace(input.Status.Value))
 		} else {
-			args = append(args, nil)
+			addArg("status = $%d", nil)
 		}
 	}
 
 	if input.SerialNumber.Set {
-		setClauses = append(setClauses, "serialnumber = ?")
 		if input.SerialNumber.Valid {
-			args = append(args, nullableStringPtr(&input.SerialNumber.Value))
+			addArg("serialnumber = $%d", nullableStringPtr(&input.SerialNumber.Value))
 		} else {
-			args = append(args, nil)
+			addArg("serialnumber = $%d", nil)
+		}
+	}
+
+	if input.RFID.Set {
+		if input.RFID.Valid {
+			addArg("rfid = $%d", nullableStringPtr(&input.RFID.Value))
+		} else {
+			addArg("rfid = $%d", nil)
 		}
 	}
 
 	if input.Barcode.Set {
-		setClauses = append(setClauses, "barcode = ?")
 		if input.Barcode.Valid {
-			args = append(args, nullableStringPtr(&input.Barcode.Value))
+			addArg("barcode = $%d", nullableStringPtr(&input.Barcode.Value))
 		} else {
-			args = append(args, nil)
+			addArg("barcode = $%d", nil)
 		}
 	}
 
 	if input.QRCode.Set {
-		setClauses = append(setClauses, "qr_code = ?")
 		if input.QRCode.Valid {
-			args = append(args, nullableStringPtr(&input.QRCode.Value))
+			addArg("qr_code = $%d", nullableStringPtr(&input.QRCode.Value))
 		} else {
-			args = append(args, nil)
+			addArg("qr_code = $%d", nil)
 		}
 	}
 
 	if input.CurrentLocation.Set {
-		setClauses = append(setClauses, "current_location = ?")
 		if input.CurrentLocation.Valid {
-			args = append(args, nullableStringPtr(&input.CurrentLocation.Value))
+			addArg("current_location = $%d", nullableStringPtr(&input.CurrentLocation.Value))
 		} else {
-			args = append(args, nil)
+			addArg("current_location = $%d", nil)
 		}
 	}
 
 	if input.ZoneID.Set {
-		setClauses = append(setClauses, "zone_id = ?")
 		if input.ZoneID.Valid {
 			id := input.ZoneID.Value
-			args = append(args, &id)
+			addArg("zone_id = $%d", &id)
 		} else {
-			args = append(args, nil)
+			addArg("zone_id = $%d", nil)
 		}
 	}
 
 	if input.ConditionRating.Set {
-		setClauses = append(setClauses, "condition_rating = ?")
 		if input.ConditionRating.Valid {
-			args = append(args, input.ConditionRating.Value)
+			addArg("condition_rating = $%d", input.ConditionRating.Value)
 		} else {
-			args = append(args, nil)
+			addArg("condition_rating = $%d", nil)
 		}
 	}
 
 	if input.UsageHours.Set {
-		setClauses = append(setClauses, "usage_hours = ?")
 		if input.UsageHours.Valid {
-			args = append(args, input.UsageHours.Value)
+			addArg("usage_hours = $%d", input.UsageHours.Value)
 		} else {
-			args = append(args, nil)
+			addArg("usage_hours = $%d", nil)
 		}
 	}
 
 	if input.PurchaseDate.Set {
-		setClauses = append(setClauses, "purchaseDate = ?")
 		if input.PurchaseDate.Valid {
-			args = append(args, parseDateValue(input.PurchaseDate.Value))
+			addArg("purchaseDate = $%d", parseDateValue(input.PurchaseDate.Value))
 		} else {
-			args = append(args, nil)
+			addArg("purchaseDate = $%d", nil)
+		}
+	}
+
+	if input.RetireDate.Set {
+		if input.RetireDate.Valid {
+			addArg("retire_date = $%d", parseDateValue(input.RetireDate.Value))
+		} else {
+			addArg("retire_date = $%d", nil)
+		}
+	}
+
+	if input.WarrantyEndDate.Set {
+		if input.WarrantyEndDate.Valid {
+			addArg("warranty_end_date = $%d", parseDateValue(input.WarrantyEndDate.Value))
+		} else {
+			addArg("warranty_end_date = $%d", nil)
 		}
 	}
 
 	if input.LastMaintenance.Set {
-		setClauses = append(setClauses, "lastmaintenance = ?")
 		if input.LastMaintenance.Valid {
-			args = append(args, parseDateValue(input.LastMaintenance.Value))
+			addArg("lastmaintenance = $%d", parseDateValue(input.LastMaintenance.Value))
 		} else {
-			args = append(args, nil)
+			addArg("lastmaintenance = $%d", nil)
 		}
 	}
 
 	if input.NextMaintenance.Set {
-		setClauses = append(setClauses, "nextmaintenance = ?")
 		if input.NextMaintenance.Valid {
-			args = append(args, parseDateValue(input.NextMaintenance.Value))
+			addArg("nextmaintenance = $%d", parseDateValue(input.NextMaintenance.Value))
 		} else {
-			args = append(args, nil)
+			addArg("nextmaintenance = $%d", nil)
 		}
 	}
 
 	if input.Notes.Set {
-		setClauses = append(setClauses, "notes = ?")
 		if input.Notes.Valid {
-			args = append(args, nullableStringPtr(&input.Notes.Value))
+			addArg("notes = $%d", nullableStringPtr(&input.Notes.Value))
 		} else {
-			args = append(args, nil)
+			addArg("notes = $%d", nil)
+		}
+	}
+
+	// Handle device ID rename
+	newDeviceID := deviceID
+	if input.NewDeviceID.Set && input.NewDeviceID.Valid {
+		trimmed := strings.TrimSpace(input.NewDeviceID.Value)
+		if trimmed != "" && trimmed != deviceID {
+			addArg("deviceID = $%d", trimmed)
+			newDeviceID = trimmed
 		}
 	}
 
@@ -295,14 +325,31 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 	}
 
 	args = append(args, deviceID)
-	query := fmt.Sprintf("UPDATE devices SET %s WHERE deviceID = ?", strings.Join(setClauses, ", "))
+	query := fmt.Sprintf("UPDATE devices SET %s WHERE deviceID = $%d", strings.Join(setClauses, ", "), len(args))
 	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to update device: %w", err)
 	}
 
+	// If device ID is being renamed, update all child tables that reference it
+	if newDeviceID != deviceID {
+		childUpdates := []string{
+			"UPDATE device_movements SET device_id = $1 WHERE device_id = $2",
+			"UPDATE scan_events SET device_id = $1 WHERE device_id = $2",
+			"UPDATE defect_reports SET device_id = $1 WHERE device_id = $2",
+			"UPDATE inspection_schedules SET device_id = $1 WHERE device_id = $2",
+			"UPDATE job_devices SET deviceID = $1 WHERE deviceID = $2",
+			"UPDATE devicescases SET deviceID = $1 WHERE deviceID = $2",
+		}
+		for _, stmt := range childUpdates {
+			if _, err := tx.ExecContext(ctx, stmt, newDeviceID, deviceID); err != nil {
+				return nil, fmt.Errorf("failed to update device references: %w", err)
+			}
+		}
+	}
+
 	shouldResetCodes := input.RegenerateCodes.Set && input.RegenerateCodes.Valid && input.RegenerateCodes.Value
 	if shouldResetCodes {
-		if err := s.resetDeviceCodes(ctx, tx, deviceID); err != nil {
+		if err := s.resetDeviceCodes(ctx, tx, newDeviceID); err != nil {
 			return nil, err
 		}
 	}
@@ -312,19 +359,19 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 	}
 
 	if shouldResetCodes {
-		log.Printf("[DEVICE] Regenerated codes for %s", deviceID)
+		log.Printf("[DEVICE] Regenerated codes for %s", newDeviceID)
 	}
 
 	if input.RegenerateLabel.Set && input.RegenerateLabel.Valid && input.RegenerateLabel.Value {
 		templateID := input.LabelTemplateID.Ptr()
 		go func() {
-			if err := s.generateLabelForDevice(deviceID, templateID); err != nil {
-				log.Printf("[DEVICE LABEL] Failed to regenerate label for %s: %v", deviceID, err)
+			if err := s.generateLabelForDevice(newDeviceID, templateID); err != nil {
+				log.Printf("[DEVICE LABEL] Failed to regenerate label for %s: %v", newDeviceID, err)
 			}
 		}()
 	}
 
-	return s.FetchDevice(ctx, deviceID)
+	return s.FetchDevice(ctx, newDeviceID)
 }
 
 // DeleteDevice removes a device and its label file if no dependencies exist.
@@ -342,7 +389,7 @@ func (s *DeviceAdminService) DeleteDevice(ctx context.Context, deviceID string) 
 	}()
 
 	var labelPath sql.NullString
-	err = tx.QueryRowContext(ctx, `SELECT label_path FROM devices WHERE deviceID = ?`, deviceID).Scan(&labelPath)
+	err = tx.QueryRowContext(ctx, `SELECT label_path FROM devices WHERE deviceID = $1`, deviceID).Scan(&labelPath)
 	if errors.Is(err, sql.ErrNoRows) {
 		return repository.ErrNotFound
 	}
@@ -390,9 +437,10 @@ func (s *DeviceAdminService) RegenerateLabel(deviceID string, templateID *int) e
 func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (*models.DeviceWithDetails, error) {
 	var device models.DeviceWithDetails
 	err := s.db.QueryRowContext(ctx, `
-		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
+		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id,
-		       d.condition_rating, d.usage_hours, d.purchaseDate, d.lastmaintenance, d.nextmaintenance,
+		       d.condition_rating, d.usage_hours, d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
 		       COALESCE(p.name, '') AS product_name,
 		       COALESCE(cat.name, '') AS product_category,
@@ -410,12 +458,13 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		LEFT JOIN cases c ON dc.caseID = c.caseID
 		LEFT JOIN job_devices jd ON d.deviceID = jd.deviceID
 		LEFT JOIN jobs j ON jd.jobID = j.jobID
-		WHERE d.deviceID = ?
+		WHERE d.deviceID = $1
 		LIMIT 1
 	`, deviceID).Scan(
 		&device.DeviceID,
 		&device.ProductID,
 		&device.SerialNumber,
+		&device.RFID,
 		&device.Barcode,
 		&device.QRCode,
 		&device.Status,
@@ -424,6 +473,8 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		&device.ConditionRating,
 		&device.UsageHours,
 		&device.PurchaseDate,
+		&device.RetireDate,
+		&device.WarrantyEndDate,
 		&device.LastMaintenance,
 		&device.NextMaintenance,
 		&device.Notes,
@@ -462,18 +513,18 @@ func (s *DeviceAdminService) ensureDeviceCodes(ctx context.Context, tx *sql.Tx, 
 		args := make([]interface{}, 0, 2)
 
 		if regenerate || !hadBarcode {
-			columns = append(columns, "barcode = ?")
 			args = append(args, barcode)
+			columns = append(columns, fmt.Sprintf("barcode = $%d", len(args)))
 		}
 		if regenerate || !hadQR {
-			columns = append(columns, "qr_code = ?")
 			args = append(args, qr)
+			columns = append(columns, fmt.Sprintf("qr_code = $%d", len(args)))
 		}
 		if len(columns) == 0 {
 			return nil
 		}
 		args = append(args, deviceID)
-		_, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE devices SET %s WHERE deviceID = ?", strings.Join(columns, ", ")), args...)
+		_, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE devices SET %s WHERE deviceID = $%d", strings.Join(columns, ", "), len(args)), args...)
 		if err != nil {
 			return fmt.Errorf("failed to backfill device codes: %w", err)
 		}
@@ -484,8 +535,8 @@ func (s *DeviceAdminService) ensureDeviceCodes(ctx context.Context, tx *sql.Tx, 
 func (s *DeviceAdminService) resetDeviceCodes(ctx context.Context, tx *sql.Tx, deviceID string) error {
 	_, err := tx.ExecContext(ctx, `
 		UPDATE devices
-		SET barcode = ?, qr_code = ?
-		WHERE deviceID = ?
+		SET barcode = $1, qr_code = $2
+		WHERE deviceID = $3
 	`, deviceID, fmt.Sprintf("QR-%s", deviceID), deviceID)
 	if err != nil {
 		return fmt.Errorf("failed to regenerate device codes: %w", err)

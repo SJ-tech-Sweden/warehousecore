@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Box,
   Eye,
   GitBranch,
   LayoutGrid,
@@ -13,11 +14,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api, ledApi } from '../../lib/api';
+import type { Device } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
 import { DeviceTreeTab } from './DeviceTreeTab';
+import { DeviceDetailModal } from '../DeviceDetailModal';
 import { ProductDependenciesModal } from '../ProductDependenciesModal';
 import { ProductDetailModal } from '../ProductDetailModal';
+import { ProductDevicesModal } from '../ProductDevicesModal';
 
 interface Product {
   product_id: number;
@@ -114,13 +118,6 @@ interface ProductFormData {
   price_per_unit?: number;
 }
 
-interface Device {
-  device_id: string;
-  product_id?: number;
-  status: string;
-  serial_number?: string;
-  barcode?: string;
-}
 
 interface CountType {
   count_type_id: number;
@@ -163,7 +160,11 @@ function useDebouncedValue<T>(value: T, delay: number) {
   return debounced;
 }
 
-export function ProductsTab() {
+interface ProductsTabProps {
+  onOpenDevicesTab?: (productId: number) => void;
+}
+
+export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
@@ -191,6 +192,10 @@ export function ProductsTab() {
   const [productDevices, setProductDevices] = useState<Device[]>([]);
   const [devicesToDelete, setDevicesToDelete] = useState<Set<string>>(new Set());
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [devicesModal, setDevicesModal] = useState<{ productId: number; productName: string } | null>(null);
+  const [devicesModalDevices, setDevicesModalDevices] = useState<Device[]>([]);
+  const [loadingDevicesModal, setLoadingDevicesModal] = useState(false);
+  const [deviceDetail, setDeviceDetail] = useState<Device | null>(null);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
@@ -384,6 +389,29 @@ export function ProductsTab() {
   const closeDetailModal = () => {
     setViewProduct(null);
   };
+
+  const handleOpenDevicesModal = useCallback(async (productId: number, productName: string) => {
+    if (onOpenDevicesTab) {
+      onOpenDevicesTab(productId);
+      return;
+    }
+    setDevicesModal({ productId, productName });
+    setLoadingDevicesModal(true);
+    try {
+      const { data } = await api.get<Device[]>(`/admin/products/${productId}/devices`);
+      setDevicesModalDevices(data || []);
+    } catch (error) {
+      console.error('Failed to load devices for modal:', error);
+      setDevicesModalDevices([]);
+    } finally {
+      setLoadingDevicesModal(false);
+    }
+  }, [onOpenDevicesTab]);
+
+  const closeDevicesModal = useCallback(() => {
+    setDevicesModal(null);
+    setDevicesModalDevices([]);
+  }, []);
 
   const handleOpenCreateModal = async () => {
     await ensureMetadataLoaded();
@@ -780,6 +808,13 @@ export function ProductsTab() {
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
+                          onClick={() => handleOpenDevicesModal(product.product_id, product.name)}
+                          className="rounded-lg bg-cyan-600/80 p-2 text-white transition hover:bg-cyan-600"
+                          title={t('admin.products.manageDevices')}
+                        >
+                          <Box className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
                           className="rounded-lg bg-purple-600/80 p-2 text-white transition hover:bg-purple-600"
                           title={t('admin.products.manageDependencies')}
@@ -838,6 +873,13 @@ export function ProductsTab() {
                     title={t('common.edit')}
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleOpenDevicesModal(product.product_id, product.name)}
+                    className="rounded-lg bg-cyan-600/80 p-2 text-white transition hover:bg-cyan-600"
+                    title={t('admin.products.manageDevices')}
+                  >
+                    <Box className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setDependenciesModal({ productId: product.product_id, productName: product.name })}
@@ -1453,6 +1495,36 @@ export function ProductsTab() {
           onClose={() => setDependenciesModal(null)}
         />
       )}
+
+      {/* Product Devices Modal */}
+      <ProductDevicesModal
+        isOpen={!!devicesModal}
+        onClose={closeDevicesModal}
+        productName={devicesModal?.productName ?? ''}
+        devices={devicesModalDevices}
+        loading={loadingDevicesModal}
+        onLocate={(device) => {
+          if (device.zone_code) {
+            ledApi.locateBin(device.zone_code).catch(err => console.error('LED locate failed:', err));
+          }
+        }}
+        onOpenZone={(device) => {
+          if (device.zone_code) {
+            ledApi.locateBin(device.zone_code).catch(err => console.error('LED locate failed:', err));
+          }
+        }}
+        onOpenDevice={(device) => {
+          setDeviceDetail(device);
+          closeDevicesModal();
+        }}
+      />
+
+      {/* Device Detail Modal (opened from Product Devices list) */}
+      <DeviceDetailModal
+        device={deviceDetail}
+        isOpen={!!deviceDetail}
+        onClose={() => setDeviceDetail(null)}
+      />
     </div>
   );
 }

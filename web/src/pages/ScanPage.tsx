@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Camera, Nfc, Keyboard, X } from 'lucide-react';
+import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Wrench, AlertTriangle, Info, Camera, Nfc, Keyboard, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { scansApi, zonesApi, jobsApi, ledApi } from '../lib/api';
-import type { ScanResponse } from '../lib/api';
+import { scansApi, zonesApi, jobsApi, ledApi, maintenanceApi } from '../lib/api';
+import type { Device, ScanResponse } from '../lib/api';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
+import { DeviceInfoModal } from '../components/DeviceInfoModal';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { useNFCScanner } from '../hooks/useNFCScanner';
 
@@ -31,8 +32,23 @@ export function ScanPage() {
   const [showLEDModal, setShowLEDModal] = useState(false);
   const [scannedJobId, setScannedJobId] = useState<number | null>(null);
 
-  // Block body scroll when LED modal is open
-  useBlockBodyScroll(showLEDModal);
+  // Device detail modal state
+  const [viewDevice, setViewDevice] = useState<Device | null>(null);
+
+  // Service modal states
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [serviceForm, setServiceForm] = useState({
+    device_id: '',
+    severity: 'medium',
+    title: '',
+    description: '',
+  });
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [serviceSuccess, setServiceSuccess] = useState(false);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+
+  // Block body scroll when LED modal or service modal is open
+  useBlockBodyScroll(showLEDModal || showServiceModal);
 
   // Keep a stable ref to the current scan submission handler so the scanner
   // callbacks (which are memoised) can always call the latest version.
@@ -288,6 +304,35 @@ export function ScanPage() {
     setScannedJobId(null);
   };
 
+  const openServiceModal = (deviceId: string, severity: 'medium' | 'high') => {
+    setServiceForm({ device_id: deviceId, severity, title: '', description: '' });
+    setServiceSuccess(false);
+    setServiceError(null);
+    setShowServiceModal(true);
+  };
+
+  const handleServiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setServiceLoading(true);
+    setServiceError(null);
+    try {
+      await maintenanceApi.createDefect(serviceForm);
+      setServiceSuccess(true);
+    } catch (error: any) {
+      console.error('Failed to create defect:', error);
+      setServiceError(error.response?.data?.error || t('maintenance.createDefectError'));
+    } finally {
+      setServiceLoading(false);
+    }
+  };
+
+  const handleServiceModalClose = () => {
+    if (serviceLoading) return;
+    setShowServiceModal(false);
+    setServiceSuccess(false);
+    setServiceError(null);
+  };
+
   return (
     <div className="flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-2xl my-auto">
@@ -481,7 +526,7 @@ export function ScanPage() {
               </div>
             )}
 
-            {/* Submit Button - always visible so camera/NFC results can be confirmed manually too */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || !scanCode.trim()}
@@ -525,12 +570,168 @@ export function ScanPage() {
                     </p>
                   </div>
                 )}
+                {/* Quick service actions after a successful check scan */}
+                {result.success && result.action === 'check' && result.device && (
+                  <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewDevice(result.device!)}
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 transition-all"
+                    >
+                      <Info className="w-4 h-4 flex-shrink-0" />
+                      {t('scan.serviceActions.moreInfo')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openServiceModal(result.device!.device_id, 'medium')}
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30 transition-all"
+                    >
+                      <Wrench className="w-4 h-4 flex-shrink-0" />
+                      {t('scan.serviceActions.reportIssue')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openServiceModal(result.device!.device_id, 'high')}
+                      className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-all"
+                    >
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                      {t('scan.serviceActions.markProblematic')}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* LED Activation Modal */}
+        {/* Service / Defect Report Modal */}
+        {showServiceModal && (
+          <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
+            <div className="glass-dark rounded-2xl p-6 sm:p-8 border-2 border-white/10 max-w-md w-full">
+              {serviceSuccess ? (
+                <div className="text-center py-4">
+                  <div className="inline-block p-4 rounded-xl bg-green-500/20 mb-4">
+                    <CheckCircle className="w-12 h-12 text-green-400" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">{t('scan.serviceModal.successTitle')}</h2>
+                  <p className="text-gray-400 text-sm sm:text-base mb-6">
+                    {t('scan.serviceModal.successDescription')}
+                  </p>
+                  <button
+                    onClick={handleServiceModalClose}
+                    className="w-full px-4 py-3 rounded-lg font-semibold bg-gradient-to-r from-accent-red to-red-700 text-white hover:shadow-lg hover:shadow-accent-red/50 transition-all"
+                  >
+                    {t('common.close')}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center mb-6">
+                    <div className={`inline-block p-4 rounded-xl mb-4 ${
+                      serviceForm.severity === 'high' || serviceForm.severity === 'critical'
+                        ? 'bg-red-500/20'
+                        : 'bg-yellow-500/20'
+                    }`}>
+                      {serviceForm.severity === 'high' || serviceForm.severity === 'critical' ? (
+                        <AlertTriangle className="w-10 h-10 text-red-400" />
+                      ) : (
+                        <Wrench className="w-10 h-10 text-yellow-300" />
+                      )}
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-1">
+                      {t('scan.serviceModal.title')}
+                    </h2>
+                    <p className="text-gray-400 text-sm">{t('scan.serviceModal.subtitle')}</p>
+                  </div>
+
+                  <form onSubmit={handleServiceSubmit} className="space-y-3 sm:space-y-4">
+                    {/* Device ID (read-only) */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5">
+                        {t('maintenance.form.deviceId')}
+                      </label>
+                      <input
+                        type="text"
+                        value={serviceForm.device_id}
+                        readOnly
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/5 border-2 border-white/10 rounded-lg sm:rounded-xl text-sm sm:text-base text-gray-300 cursor-default"
+                      />
+                    </div>
+
+                    {/* Severity */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5">
+                        {t('maintenance.form.severity')}
+                      </label>
+                      <select
+                        value={serviceForm.severity}
+                        onChange={(e) => setServiceForm({ ...serviceForm, severity: e.target.value })}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/10 border-2 border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white focus:outline-none focus:border-accent-red"
+                      >
+                        <option value="low">{t('maintenance.severity.low')}</option>
+                        <option value="medium">{t('maintenance.severity.medium')}</option>
+                        <option value="high">{t('maintenance.severity.high')}</option>
+                        <option value="critical">{t('maintenance.severity.critical')}</option>
+                      </select>
+                    </div>
+
+                    {/* Title */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5">
+                        {t('maintenance.form.title')}
+                      </label>
+                      <input
+                        type="text"
+                        value={serviceForm.title}
+                        onChange={(e) => setServiceForm({ ...serviceForm, title: e.target.value })}
+                        required
+                        placeholder={t('scan.serviceModal.titlePlaceholder')}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/10 border-2 border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-red"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1.5">
+                        {t('maintenance.form.description')}
+                      </label>
+                      <textarea
+                        value={serviceForm.description}
+                        onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                        required
+                        rows={3}
+                        placeholder={t('scan.serviceModal.descriptionPlaceholder')}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/10 border-2 border-white/20 rounded-lg sm:rounded-xl text-sm sm:text-base text-white placeholder-gray-500 focus:outline-none focus:border-accent-red resize-none"
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleServiceModalClose}
+                        disabled={serviceLoading}
+                        className="flex-1 px-4 py-2.5 sm:py-3 rounded-lg font-semibold bg-white/10 text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+                      >
+                        {t('common.cancel')}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={serviceLoading}
+                        className="flex-1 px-4 py-2.5 sm:py-3 rounded-lg font-semibold bg-gradient-to-r from-accent-red to-red-700 text-white hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm sm:text-base"
+                      >
+                        {serviceLoading ? t('common.saving') : t('maintenance.form.submit')}
+                      </button>
+                    </div>
+                    {serviceError && (
+                      <p className="text-red-400 text-xs sm:text-sm text-center pt-1">{serviceError}</p>
+                    )}
+                  </form>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {showLEDModal && (
           <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
             <div className="flex justify-center">
@@ -565,6 +766,17 @@ export function ScanPage() {
           </div>
         )}
       </div>
+
+      {/* Device Info Modal */}
+      <DeviceInfoModal
+        device={viewDevice}
+        isOpen={viewDevice !== null}
+        onClose={() => setViewDevice(null)}
+        onEdit={(device) => {
+          setViewDevice(null);
+          navigate('/products', { state: { openEditDeviceId: device.device_id } });
+        }}
+      />
     </div>
   );
 }

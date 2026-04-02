@@ -21,6 +21,7 @@ type DeviceAdminResponse struct {
 	ProductName     string  `json:"product_name,omitempty"`
 	ProductCategory string  `json:"product_category,omitempty"`
 	SerialNumber    *string `json:"serial_number,omitempty"`
+	RFID            *string `json:"rfid,omitempty"`
 	Barcode         *string `json:"barcode,omitempty"`
 	QRCode          *string `json:"qr_code,omitempty"`
 	Status          string  `json:"status"`
@@ -35,6 +36,8 @@ type DeviceAdminResponse struct {
 	ConditionRating float64 `json:"condition_rating"`
 	UsageHours      float64 `json:"usage_hours"`
 	PurchaseDate    *string `json:"purchase_date,omitempty"`
+	RetireDate      *string `json:"retire_date,omitempty"`
+	WarrantyEndDate *string `json:"warranty_end_date,omitempty"`
 	LastMaintenance *string `json:"last_maintenance,omitempty"`
 	NextMaintenance *string `json:"next_maintenance,omitempty"`
 	Notes           *string `json:"notes,omitempty"`
@@ -68,6 +71,7 @@ func toDeviceAdminResponse(device *models.DeviceWithDetails) DeviceAdminResponse
 		ProductName:     device.ProductName,
 		ProductCategory: device.ProductCategory,
 		SerialNumber:    ptrString(device.SerialNumber),
+		RFID:            ptrString(device.RFID),
 		Barcode:         ptrString(device.Barcode),
 		QRCode:          ptrString(device.QRCode),
 		Status:          device.Status,
@@ -82,6 +86,8 @@ func toDeviceAdminResponse(device *models.DeviceWithDetails) DeviceAdminResponse
 		ConditionRating: device.ConditionRating,
 		UsageHours:      device.UsageHours,
 		PurchaseDate:    formatNullTime(device.PurchaseDate),
+		RetireDate:      formatNullTime(device.RetireDate),
+		WarrantyEndDate: formatNullTime(device.WarrantyEndDate),
 		LastMaintenance: formatNullTime(device.LastMaintenance),
 		NextMaintenance: formatNullTime(device.NextMaintenance),
 		Notes:           ptrString(device.Notes),
@@ -98,9 +104,10 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
 	query := `
-		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.status,
+		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id,
-		       d.condition_rating, d.usage_hours, d.purchaseDate, d.lastmaintenance, d.nextmaintenance,
+		       d.condition_rating, d.usage_hours, d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
 		       COALESCE(p.name, '') AS product_name,
 		       COALESCE(cat.name, '') AS product_category,
@@ -136,6 +143,7 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 			&device.DeviceID,
 			&device.ProductID,
 			&device.SerialNumber,
+			&device.RFID,
 			&device.Barcode,
 			&device.QRCode,
 			&device.Status,
@@ -144,6 +152,8 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 			&device.ConditionRating,
 			&device.UsageHours,
 			&device.PurchaseDate,
+			&device.RetireDate,
+			&device.WarrantyEndDate,
 			&device.LastMaintenance,
 			&device.NextMaintenance,
 			&device.Notes,

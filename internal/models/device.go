@@ -23,6 +23,7 @@ type Device struct {
 	ProductID       sql.NullInt64  `json:"product_id" db:"productID"`
 	ProductName     string         `json:"product_name,omitempty" db:"product_name"`
 	SerialNumber    sql.NullString `json:"serial_number" db:"serialnumber"`
+	RFID            sql.NullString `json:"rfid" db:"rfid"`
 	Barcode         sql.NullString `json:"barcode" db:"barcode"`
 	QRCode          sql.NullString `json:"qr_code" db:"qr_code"`
 	Status          string         `json:"status" db:"status"`
@@ -33,6 +34,8 @@ type Device struct {
 	ConditionRating float64        `json:"condition_rating" db:"condition_rating"`
 	UsageHours      float64        `json:"usage_hours" db:"usage_hours"`
 	PurchaseDate    sql.NullTime   `json:"purchase_date" db:"purchaseDate"`
+	RetireDate      sql.NullTime   `json:"retire_date" db:"retire_date"`
+	WarrantyEndDate sql.NullTime   `json:"warranty_end_date" db:"warranty_end_date"`
 	LastMaintenance sql.NullTime   `json:"last_maintenance" db:"lastmaintenance"`
 	NextMaintenance sql.NullTime   `json:"next_maintenance" db:"nextmaintenance"`
 	Notes           sql.NullString `json:"notes" db:"notes"`

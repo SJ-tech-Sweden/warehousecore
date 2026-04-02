@@ -113,7 +113,8 @@
       "defective": "Defekt",
       "in_repair": "In Reparatur",
       "retired": "Ausgemustert"
-    }
+    },
+    "rfid": "RFID"
   },
   "products": {
     "title": "Produkte",
@@ -326,7 +327,8 @@
       "brands": "Marken & Hersteller",
       "countTypes": "Mess-Einheiten",
       "apiKeys": "API-Keys",
-      "export": "CSV-Export"
+      "export": "CSV-Export",
+      "devices": "Geräte"
     },
     "apiSettings": {
       "title": "API-Limits",
@@ -671,7 +673,10 @@
         "defective": "Defekt",
         "maintenance": "Wartung",
         "retired": "Ausgemustert"
-      }
+      },
+      "retireDate": "Außerdienststellungsdatum",
+      "warrantyEndDate": "Garantieende",
+      "deviceIdHint": "Geräte-ID ändern, um ein vorhandenes Etikett zu verwenden. Vorsicht – dies aktualisiert auch alle Verweise."
     },
     "cases": {
       "title": "Cases-Verwaltung",
@@ -1031,6 +1036,19 @@
       "cancel": "Nein, direkt zum Job",
       "confirm": "Ja, LED aktivieren"
     },
+    "serviceActions": {
+      "moreInfo": "Mehr Info",
+      "reportIssue": "Problem melden",
+      "markProblematic": "Als problematisch markieren"
+    },
+    "serviceModal": {
+      "title": "Servicebericht erstellen",
+      "subtitle": "Problem erfassen, damit es verfolgt und behoben werden kann",
+      "titlePlaceholder": "z. B. Display gebrochen, Stromausfall...",
+      "descriptionPlaceholder": "Beschreibe das Problem ausführlich...",
+      "successTitle": "Bericht erstellt",
+      "successDescription": "Das Problem wurde protokolliert und das Gerät entsprechend markiert."
+    },
     "inputMethods": {
       "keyboard": "Tastatur",
       "camera": "Kamera",
@@ -1189,7 +1207,8 @@
     "avatarUrl": "Avatar URL (optional)",
     "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
     "saveSuccess": "Profil erfolgreich gespeichert",
-    "saveError": "Fehler beim Speichern: {{error}}"
+    "saveError": "Fehler beim Speichern: {{error}}",
+    "openProfile": "Profil öffnen"
   },
   "zonesPage": {
     "title": "Lager",
@@ -1208,7 +1227,8 @@
     "deleteZone": "Zone löschen",
     "capacityLabel": "Kapazität: {{capacity}}",
     "empty": "Noch keine Lagerorte vorhanden",
-    "firstZone": "Erste Zone erstellen"
+    "firstZone": "Erste Zone erstellen",
+    "loadError": "Lagertypen konnten nicht geladen werden."
   },
   "zoneDetail": {
     "backToZones": "Zurück zu Lager",
@@ -1474,6 +1494,12 @@
     "productsTitle": "Produktkatalog",
     "productsSubtitle": "Produktstammdaten verwalten.",
     "cablesTitle": "Kabelverwaltung",
-    "cablesSubtitle": "Kabeltypen und Zuordnungen pflegen."
+    "cablesSubtitle": "Kabeltypen und Zuordnungen pflegen.",
+    "devicesTabLabel": "Geräte"
+  },
+  "roleGuard": {
+    "loading": "Lade Berechtigungen...",
+    "accessDenied": "Zugriff verweigert",
+    "accessDeniedDescription": "Für diesen Bereich werden erweiterte Rechte benötigt. Bitte wende dich an einen Administrator, falls du Zugriff auf die Admin-Einstellungen benötigst."
   }
 }
