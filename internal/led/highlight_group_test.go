@@ -95,18 +95,23 @@ func TestHighlightGroupToCommandEmptyShelf(t *testing.T) {
 
 func TestHighlightGroupToCommandBinsCopied(t *testing.T) {
 	g := newHighlightGroup(testController())
-	bin := Bin{BinID: "A-01", Pixels: []int{1, 2, 3}, Color: "#FFFFFF", Pattern: "blink", Intensity: 255}
-	g.addBin("A", bin)
+	g.addBin("A", Bin{BinID: "A-01", Pixels: []int{1, 2, 3}, Color: "#FFFFFF", Pattern: "blink", Intensity: 255})
 
 	cmd := g.toCommand("wh-copy")
 
-	// Mutating the original bin should not affect the command's copy
-	bin.Color = "#000000"
+	// Mutating the group's internal bins after toCommand should not affect the command's copy.
+	// If toCommand only aliases the slice or its elements, these mutations would show up in cmd.
+	g.shelves["A"].Bins[0].Color = "#000000"
+	g.shelves["A"].Bins = append(g.shelves["A"].Bins, Bin{BinID: "A-02", Pixels: []int{4, 5, 6}, Color: "#123456", Pattern: "solid", Intensity: 100})
 
 	for _, shelf := range cmd.Shelves {
+		// We originally added only one bin to shelf "A"; the command should still see exactly one.
+		if len(shelf.Bins) != 1 {
+			t.Fatalf("command bins share slice header with group bins - expected 1 bin, got %d", len(shelf.Bins))
+		}
 		for _, b := range shelf.Bins {
 			if b.Color == "#000000" {
-				t.Fatal("command bins share memory with original bins - expected a copy")
+				t.Fatal("command bins share memory with group bins - expected a copy")
 			}
 		}
 	}
