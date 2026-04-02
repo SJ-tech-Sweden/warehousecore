@@ -89,7 +89,7 @@ export function ProductsPage() {
             initialProductFilter={devicesProductFilter}
             key={devicesProductFilter}
             initialEditDeviceId={initialEditDeviceId}
-            onEditComplete={() => navigate('/scan')}
+            onEditComplete={initialEditDeviceId ? () => navigate('/scan') : undefined}
           />
         )}
       </div>
