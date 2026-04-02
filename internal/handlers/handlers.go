@@ -2252,7 +2252,97 @@ func RemoveDeviceFromCase(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Device removed from case successfully"})
 }
 
-// GetDefects returns defect reports with filters
+// GetCaseByScan finds a case by its barcode, RFID tag, or name
+// GET /api/v1/cases/scan?scan_code=...
+func GetCaseByScan(w http.ResponseWriter, r *http.Request) {
+	scanCode := strings.TrimSpace(r.URL.Query().Get("scan_code"))
+	if scanCode == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "scan_code parameter required"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+	qb := NewQueryBuilder()
+	query := `
+		SELECT
+			c.caseID,
+			c.name,
+			c.description,
+			c.status,
+			c.width,
+			c.height,
+			c.depth,
+			c.weight,
+			c.zone_id,
+			c.label_path,
+			COALESCE(z.name, '') AS zone_name,
+			COALESCE(z.code, '') AS zone_code,
+			COUNT(dc.deviceID) AS device_count
+		FROM cases c
+		LEFT JOIN devicescases dc ON c.caseID = dc.caseID
+		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
+		WHERE (c.barcode = ` + qb.NextPlaceholder() + ` OR c.rfid_tag = ` + qb.NextPlaceholder() + ` OR LOWER(c.name) = LOWER(` + qb.NextPlaceholder() + `))
+		GROUP BY c.caseID, c.name, c.description, c.status, c.width, c.height, c.depth, c.weight, c.zone_id, c.label_path, zone_name, zone_code
+		LIMIT 1
+	`
+
+	var item CaseSummary
+	var description sql.NullString
+	var width, height, depth, weight sql.NullFloat64
+	var zoneID sql.NullInt64
+	var labelPath sql.NullString
+	var zoneName, zoneCode sql.NullString
+	var deviceCount sql.NullInt64
+
+	err := db.QueryRow(query, scanCode, scanCode, scanCode).Scan(
+		&item.CaseID,
+		&item.Name,
+		&description,
+		&item.Status,
+		&width,
+		&height,
+		&depth,
+		&weight,
+		&zoneID,
+		&labelPath,
+		&zoneName,
+		&zoneCode,
+		&deviceCount,
+	)
+	if err == sql.ErrNoRows {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Case not found"})
+		return
+	}
+	if err != nil {
+		log.Printf("GetCaseByScan query error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to find case"})
+		return
+	}
+
+	descPtr := ptrString(description)
+	if descPtr != nil && strings.TrimSpace(*descPtr) == "" {
+		descPtr = nil
+	}
+	item.Description = descPtr
+	item.Width = ptrFloat64(width)
+	item.Height = ptrFloat64(height)
+	item.Depth = ptrFloat64(depth)
+	item.Weight = ptrFloat64(weight)
+	item.ZoneID = ptrInt(zoneID)
+	item.LabelPath = ptrString(labelPath)
+
+	if zoneName.Valid && strings.TrimSpace(zoneName.String) != "" {
+		item.ZoneName = ptrString(zoneName)
+	}
+	if zoneCode.Valid && strings.TrimSpace(zoneCode.String) != "" {
+		item.ZoneCode = ptrString(zoneCode)
+	}
+	if deviceCount.Valid {
+		item.DeviceCount = int(deviceCount.Int64)
+	}
+
+	respondJSON(w, http.StatusOK, item)
+}
 func GetDefects(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
 	severity := r.URL.Query().Get("severity")

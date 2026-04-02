@@ -1,22 +1,22 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Wrench, AlertTriangle, Info, Camera, Nfc, Keyboard, X } from 'lucide-react';
+import { ScanLine, CheckCircle, XCircle, MapPin, Lightbulb, Wrench, AlertTriangle, Info, Camera, Nfc, Keyboard, X, Box, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { scansApi, zonesApi, jobsApi, ledApi, maintenanceApi } from '../lib/api';
-import type { Device, ScanResponse } from '../lib/api';
+import { scansApi, zonesApi, jobsApi, ledApi, maintenanceApi, casesApi } from '../lib/api';
+import type { Device, ScanResponse, CaseDetail } from '../lib/api';
 import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 import { DeviceInfoModal } from '../components/DeviceInfoModal';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { useNFCScanner } from '../hooks/useNFCScanner';
 
 type InputMethod = 'keyboard' | 'camera' | 'nfc';
-type ScanStep = 'device' | 'zone';
+type ScanStep = 'device' | 'zone' | 'case' | 'device-for-case';
 
 export function ScanPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [scanCode, setScanCode] = useState('');
-  const [action, setAction] = useState<'intake' | 'outtake' | 'check'>('check');
+  const [action, setAction] = useState<'intake' | 'outtake' | 'check' | 'case'>('check');
   const [result, setResult] = useState<ScanResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +27,11 @@ export function ScanPage() {
   const [step, setStep] = useState<ScanStep>('device');
   const [deviceScanCode, setDeviceScanCode] = useState('');
   const [consumableQuantity, setConsumableQuantity] = useState<number | undefined>(undefined);
+
+  // Case scanning workflow
+  const [scannedCase, setScannedCase] = useState<CaseDetail | null>(null);
+  const [caseDeviceIds, setCaseDeviceIds] = useState<string[]>([]);
+  const [caseActionMessage, setCaseActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Job-Code scan states
   const [showLEDModal, setShowLEDModal] = useState(false);
@@ -54,6 +59,20 @@ export function ScanPage() {
   // callbacks (which are memoised) can always call the latest version.
   const submitCodeRef = useRef<(code: string) => void>(() => {});
 
+  // Ref for case action message auto-dismiss timeout – cleared on unmount to
+  // prevent state updates on an unmounted component.
+  const caseActionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleCaseActionDismiss = useCallback((ms: number) => {
+    if (caseActionTimeoutRef.current !== null) {
+      clearTimeout(caseActionTimeoutRef.current);
+    }
+    caseActionTimeoutRef.current = setTimeout(() => {
+      setCaseActionMessage(null);
+      caseActionTimeoutRef.current = null;
+    }, ms);
+  }, []);
+
   const handleCodeDetected = useCallback((code: string) => {
     submitCodeRef.current(code);
   }, []);
@@ -75,11 +94,14 @@ export function ScanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputMethod]);
 
-  // Stop scanners on unmount
+  // Stop scanners on unmount; also clear any pending case-action-message timeout
   useEffect(() => {
     return () => {
       barcodeScanner.stopScanning();
       nfcScanner.stopScanning();
+      if (caseActionTimeoutRef.current !== null) {
+        clearTimeout(caseActionTimeoutRef.current);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -130,8 +152,53 @@ export function ScanPage() {
 
     setLoading(true);
     try {
-      // Step 1: Scan device
-      if (action === 'intake' && step === 'device') {
+      // Case scanning workflow: Step 1 - Scan case
+      if (action === 'case' && step === 'case') {
+        const { data: caseData } = await casesApi.getByScan(code);
+        setScannedCase(caseData);
+        setCaseDeviceIds([]);
+        setCaseActionMessage(null);
+        setStep('device-for-case');
+        setScanCode('');
+        setResult(null);
+      }
+      // Case scanning workflow: Step 2 - Scan devices to add
+      else if (action === 'case' && step === 'device-for-case') {
+        if (!scannedCase) return;
+
+        // Verify device exists
+        const { data: checkData } = await scansApi.process({
+          scan_code: code,
+          action: 'check',
+        });
+
+        if (!checkData.success || !checkData.device) {
+          setCaseActionMessage({ type: 'error', text: checkData.message || t('scan.scanError') });
+          setScanCode('');
+          scheduleCaseActionDismiss(3000);
+        } else {
+          const deviceId = checkData.device.device_id;
+          if (caseDeviceIds.includes(deviceId)) {
+            setCaseActionMessage({ type: 'error', text: t('scan.case.alreadyScanned', { id: deviceId }) });
+            setScanCode('');
+            scheduleCaseActionDismiss(3000);
+          } else {
+            // Add device to case immediately
+            const { data: addData } = await casesApi.addDevices(scannedCase.case_id, [deviceId]);
+            if (addData.success_count > 0) {
+              setCaseDeviceIds(prev => [...prev, deviceId]);
+              setCaseActionMessage({ type: 'success', text: t('scan.case.deviceAdded', { id: deviceId }) });
+            } else {
+              const errMsg = addData.errors?.[0] ?? t('scan.case.addFailed');
+              setCaseActionMessage({ type: 'error', text: errMsg });
+            }
+            setScanCode('');
+            scheduleCaseActionDismiss(3000);
+          }
+        }
+      }
+      // Step 1: Scan device for intake
+      else if (action === 'intake' && step === 'device') {
         // Verify device exists by trying to scan it (check action)
         const { data } = await scansApi.process({
           scan_code: code,
@@ -194,7 +261,7 @@ export function ScanPage() {
         setStep('device');
       }
       // All other actions (outtake, check) - single step
-      else {
+      else if (action !== 'case') {
         // For consumables with intake/outtake, ask for quantity first
         let quantity = undefined;
         if ((action === 'intake' || action === 'outtake')) {
@@ -228,7 +295,7 @@ export function ScanPage() {
         // Now do the actual scan with quantity if provided
         const { data } = await scansApi.process({
           scan_code: code,
-          action,
+          action: action,
           job_id: quantity, // Pass quantity via job_id field (backend expects this)
         });
         setResult(data);
@@ -236,23 +303,34 @@ export function ScanPage() {
       }
     } catch (error: any) {
       console.error('Scan failed:', error);
-      setResult({
-        success: false,
-        message: error.response?.data?.error || t('scan.scanError'),
-        action,
-        duplicate: false,
-      });
 
-      // Reset to step 1 on error
-      if (step === 'zone') {
-        setStep('device');
-        setDeviceScanCode('');
+      if (action === 'case' && step === 'case') {
+        setCaseActionMessage({ type: 'error', text: error.response?.data?.error || t('scan.case.caseNotFound') });
         setScanCode('');
+        scheduleCaseActionDismiss(4000);
+      } else if (action === 'case' && step === 'device-for-case') {
+        setCaseActionMessage({ type: 'error', text: error.response?.data?.error || t('scan.scanError') });
+        setScanCode('');
+        scheduleCaseActionDismiss(3000);
+      } else {
+        setResult({
+          success: false,
+          message: error.response?.data?.error || t('scan.scanError'),
+          action,
+          duplicate: false,
+        });
+
+        // Reset to step 1 on error
+        if (step === 'zone') {
+          setStep('device');
+          setDeviceScanCode('');
+          setScanCode('');
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [action, step, deviceScanCode, consumableQuantity, t, handleJobCodeScan]);
+  }, [action, step, deviceScanCode, consumableQuantity, scannedCase, caseDeviceIds, t, handleJobCodeScan, scheduleCaseActionDismiss]);
 
   // Keep submitCodeRef in sync with the latest processCode so scanner callbacks
   // (which are memoised on mount) can always reach the current state closure.
@@ -265,9 +343,16 @@ export function ScanPage() {
     processCode(scanCode);
   };
 
-  const handleActionChange = (newAction: 'intake' | 'outtake' | 'check') => {
+  const handleActionChange = (newAction: 'intake' | 'outtake' | 'check' | 'case') => {
     setAction(newAction);
-    setStep('device');
+    if (newAction === 'case') {
+      setStep('case');
+      setScannedCase(null);
+      setCaseDeviceIds([]);
+      setCaseActionMessage(null);
+    } else {
+      setStep('device');
+    }
     setDeviceScanCode('');
     setConsumableQuantity(undefined);
     setScanCode('');
@@ -341,17 +426,29 @@ export function ScanPage() {
             <div className="inline-block p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-accent-red to-red-700 mb-3 sm:mb-4">
               {step === 'zone' ? (
                 <MapPin className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
+              ) : step === 'case' || step === 'device-for-case' ? (
+                <Box className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
               ) : (
                 <ScanLine className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
               )}
             </div>
             <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">
-              {step === 'zone' ? t('scan.zoneTitle') : t('scan.scannerTitle')}
+              {step === 'zone'
+                ? t('scan.zoneTitle')
+                : step === 'case'
+                  ? t('scan.case.title')
+                  : step === 'device-for-case'
+                    ? t('scan.case.addDevicesTitle')
+                    : t('scan.scannerTitle')}
             </h1>
             <p className="text-sm sm:text-base text-gray-400">
               {step === 'zone'
                 ? t('scan.zoneSubtitle')
-                : t('scan.scannerSubtitle')}
+                : step === 'case'
+                  ? t('scan.case.subtitle')
+                  : step === 'device-for-case'
+                    ? t('scan.case.addDevicesSubtitle')
+                    : t('scan.scannerSubtitle')}
             </p>
           </div>
 
@@ -375,6 +472,92 @@ export function ScanPage() {
                 </div>
                 <span className="text-sm sm:text-base font-semibold">{t('scan.steps.zone')}</span>
               </div>
+            </div>
+          )}
+
+          {/* Step Indicator for Case scanning */}
+          {action === 'case' && (
+            <div className="mb-4 sm:mb-6 flex items-center justify-center gap-2 sm:gap-4">
+              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'case' ? 'text-accent-red' : 'text-green-500'}`}>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base ${
+                  step === 'case' ? 'bg-accent-red' : 'bg-green-500'
+                }`}>
+                  {step !== 'case' ? '✓' : '1'}
+                </div>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.case.steps.case')}</span>
+              </div>
+              <div className="w-8 sm:w-12 h-0.5 bg-white/20"></div>
+              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'device-for-case' ? 'text-accent-red' : 'text-gray-500'}`}>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base ${
+                  step === 'device-for-case' ? 'bg-accent-red' : 'bg-gray-700'
+                }`}>
+                  2
+                </div>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.case.steps.devices')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Active Case Info Panel */}
+          {action === 'case' && step === 'device-for-case' && scannedCase && (
+            <div className="mb-4 p-4 rounded-xl bg-accent-red/10 border border-accent-red/30">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Box className="w-4 h-4 text-accent-red flex-shrink-0" />
+                  <span className="font-semibold text-white text-sm truncate">{scannedCase.name}</span>
+                  <span className="text-xs text-gray-400 font-mono flex-shrink-0">#{scannedCase.case_id}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => { setStep('case'); setScannedCase(null); setCaseDeviceIds([]); setCaseActionMessage(null); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20 text-gray-300 transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <X className="w-3 h-3" />
+                  {t('scan.case.changeCase')}
+                </button>
+              </div>
+              {caseActionMessage && (
+                <div className={`mb-2 flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg ${
+                  caseActionMessage.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {caseActionMessage.type === 'success'
+                    ? <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    : <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  }
+                  {caseActionMessage.text}
+                </div>
+              )}
+              {caseDeviceIds.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs text-gray-400 mb-1.5">{t('scan.case.addedDevices', { count: caseDeviceIds.length })}</p>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                    {caseDeviceIds.map(id => (
+                      <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/10 text-xs text-gray-300 font-mono">
+                        {id}
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={async () => {
+                            try {
+                              await casesApi.removeDevice(scannedCase.case_id, id);
+                              setCaseDeviceIds(prev => prev.filter(d => d !== id));
+                              setCaseActionMessage({ type: 'success', text: t('casesPage.messages.deviceRemoved', { id }) });
+                              scheduleCaseActionDismiss(2000);
+                            } catch {
+                              setCaseActionMessage({ type: 'error', text: t('scan.case.removeFailed') });
+                              scheduleCaseActionDismiss(2000);
+                            }
+                          }}
+                          className="text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -493,7 +676,13 @@ export function ScanPage() {
                 onChange={(e) => setScanCode(e.target.value)}
                 placeholder={
                   inputMethod === 'keyboard'
-                    ? (step === 'zone' ? t('scan.placeholders.zone') : t('scan.placeholders.device'))
+                    ? step === 'zone'
+                      ? t('scan.placeholders.zone')
+                      : step === 'case'
+                        ? t('scan.case.placeholderCase')
+                        : step === 'device-for-case'
+                          ? t('scan.case.placeholderDevice')
+                          : t('scan.placeholders.device')
                     : t('scan.placeholders.manualFallback')
                 }
                 autoFocus={inputMethod === 'keyboard'}
@@ -502,18 +691,19 @@ export function ScanPage() {
             </div>
 
             {/* Action Selection - only show in step 1 */}
-            {step === 'device' && (
-              <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                {[
-                  { value: 'check', label: t('scan.actions.check'), color: 'blue' },
-                  { value: 'intake', label: t('scan.actions.intake'), color: 'green' },
-                  { value: 'outtake', label: t('scan.actions.outtake'), color: 'red' },
-                ].map((btn) => (
+            {(step === 'device' || step === 'case') && (
+              <div className="grid grid-cols-4 gap-2 sm:gap-3">
+                {([
+                  { value: 'check', label: t('scan.actions.check') },
+                  { value: 'intake', label: t('scan.actions.intake') },
+                  { value: 'outtake', label: t('scan.actions.outtake') },
+                  { value: 'case', label: t('scan.actions.case') },
+                ] as const).map((btn) => (
                   <button
                     key={btn.value}
                     type="button"
-                    onClick={() => handleActionChange(btn.value as any)}
-                    className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-semibold transition-all ${
+                    onClick={() => handleActionChange(btn.value)}
+                    className={`px-2 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                       action === btn.value
                         ? 'bg-accent-red text-white scale-105'
                         : 'glass text-gray-400 hover:text-white hover:scale-105'
@@ -531,7 +721,15 @@ export function ScanPage() {
               disabled={loading || !scanCode.trim()}
               className="w-full py-3 sm:py-4 bg-gradient-to-r from-accent-red to-red-700 text-white font-bold text-base sm:text-lg rounded-xl hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
             >
-              {loading ? t('scan.scanning') : step === 'zone' ? t('scan.scanZone') : t('scan.scanDevice')}
+              {loading
+                ? t('scan.scanning')
+                : step === 'zone'
+                  ? t('scan.scanZone')
+                  : step === 'case'
+                    ? t('scan.case.scanCase')
+                    : step === 'device-for-case'
+                      ? t('scan.case.scanDeviceForCase')
+                      : t('scan.scanDevice')}
             </button>
           </form>
         </div>

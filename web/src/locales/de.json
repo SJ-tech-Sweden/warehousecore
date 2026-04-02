@@ -1016,7 +1016,8 @@
       "intake": "Einlagern",
       "outtake": "Auslagern",
       "transfer": "Umlagerung",
-      "check": "Prüfen"
+      "check": "Prüfen",
+      "case": "In Koffer"
     },
     "scanning": "Scannen...",
     "scanZone": "Lagerplatz Scannen",
@@ -1076,6 +1077,28 @@
         "readError": "NFC-Lesefehler. Bitte erneut versuchen.",
         "startFailed": "NFC-Scan konnte nicht gestartet werden."
       }
+    },
+    "case": {
+      "title": "Koffer scannen",
+      "subtitle": "Koffer-Barcode scannen oder Koffernamen eingeben",
+      "addDevicesTitle": "Geräte zum Koffer hinzufügen",
+      "addDevicesSubtitle": "Geräte scannen, um sie dem Koffer hinzuzufügen",
+      "steps": {
+        "case": "Koffer",
+        "devices": "Geräte"
+      },
+      "placeholderCase": "Koffer-Barcode / Name",
+      "placeholderDevice": "Geräte-Barcode / QR-Code / ID",
+      "scanCase": "Koffer scannen",
+      "scanDeviceForCase": "Gerät zum Koffer hinzufügen",
+      "changeCase": "Koffer wechseln",
+      "addedDevices": "{{count}} Gerät hinzugefügt",
+      "addedDevices_other": "{{count}} Geräte hinzugefügt",
+      "deviceAdded": "Gerät {{id}} dem Koffer hinzugefügt",
+      "alreadyScanned": "Gerät {{id}} bereits hinzugefügt",
+      "addFailed": "Gerät konnte nicht zum Koffer hinzugefügt werden",
+      "removeFailed": "Gerät konnte nicht entfernt werden",
+      "caseNotFound": "Koffer nicht gefunden. Barcode oder Namen prüfen und erneut versuchen."
     }
   },
   "auth": {
@@ -1399,7 +1422,11 @@
       "addSelected": "{{count}} Gerät hinzufügen",
       "addSelected_other": "{{count}} Geräte hinzufügen",
       "countShort": "{{count}} Geräte",
-      "alreadyInZone": "Bereits in dieser Zone"
+      "alreadyInZone": "Bereits in dieser Zone",
+      "searchPlaceholder": "Geräte suchen...",
+      "searchLabel": "Geräte suchen",
+      "clearSearch": "Suche löschen",
+      "noSearchResults": "Keine Geräte gefunden"
     },
     "productDependencies": {
       "title": "Produktabhängigkeiten",

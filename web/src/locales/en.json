@@ -1016,7 +1016,8 @@
       "intake": "Intake",
       "outtake": "Outtake",
       "transfer": "Transfer",
-      "check": "Check"
+      "check": "Check",
+      "case": "To Case"
     },
     "scanning": "Scanning...",
     "scanZone": "Scan Storage Location",
@@ -1076,6 +1077,28 @@
         "readError": "NFC read error. Please try again.",
         "startFailed": "Failed to start NFC scanning."
       }
+    },
+    "case": {
+      "title": "Scan Case",
+      "subtitle": "Scan a case barcode or enter the case name",
+      "addDevicesTitle": "Add Devices to Case",
+      "addDevicesSubtitle": "Scan devices to add them to the case",
+      "steps": {
+        "case": "Case",
+        "devices": "Devices"
+      },
+      "placeholderCase": "Case barcode / name",
+      "placeholderDevice": "Device barcode / QR code / ID",
+      "scanCase": "Scan Case",
+      "scanDeviceForCase": "Add Device to Case",
+      "changeCase": "Change Case",
+      "addedDevices": "{{count}} device added",
+      "addedDevices_other": "{{count}} devices added",
+      "deviceAdded": "Device {{id}} added to case",
+      "alreadyScanned": "Device {{id}} already added",
+      "addFailed": "Failed to add device to case",
+      "removeFailed": "Failed to remove device",
+      "caseNotFound": "Case not found. Check barcode or name and try again."
     }
   },
   "auth": {
@@ -1399,7 +1422,11 @@
       "addSelected": "Add {{count}} device",
       "addSelected_other": "Add {{count}} devices",
       "countShort": "{{count}} devices",
-      "alreadyInZone": "Already in this zone"
+      "alreadyInZone": "Already in this zone",
+      "searchPlaceholder": "Search devices...",
+      "searchLabel": "Search devices",
+      "clearSearch": "Clear search",
+      "noSearchResults": "No devices match your search"
     },
     "productDependencies": {
       "title": "Product Dependencies",
