@@ -315,6 +315,7 @@ export const casesApi = {
   list: (params?: { search?: string; status?: string }) =>
     api.get<CasesResponse>('/cases', { params }),
   getById: (id: number) => api.get<CaseDetail>(`/cases/${id}`),
+  getByScan: (scanCode: string) => api.get<CaseDetail>('/cases/scan', { params: { scan_code: scanCode } }),
   getDevices: (id: number) => api.get<CaseDevice[]>(`/cases/${id}/contents`),
   create: (data: Partial<CaseDetail>) => api.post<{ case_id: number; message: string }>('/cases', data),
   update: (id: number, data: Partial<CaseDetail>) => api.put<{ message: string }>(`/cases/${id}`, data),

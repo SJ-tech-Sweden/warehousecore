@@ -208,6 +208,7 @@ func main() {
 	api.HandleFunc("/inventory/low-stock", handlers.GetLowStockAlerts).Methods("GET")
 
 	// Case endpoints
+	api.HandleFunc("/cases/scan", handlers.GetCaseByScan).Methods("GET")
 	api.HandleFunc("/cases", handlers.GetCases).Methods("GET")
 	api.HandleFunc("/cases", handlers.CreateCase).Methods("POST")
 	api.HandleFunc("/cases/{id}", handlers.GetCase).Methods("GET")

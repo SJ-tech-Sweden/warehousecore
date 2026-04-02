@@ -36,13 +36,13 @@ export function CaseDetailModal({
   // Block body scroll when modal is open
   useBlockBodyScroll(isOpen);
 
-  if (!isOpen) return null;
-
   // Cache-busting for label image - regenerates URL when label_path changes
   const labelUrl = useMemo(() => {
     if (!caseInfo?.label_path) return null;
     return `${caseInfo.label_path}?t=${Date.now()}`;
   }, [caseInfo?.label_path]);
+
+  if (!isOpen) return null;
 
   const formatDimension = (value?: number) => {
     if (value === undefined || Number.isNaN(value)) {

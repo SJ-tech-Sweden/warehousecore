@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { X, ChevronRight, Package } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { X, ChevronRight, Package, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ModalPortal } from './ModalPortal';
@@ -51,6 +51,7 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Block body scroll when modal is open
   useBlockBodyScroll(isOpen);
@@ -73,6 +74,62 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
       setLoading(false);
     }
   };
+
+  // Collect all devices matching search query
+  const matchingDeviceIds = useMemo<Set<string>>(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return new Set();
+    const ids = new Set<string>();
+    const checkDevice = (d: Device) => {
+      if (
+        d.device_id.toLowerCase().includes(q) ||
+        d.product_name.toLowerCase().includes(q) ||
+        (d.serial_number && d.serial_number.toLowerCase().includes(q)) ||
+        (d.barcode && d.barcode.toLowerCase().includes(q))
+      ) {
+        ids.add(d.device_id);
+      }
+    };
+    for (const cat of treeData) {
+      cat.direct_devices.forEach(checkDevice);
+      for (const sub of cat.subcategories) {
+        sub.direct_devices.forEach(checkDevice);
+        for (const subbier of sub.subbiercategories) {
+          subbier.devices.forEach(checkDevice);
+        }
+      }
+    }
+    return ids;
+  }, [search, treeData]);
+
+  // Auto-expand nodes that contain matching devices
+  const searchExpandedNodes = useMemo<Set<string>>(() => {
+    if (!search.trim()) return new Set<string>();
+    const expanded = new Set<string>();
+    for (const cat of treeData) {
+      let catHasMatch = cat.direct_devices.some(d => matchingDeviceIds.has(d.device_id));
+      for (const sub of cat.subcategories) {
+        let subHasMatch = sub.direct_devices.some(d => matchingDeviceIds.has(d.device_id));
+        for (const subbier of sub.subbiercategories) {
+          if (subbier.devices.some(d => matchingDeviceIds.has(d.device_id))) {
+            expanded.add(`subbier-${subbier.id}`);
+            subHasMatch = true;
+          }
+        }
+        if (subHasMatch) {
+          expanded.add(`subcat-${sub.id}`);
+          catHasMatch = true;
+        }
+      }
+      if (catHasMatch) expanded.add(`cat-${cat.id}`);
+    }
+    return expanded;
+  }, [search, treeData, matchingDeviceIds]);
+
+  const effectiveExpanded = useMemo(
+    () => search.trim() ? new Set([...expandedNodes, ...searchExpandedNodes]) : expandedNodes,
+    [expandedNodes, searchExpandedNodes, search]
+  );
 
   const toggleNode = (nodeId: string) => {
     const newExpanded = new Set(expandedNodes);
@@ -97,11 +154,13 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
   const handleConfirm = () => {
     onConfirm(Array.from(selectedDevices));
     setSelectedDevices(new Set());
+    setSearch('');
     onClose();
   };
 
   const handleClose = () => {
     setSelectedDevices(new Set());
+    setSearch('');
     onClose();
   };
 
@@ -133,6 +192,29 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
           </p>
         </div>
 
+        {/* Search */}
+        <div className="px-6 py-3 border-b border-white/10">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('modals.deviceTree.searchPlaceholder')}
+              className="w-full pl-9 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Device Tree */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
@@ -149,11 +231,12 @@ export function DeviceTreeModal({ isOpen, onClose, onConfirm, zoneId }: DeviceTr
                 <CategoryNode
                   key={category.id}
                   category={category}
-                  expandedNodes={expandedNodes}
+                  expandedNodes={effectiveExpanded}
                   selectedDevices={selectedDevices}
                   onToggleNode={toggleNode}
                   onToggleDevice={toggleDeviceSelection}
                   currentZoneId={zoneId}
+                  matchingDeviceIds={search.trim() ? matchingDeviceIds : null}
                   t={t}
                 />
               ))}
@@ -191,6 +274,7 @@ function CategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  matchingDeviceIds,
   t,
 }: {
   category: Category;
@@ -199,10 +283,26 @@ function CategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  matchingDeviceIds: Set<string> | null;
   t: TFunction;
 }) {
   const nodeId = `cat-${category.id}`;
   const isExpanded = expandedNodes.has(nodeId);
+
+  // When filtering, only show this category if it has matching devices
+  const visibleSubcategories = matchingDeviceIds
+    ? category.subcategories.filter(sub =>
+        sub.direct_devices.some(d => matchingDeviceIds.has(d.device_id)) ||
+        sub.subbiercategories.some(sb => sb.devices.some(d => matchingDeviceIds.has(d.device_id)))
+      )
+    : category.subcategories;
+  const visibleDirectDevices = matchingDeviceIds
+    ? category.direct_devices.filter(d => matchingDeviceIds.has(d.device_id))
+    : category.direct_devices;
+
+  if (matchingDeviceIds && visibleSubcategories.length === 0 && visibleDirectDevices.length === 0) {
+    return null;
+  }
 
   return (
     <div className="border border-white/10 rounded-lg bg-surface-1">
@@ -222,7 +322,7 @@ function CategoryNode({
 
       {isExpanded && (
         <div className="pl-6 pb-2 pr-2">
-          {category.subcategories.map((subcategory) => (
+          {visibleSubcategories.map((subcategory) => (
             <SubcategoryNode
               key={subcategory.id}
               subcategory={subcategory}
@@ -231,9 +331,24 @@ function CategoryNode({
               onToggleNode={onToggleNode}
               onToggleDevice={onToggleDevice}
               currentZoneId={currentZoneId}
+              matchingDeviceIds={matchingDeviceIds}
               t={t}
             />
           ))}
+          {visibleDirectDevices.length > 0 && (
+            <div className="mt-2 pl-2 space-y-1">
+              {visibleDirectDevices.map((device) => (
+                <DeviceNode
+                  key={device.device_id}
+                  device={device}
+                  isSelected={selectedDevices.has(device.device_id)}
+                  onToggle={onToggleDevice}
+                  isInCurrentZone={device.zone_id === currentZoneId}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -248,6 +363,7 @@ function SubcategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  matchingDeviceIds,
   t,
 }: {
   subcategory: Subcategory;
@@ -256,10 +372,18 @@ function SubcategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  matchingDeviceIds: Set<string> | null;
   t: TFunction;
 }) {
   const nodeId = `subcat-${subcategory.id}`;
   const isExpanded = expandedNodes.has(nodeId);
+
+  const visibleSubbiercategories = matchingDeviceIds
+    ? subcategory.subbiercategories.filter(sb => sb.devices.some(d => matchingDeviceIds.has(d.device_id)))
+    : subcategory.subbiercategories;
+  const visibleDirectDevices = matchingDeviceIds
+    ? subcategory.direct_devices.filter(d => matchingDeviceIds.has(d.device_id))
+    : subcategory.direct_devices;
 
   return (
     <div className="mt-2">
@@ -279,7 +403,7 @@ function SubcategoryNode({
 
       {isExpanded && (
         <div className="pl-6 pt-1">
-          {subcategory.subbiercategories.map((subbiercategory) => (
+          {visibleSubbiercategories.map((subbiercategory) => (
             <SubbiercategoryNode
               key={subbiercategory.id}
               subbiercategory={subbiercategory}
@@ -288,9 +412,24 @@ function SubcategoryNode({
               onToggleNode={onToggleNode}
               onToggleDevice={onToggleDevice}
               currentZoneId={currentZoneId}
+              matchingDeviceIds={matchingDeviceIds}
               t={t}
             />
           ))}
+          {visibleDirectDevices.length > 0 && (
+            <div className="mt-1 space-y-1">
+              {visibleDirectDevices.map((device) => (
+                <DeviceNode
+                  key={device.device_id}
+                  device={device}
+                  isSelected={selectedDevices.has(device.device_id)}
+                  onToggle={onToggleDevice}
+                  isInCurrentZone={device.zone_id === currentZoneId}
+                  t={t}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -305,6 +444,7 @@ function SubbiercategoryNode({
   onToggleNode,
   onToggleDevice,
   currentZoneId,
+  matchingDeviceIds,
   t,
 }: {
   subbiercategory: Subbiercategory;
@@ -313,10 +453,15 @@ function SubbiercategoryNode({
   onToggleNode: (id: string) => void;
   onToggleDevice: (id: string) => void;
   currentZoneId: number;
+  matchingDeviceIds: Set<string> | null;
   t: TFunction;
 }) {
   const nodeId = `subbier-${subbiercategory.id}`;
   const isExpanded = expandedNodes.has(nodeId);
+
+  const visibleDevices = matchingDeviceIds
+    ? subbiercategory.devices.filter(d => matchingDeviceIds.has(d.device_id))
+    : subbiercategory.devices;
 
   return (
     <div className="mt-2">
@@ -336,7 +481,7 @@ function SubbiercategoryNode({
 
       {isExpanded && (
         <div className="pl-6 pt-1 space-y-1">
-          {subbiercategory.devices.map((device) => (
+          {visibleDevices.map((device) => (
             <DeviceNode
               key={device.device_id}
               device={device}
