@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 
 	"warehousecore/internal/models"
@@ -76,25 +77,13 @@ func GetCurrencySymbol() string {
 
 	var setting models.AppSetting
 	if err := db.Where("scope = ? AND key = ?", "warehousecore", "app.currency").First(&setting).Error; err != nil {
-		if err != gorm.ErrRecordNotFound {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("[SETTINGS] Failed to query currency symbol: %v", err)
 		}
 		return "€"
 	}
 
-	bytes, err := json.Marshal(setting.Value)
-	if err != nil {
-		log.Printf("[SETTINGS] Failed to marshal currency setting: %v", err)
-		return "€"
-	}
-
-	var currencyConfig map[string]interface{}
-	if err := json.Unmarshal(bytes, &currencyConfig); err != nil {
-		log.Printf("[SETTINGS] Failed to unmarshal currency setting: %v", err)
-		return "€"
-	}
-
-	if symbol, ok := currencyConfig["symbol"].(string); ok && symbol != "" {
+	if symbol, ok := setting.Value["symbol"].(string); ok && symbol != "" {
 		return symbol
 	}
 
@@ -114,7 +103,7 @@ func UpdateCurrencySymbol(symbol string) error {
 
 	currencyValue := models.JSONMap{"symbol": symbol}
 
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		setting = models.AppSetting{
 			Scope: "warehousecore",
 			Key:   "app.currency",
