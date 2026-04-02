@@ -14,6 +14,7 @@ export interface SearchableSelectProps {
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
+  /** Applied to the outer container (for sizing/layout) and the interactive control (button/input). */
   className?: string;
   title?: string;
 }
@@ -31,9 +32,11 @@ export function SearchableSelect({
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
+  const optionIdPrefix = useId();
 
   const selectedOption = options.find(opt => opt.value === value);
 
@@ -47,6 +50,7 @@ export function SearchableSelect({
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSearchText('');
+        setActiveIndex(-1);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -56,8 +60,14 @@ export function SearchableSelect({
   useEffect(() => {
     if (isOpen) {
       inputRef.current?.focus();
+      setActiveIndex(-1);
     }
   }, [isOpen]);
+
+  // Reset keyboard cursor when filtered list changes
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchText]);
 
   const handleOpen = () => {
     if (disabled) return;
@@ -69,6 +79,7 @@ export function SearchableSelect({
     onChange(optionValue);
     setIsOpen(false);
     setSearchText('');
+    setActiveIndex(-1);
   };
 
   const handleClear = (e: React.MouseEvent) => {
@@ -76,14 +87,36 @@ export function SearchableSelect({
     onChange('');
     setIsOpen(false);
     setSearchText('');
+    setActiveIndex(-1);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setIsOpen(false);
-      setSearchText('');
-    } else if (e.key === 'Enter' && filteredOptions.length === 1) {
-      handleSelect(filteredOptions[0].value);
+    switch (e.key) {
+      case 'Escape':
+        setIsOpen(false);
+        setSearchText('');
+        setActiveIndex(-1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        if (filteredOptions.length > 0) {
+          setActiveIndex(prev => (prev < filteredOptions.length - 1 ? prev + 1 : 0));
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        if (filteredOptions.length > 0) {
+          setActiveIndex(prev => (prev > 0 ? prev - 1 : filteredOptions.length - 1));
+        }
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (activeIndex >= 0 && activeIndex < filteredOptions.length) {
+          handleSelect(filteredOptions[activeIndex].value);
+        } else if (filteredOptions.length === 1) {
+          handleSelect(filteredOptions[0].value);
+        }
+        break;
     }
   };
 
@@ -99,7 +132,9 @@ export function SearchableSelect({
         tabIndex={-1}
         className="sr-only"
       >
-        <option value="" />
+        {!options.some(opt => opt.value === '') && (
+          <option value="">{placeholder ?? ''}</option>
+        )}
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -110,15 +145,21 @@ export function SearchableSelect({
       {isOpen ? (
         <div>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
             <input
               ref={inputRef}
+              role="combobox"
+              aria-expanded={true}
+              aria-controls={listboxId}
+              aria-haspopup="listbox"
+              aria-autocomplete="list"
+              aria-activedescendant={activeIndex >= 0 && activeIndex < filteredOptions.length ? `${optionIdPrefix}-${activeIndex}` : undefined}
               type="text"
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t('common.search')}
-              className="w-full rounded-lg border border-accent-red bg-white/10 py-2 pl-9 pr-3 text-white placeholder-gray-500 outline-none"
+              className={`w-full rounded-lg border border-accent-red bg-white/10 py-2 pl-9 pr-3 text-white placeholder-gray-500 outline-none ${className}`}
             />
           </div>
           <div
@@ -129,14 +170,19 @@ export function SearchableSelect({
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-500">{t('common.noResults')}</div>
             ) : (
-              filteredOptions.map(opt => (
+              filteredOptions.map((opt, index) => (
                 <div
                   key={opt.value}
+                  id={`${optionIdPrefix}-${index}`}
                   role="option"
                   aria-selected={opt.value === value}
-                  onMouseDown={() => handleSelect(opt.value)}
+                  onClick={() => handleSelect(opt.value)}
                   className={`cursor-pointer px-3 py-2 text-sm hover:bg-white/10 ${
-                    opt.value === value ? 'bg-white/15 text-accent-red' : 'text-white'
+                    index === activeIndex
+                      ? 'bg-white/20 text-white'
+                      : opt.value === value
+                        ? 'bg-white/15 text-accent-red'
+                        : 'text-white'
                   }`}
                 >
                   {opt.label}
@@ -148,22 +194,29 @@ export function SearchableSelect({
       ) : (
         <button
           type="button"
+          role="combobox"
+          aria-expanded={false}
+          aria-controls={listboxId}
+          aria-haspopup="listbox"
           onClick={handleOpen}
           disabled={disabled}
           className={`flex w-full items-center justify-between rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-left text-sm transition focus:outline-none focus:ring-1 focus:ring-accent-red disabled:cursor-not-allowed disabled:opacity-50 ${
             selectedOption ? 'text-white' : 'text-gray-400'
-          }`}
+          } ${className}`}
         >
           <span className="truncate">{selectedOption ? selectedOption.label : (placeholder ?? t('common.select'))}</span>
           <span className="ml-2 flex shrink-0 items-center gap-1">
             {value && !disabled && (
-              <X
-                className="h-3.5 w-3.5 text-gray-400 hover:text-white"
-                onMouseDown={handleClear}
+              <button
+                type="button"
+                onClick={handleClear}
+                className="p-0 text-gray-400 hover:text-white"
                 aria-label={t('common.clear')}
-              />
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
             )}
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
           </span>
         </button>
       )}
