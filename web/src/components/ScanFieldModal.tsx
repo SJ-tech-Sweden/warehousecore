@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { ModalPortal } from './ModalPortal';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { useNFCScanner } from '../hooks/useNFCScanner';
-import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 
 type InputMethod = 'keyboard' | 'camera' | 'nfc';
 
@@ -20,8 +19,6 @@ export function ScanFieldModal({ isOpen, fieldLabel, onConfirm, onClose }: ScanF
   const [inputMethod, setInputMethod] = useState<InputMethod>('keyboard');
   const [manualValue, setManualValue] = useState('');
   const [scannedValue, setScannedValue] = useState('');
-
-  useBlockBodyScroll(isOpen);
 
   const handleCodeDetected = useCallback((code: string) => {
     setScannedValue(code);
@@ -40,8 +37,7 @@ export function ScanFieldModal({ isOpen, fieldLabel, onConfirm, onClose }: ScanF
     } else if (inputMethod === 'nfc') {
       nfcScanner.startScanning();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputMethod]);
+  }, [inputMethod, barcodeScanner.startScanning, barcodeScanner.stopScanning, nfcScanner.startScanning, nfcScanner.stopScanning]);
 
   // Stop scanners when modal closes
   useEffect(() => {
@@ -52,8 +48,7 @@ export function ScanFieldModal({ isOpen, fieldLabel, onConfirm, onClose }: ScanF
       setManualValue('');
       setInputMethod('keyboard');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, barcodeScanner.stopScanning, nfcScanner.stopScanning]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -61,8 +56,7 @@ export function ScanFieldModal({ isOpen, fieldLabel, onConfirm, onClose }: ScanF
       barcodeScanner.stopScanning();
       nfcScanner.stopScanning();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [barcodeScanner.stopScanning, nfcScanner.stopScanning]);
 
   const handleInputMethodChange = useCallback((method: InputMethod) => {
     setScannedValue('');

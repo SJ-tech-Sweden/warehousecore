@@ -339,6 +339,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
       }
 
       setModalOpen(false);
+      setScanFieldTarget(null);
       setFormData({ ...initialFormData, label_template_id: undefined });
 
       // If an onEditComplete callback is provided (navigated here from Scan), call it
@@ -698,11 +699,11 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
               <button
                 onClick={() => {
                   setModalOpen(false);
+                  setScanFieldTarget(null);
                   if (onCancel) {
                     onCancel();
                   }
                 }}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
                 aria-label={t('common.close')}
                 title={t('common.close')}
               >
@@ -1151,6 +1152,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                   type="button"
                   onClick={() => {
                     setModalOpen(false);
+                    setScanFieldTarget(null);
                     if (onCancel) {
                       onCancel();
                     }
