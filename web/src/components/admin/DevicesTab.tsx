@@ -19,6 +19,7 @@ import type { Device, DeviceCreateInput, DeviceUpdateInput, LabelTemplate } from
 import { useBlockBodyScroll } from '../../hooks/useBlockBodyScroll';
 import { ModalPortal } from '../ModalPortal';
 import { DeviceInfoModal } from '../DeviceInfoModal';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface Product {
   product_id: number;
@@ -419,34 +420,34 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
           </select>
 
           {/* Product Filter */}
-          <select
-            value={productFilter}
-            onChange={(e) => setProductFilter(e.target.value ? Number(e.target.value) : '')}
-            className="input-field"
+          <SearchableSelect
+            value={productFilter === '' ? '' : String(productFilter)}
+            onChange={(v) => setProductFilter(v ? Number(v) : '')}
+            options={[
+              { value: '', label: t('admin.devices.filters.allProducts') },
+              ...products.map((product) => ({
+                value: String(product.product_id),
+                label: product.name,
+              })),
+            ]}
+            className="input-field p-0 border-0"
             title={t('zoneDetail.columns.product')}
-          >
-            <option value="">{t('admin.devices.filters.allProducts')}</option>
-            {products.map((product) => (
-              <option key={product.product_id} value={product.product_id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
+          />
 
           {/* Zone Filter */}
-          <select
-            value={zoneFilter}
-            onChange={(e) => setZoneFilter(e.target.value ? Number(e.target.value) : '')}
-            className="input-field"
+          <SearchableSelect
+            value={zoneFilter === '' ? '' : String(zoneFilter)}
+            onChange={(v) => setZoneFilter(v ? Number(v) : '')}
+            options={[
+              { value: '', label: t('admin.devices.filters.allZones') },
+              ...zones.map((zone) => ({
+                value: String(zone.zone_id),
+                label: `${zone.code} - ${zone.name}`,
+              })),
+            ]}
+            className="input-field p-0 border-0"
             title={t('devices.zone')}
-          >
-            <option value="">{t('admin.devices.filters.allZones')}</option>
-            {zones.map((zone) => (
-              <option key={zone.zone_id} value={zone.zone_id}>
-                {zone.code} - {zone.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Action Buttons */}
@@ -712,24 +713,23 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   {t('zoneDetail.columns.product')} *
                 </label>
-                <select
-                  value={formData.product_id || ''}
-                  onChange={(e) =>
-                    setFormData({ ...formData, product_id: e.target.value ? Number(e.target.value) : undefined })
+                <SearchableSelect
+                  value={formData.product_id ? String(formData.product_id) : ''}
+                  onChange={(v) =>
+                    setFormData({ ...formData, product_id: v ? Number(v) : undefined })
                   }
-                  className="input-field w-full"
+                  options={products.map((product) => ({
+                    value: String(product.product_id),
+                    label: product.category_name
+                      ? `${product.name} (${product.category_name})`
+                      : product.name,
+                  }))}
+                  placeholder={t('admin.devices.selectProduct')}
                   required
                   disabled={!!editingDevice}
+                  className="w-full"
                   title={t('zoneDetail.columns.product')}
-                >
-                  <option value="">{t('admin.devices.selectProduct')}</option>
-                  {products.map((product) => (
-                    <option key={product.product_id} value={product.product_id}>
-                      {product.name}
-                      {product.category_name && ` (${product.category_name})`}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Device ID (only when editing – allows renaming) */}
@@ -828,21 +828,21 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     {t('devices.zone')}
                   </label>
-                  <select
-                    value={formData.zone_id || ''}
-                    onChange={(e) =>
-                      setFormData({ ...formData, zone_id: e.target.value ? Number(e.target.value) : undefined })
+                  <SearchableSelect
+                    value={formData.zone_id ? String(formData.zone_id) : ''}
+                    onChange={(v) =>
+                      setFormData({ ...formData, zone_id: v ? Number(v) : undefined })
                     }
-                    className="input-field w-full"
+                    options={[
+                      { value: '', label: t('casesPage.noZone') },
+                      ...zones.map((zone) => ({
+                        value: String(zone.zone_id),
+                        label: `${zone.code} - ${zone.name}`,
+                      })),
+                    ]}
+                    className="w-full"
                     title={t('devices.zone')}
-                  >
-                    <option value="">{t('casesPage.noZone')}</option>
-                    {zones.map((zone) => (
-                      <option key={zone.zone_id} value={zone.zone_id}>
-                        {zone.code} - {zone.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               </div>
 

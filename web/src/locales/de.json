@@ -31,7 +31,10 @@
     "settings": "Einstellungen",
     "language": "Sprache",
     "changeLanguage": "Sprache wechseln",
-    "name": "Name"
+    "name": "Name",
+    "noResults": "Keine Ergebnisse",
+    "select": "Auswählen…",
+    "clear": "Leeren"
   },
   "nav": {
     "dashboard": "Dashboard",

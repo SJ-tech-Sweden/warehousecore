@@ -31,7 +31,10 @@
     "settings": "Settings",
     "language": "Language",
     "changeLanguage": "Change language",
-    "name": "Name"
+    "name": "Name",
+    "noResults": "No results",
+    "select": "Select…",
+    "clear": "Clear"
   },
   "nav": {
     "dashboard": "Dashboard",

@@ -22,6 +22,7 @@ import { DeviceDetailModal } from '../DeviceDetailModal';
 import { ProductDependenciesModal } from '../ProductDependenciesModal';
 import { ProductDetailModal } from '../ProductDetailModal';
 import { ProductDevicesModal } from '../ProductDevicesModal';
+import { SearchableSelect } from '../SearchableSelect';
 
 interface Product {
   product_id: number;
@@ -625,19 +626,19 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
               />
             </div>
 
-            <select
-              value={categoryFilter}
-              onChange={event => handleCategoryFilterChange(event.target.value)}
-              className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:bg-white/15 focus:ring-1 focus:ring-accent-red"
+            <SearchableSelect
+              value={categoryFilter === '' ? '' : String(categoryFilter)}
+              onChange={event => handleCategoryFilterChange(event)}
+              options={[
+                { value: '', label: t('admin.products.allCategories') },
+                ...categories.map(category => ({
+                  value: String(category.category_id),
+                  label: category.name,
+                })),
+              ]}
+              className="rounded-lg text-sm"
               title={t('products.category')}
-            >
-              <option value="">{t('admin.products.allCategories')}</option>
-              {categories.map(category => (
-                <option key={category.category_id} value={category.category_id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+            />
 
             {hasActiveFilters && (
               <button
@@ -955,10 +956,10 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">{t('products.category')}</label>
-                    <select
-                      value={formData.category_id ?? ''}
-                      onChange={event => {
-                        const value = event.target.value ? Number(event.target.value) : undefined;
+                    <SearchableSelect
+                      value={formData.category_id != null ? String(formData.category_id) : ''}
+                      onChange={v => {
+                        const value = v ? Number(v) : undefined;
                         setFormData({
                           ...formData,
                           category_id: value,
@@ -966,77 +967,75 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                           subbiercategory_id: undefined,
                         });
                       }}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      options={[
+                        { value: '', label: t('admin.products.none') },
+                        ...categories.map(category => ({
+                          value: String(category.category_id),
+                          label: category.name,
+                        })),
+                      ]}
+                      className="w-full"
                       title={t('products.category')}
-                    >
-                      <option value="">{t('admin.products.none')}</option>
-                      {categories.map(category => (
-                        <option key={category.category_id} value={category.category_id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">{t('admin.categories.levels.subcategories')}</label>
-                    <select
-                      value={formData.subcategory_id ?? ''}
-                      onChange={event => {
-                        const value = event.target.value || undefined;
+                    <SearchableSelect
+                      value={formData.subcategory_id != null ? String(formData.subcategory_id) : ''}
+                      onChange={v => {
                         setFormData({
                           ...formData,
-                          subcategory_id: value,
+                          subcategory_id: v || undefined,
                           subbiercategory_id: undefined,
                         });
                       }}
+                      options={[
+                        { value: '', label: t('admin.products.none') },
+                        ...filteredSubcategories.map(sub => ({
+                          value: String(sub.subcategory_id),
+                          label: sub.name,
+                        })),
+                      ]}
                       disabled={!formData.category_id}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red disabled:opacity-50"
+                      className="w-full"
                       title={t('admin.categories.levels.subcategories')}
-                    >
-                      <option value="">{t('admin.products.none')}</option>
-                      {filteredSubcategories.map(sub => (
-                        <option key={sub.subcategory_id} value={sub.subcategory_id}>
-                          {sub.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">
                       {t('admin.categories.levels.subSubcategories')}
                     </label>
-                    <select
-                      value={formData.subbiercategory_id ?? ''}
-                      onChange={event => {
-                        const value = event.target.value || undefined;
+                    <SearchableSelect
+                      value={formData.subbiercategory_id != null ? String(formData.subbiercategory_id) : ''}
+                      onChange={v => {
                         setFormData({
                           ...formData,
-                          subbiercategory_id: value,
+                          subbiercategory_id: v || undefined,
                         });
                       }}
+                      options={[
+                        { value: '', label: t('admin.products.none') },
+                        ...filteredSubbiercategories.map(subbier => ({
+                          value: String(subbier.subbiercategory_id),
+                          label: subbier.name,
+                        })),
+                      ]}
                       disabled={!formData.subcategory_id}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red disabled:opacity-50"
+                      className="w-full"
                       title={t('admin.categories.levels.subSubcategories')}
-                    >
-                      <option value="">{t('admin.products.none')}</option>
-                      {filteredSubbiercategories.map(subbier => (
-                        <option key={subbier.subbiercategory_id} value={subbier.subbiercategory_id}>
-                          {subbier.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">{t('products.brand')}</label>
-                    <select
-                      value={formData.brand_id ?? ''}
-                      onChange={event => {
-                        const value = event.target.value ? Number(event.target.value) : undefined;
+                    <SearchableSelect
+                      value={formData.brand_id != null ? String(formData.brand_id) : ''}
+                      onChange={v => {
+                        const value = v ? Number(v) : undefined;
                         let manufacturerId = formData.manufacturer_id;
                         if (value) {
                           const brand = brandsByName.find(b => b.brand_id === value);
@@ -1050,40 +1049,40 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                           manufacturer_id: manufacturerId ?? formData.manufacturer_id,
                         });
                       }}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      options={[
+                        { value: '', label: t('admin.products.none') },
+                        ...brandsByName.map(brand => ({
+                          value: String(brand.brand_id),
+                          label: brand.manufacturer_name
+                            ? `${brand.name} • ${brand.manufacturer_name}`
+                            : brand.name,
+                        })),
+                      ]}
+                      className="w-full"
                       title={t('products.brand')}
-                    >
-                      <option value="">{t('admin.products.none')}</option>
-                      {brandsByName.map(brand => (
-                        <option key={brand.brand_id} value={brand.brand_id}>
-                          {brand.name}
-                          {brand.manufacturer_name ? ` • ${brand.manufacturer_name}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-white">{t('products.manufacturer')}</label>
-                    <select
-                      value={formData.manufacturer_id ?? ''}
-                      onChange={event => {
-                        const value = event.target.value ? Number(event.target.value) : undefined;
+                    <SearchableSelect
+                      value={formData.manufacturer_id != null ? String(formData.manufacturer_id) : ''}
+                      onChange={v => {
                         setFormData({
                           ...formData,
-                          manufacturer_id: value,
+                          manufacturer_id: v ? Number(v) : undefined,
                         });
                       }}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white outline-none transition focus:border-accent-red"
+                      options={[
+                        { value: '', label: t('admin.products.none') },
+                        ...manufacturerOptions.map(manufacturer => ({
+                          value: String(manufacturer.manufacturer_id),
+                          label: manufacturer.name,
+                        })),
+                      ]}
+                      className="w-full"
                       title={t('products.manufacturer')}
-                    >
-                      <option value="">{t('admin.products.none')}</option>
-                      {manufacturerOptions.map(manufacturer => (
-                        <option key={manufacturer.manufacturer_id} value={manufacturer.manufacturer_id}>
-                          {manufacturer.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
