@@ -38,14 +38,24 @@ export function useCurrencySymbol(): string {
   );
 
   useEffect(() => {
-    fetchCurrencySymbol().then(s => setSymbol(s));
+    let isMounted = true;
+
+    fetchCurrencySymbol().then(s => {
+      if (isMounted) setSymbol(s);
+    });
 
     const handleUpdate = (e: Event) => {
       const detail = (e as CustomEvent<{ symbol: string }>).detail;
-      if (detail?.symbol) setSymbol(detail.symbol);
+      if (detail?.symbol) {
+        cachedSymbol = detail.symbol;
+        if (isMounted) setSymbol(detail.symbol);
+      }
     };
     window.addEventListener('currency-symbol-updated', handleUpdate);
-    return () => window.removeEventListener('currency-symbol-updated', handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('currency-symbol-updated', handleUpdate);
+    };
   }, []);
 
   return symbol;

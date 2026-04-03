@@ -33,7 +33,7 @@ export function CurrencySettingsTab() {
       setMessage({ type: 'error', text: t('admin.currencySettings.symbolRequired') });
       return;
     }
-    if (trimmed.length > 8) {
+    if (Array.from(trimmed).length > 8) {
       setMessage({ type: 'error', text: t('admin.currencySettings.symbolTooLong') });
       return;
     }
