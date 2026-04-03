@@ -6,6 +6,7 @@ import { useBlockBodyScroll } from '../hooks/useBlockBodyScroll';
 import { productPicturesApi, productWebsiteApi } from '../lib/api';
 import type { ChangeEvent } from 'react';
 import type { ProductPicture } from '../lib/api';
+import { useCurrencySymbol } from '../hooks/useCurrencySymbol';
 
 export interface ProductDetail {
   product_id: number;
@@ -45,6 +46,7 @@ interface ProductDetailModalProps {
 
 export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailModalProps) {
   const { t, i18n } = useTranslation();
+  const currencySymbol = useCurrencySymbol();
   useBlockBodyScroll(isOpen);
 
   const [pictures, setPictures] = useState<ProductPicture[]>([]);
@@ -64,7 +66,11 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
   const formatCurrency = (value?: number) => {
     if (value == null) return '—';
     const locale = i18n.language?.startsWith('de') ? 'de-DE' : 'en-US';
-    return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(value);
+    const formatted = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+    return `${formatted} ${currencySymbol}`;
   };
 
   const formatMeasurement = (value?: number, unit?: string) => {
