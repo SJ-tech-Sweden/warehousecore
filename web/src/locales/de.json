@@ -373,8 +373,8 @@
       "colDescription": "Beschreibung",
       "infoTitle": "Über diese Integration",
       "info1": "Produkte werden in die Mietartikel-Tabelle unter Lieferant 'Eventory' importiert.",
-      "info2": "Ein erneuter Sync aktualisiert vorhandene Eventory-Produkte und fuegt neue hinzu.",
-      "info3": "Der API-Schluessel wird verschluesselt in der Datenbank gespeichert und niemals vollstaendig angezeigt."
+      "info2": "Ein erneuter Sync aktualisiert vorhandene Eventory-Produkte und fügt neue hinzu.",
+      "info3": "Der API-Schlüssel wird verschlüsselt in der Datenbank gespeichert und niemals vollständig angezeigt."
     },
     "currencySettings": {
       "title": "Währungseinstellungen",

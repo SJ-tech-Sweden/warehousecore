@@ -12,6 +12,9 @@ import (
 	"warehousecore/internal/services"
 )
 
+// eventorySupplierName is the supplier name used when syncing products from Eventory.
+const eventorySupplierName = "Eventory"
+
 // ===========================
 // EVENTORY INTEGRATION HANDLERS
 // ===========================
@@ -133,6 +136,20 @@ func SyncEventoryProducts(w http.ResponseWriter, r *http.Request) {
 	updated := 0
 	skipped := 0
 
+	tx, err := db.Begin()
+	if err != nil {
+		log.Printf("[EVENTORY] Failed to begin transaction: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to start database transaction"})
+		return
+	}
+	defer func() {
+		if err != nil {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				log.Printf("[EVENTORY] Rollback failed: %v", rbErr)
+			}
+		}
+	}()
+
 	for _, p := range products {
 		name := strings.TrimSpace(p.Name)
 		if name == "" {
@@ -142,21 +159,33 @@ func SyncEventoryProducts(w http.ResponseWriter, r *http.Request) {
 
 		category := strings.TrimSpace(p.Category)
 		description := strings.TrimSpace(p.Description)
+		now := time.Now()
 
-		// Check whether a row with this product name and supplier already exists
-		var existingID int
-		err := db.QueryRow(
-			`SELECT equipment_id FROM rental_equipment WHERE product_name = $1 AND supplier_name = 'Eventory'`,
-			name,
-		).Scan(&existingID)
+		// Atomic upsert: update first; if no row matched, insert.
+		result, execErr := tx.Exec(`
+			UPDATE rental_equipment
+			SET rental_price = $1, category = $2, description = $3, updated_at = $4
+			WHERE product_name = $5 AND supplier_name = $6
+		`, p.Price, nullableStr(category), nullableStr(description), now, name, eventorySupplierName)
+		if execErr != nil {
+			log.Printf("[EVENTORY] Failed to update product %q: %v", name, execErr)
+			skipped++
+			continue
+		}
 
-		if err != nil {
-			// Not found – insert
-			_, insertErr := db.Exec(`
+		rowsAffected, raErr := result.RowsAffected()
+		if raErr != nil {
+			log.Printf("[EVENTORY] Failed to get rows affected for %q: %v", name, raErr)
+			skipped++
+			continue
+		}
+
+		if rowsAffected == 0 {
+			_, insertErr := tx.Exec(`
 				INSERT INTO rental_equipment
 					(product_name, supplier_name, rental_price, customer_price, category, description, is_active, created_at, updated_at)
-				VALUES ($1, 'Eventory', $2, 0, $3, $4, TRUE, $5, $5)
-			`, name, p.Price, nullableStr(category), nullableStr(description), time.Now())
+				VALUES ($1, $2, $3, 0, $4, $5, TRUE, $6, $6)
+			`, name, eventorySupplierName, p.Price, nullableStr(category), nullableStr(description), now)
 			if insertErr != nil {
 				log.Printf("[EVENTORY] Failed to insert product %q: %v", name, insertErr)
 				skipped++
@@ -164,19 +193,15 @@ func SyncEventoryProducts(w http.ResponseWriter, r *http.Request) {
 				imported++
 			}
 		} else {
-			// Exists – update
-			_, updateErr := db.Exec(`
-				UPDATE rental_equipment
-				SET rental_price = $1, category = $2, description = $3, updated_at = $4
-				WHERE equipment_id = $5
-			`, p.Price, nullableStr(category), nullableStr(description), time.Now(), existingID)
-			if updateErr != nil {
-				log.Printf("[EVENTORY] Failed to update product %q (id=%d): %v", name, existingID, updateErr)
-				skipped++
-			} else {
-				updated++
-			}
+			updated++
 		}
+	}
+
+	if commitErr := tx.Commit(); commitErr != nil {
+		err = commitErr
+		log.Printf("[EVENTORY] Failed to commit transaction: %v", commitErr)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to commit sync transaction"})
+		return
 	}
 
 	log.Printf("[EVENTORY] Sync complete: %d imported, %d updated, %d skipped", imported, updated, skipped)
