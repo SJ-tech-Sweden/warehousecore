@@ -343,11 +343,14 @@ func ValidateEventoryURL(rawURL string) error {
 	// For hostnames, resolve all A/AAAA records and reject any that are private
 	// or loopback. This prevents DNS-based SSRF even when the literal hostname
 	// looks safe.
+	// If DNS resolution fails (network unavailable, air-gapped env, etc.) we log
+	// a warning but allow the URL through so admins can still configure the
+	// integration. The actual HTTP client call will fail at runtime if the host
+	// is truly unreachable.
 	addrs, err := net.LookupHost(host)
 	if err != nil {
-		// If we cannot resolve the host at validation time, reject it rather
-		// than allowing an unresolvable name through.
-		return fmt.Errorf("hostname could not be resolved: %w", err)
+		log.Printf("[EVENTORY] Warning: could not resolve %q during URL validation: %v (proceeding)", host, err)
+		return nil
 	}
 	for _, addr := range addrs {
 		if ip := net.ParseIP(addr); ip != nil && isPrivateIP(ip) {

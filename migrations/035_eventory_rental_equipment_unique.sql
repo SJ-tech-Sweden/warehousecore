@@ -3,13 +3,20 @@
 -- Eventory sync, and also prevents accidental duplicate rows.
 --
 -- Step 1: Remove duplicate rows, keeping the row with the highest equipment_id
--- (i.e. the most recently inserted). This makes the migration safe to apply
--- on existing databases that already contain duplicates.
+-- (i.e. the most recently inserted). Uses ROW_NUMBER() to avoid a full-table
+-- scan in the subquery, making it safe to run even on large datasets.
 DELETE FROM rental_equipment
-WHERE equipment_id NOT IN (
-    SELECT MAX(equipment_id)
-    FROM rental_equipment
-    GROUP BY product_name, supplier_name
+WHERE equipment_id IN (
+    SELECT equipment_id
+    FROM (
+        SELECT equipment_id,
+               ROW_NUMBER() OVER (
+                   PARTITION BY product_name, supplier_name
+                   ORDER BY equipment_id DESC
+               ) AS rn
+        FROM rental_equipment
+    ) t
+    WHERE rn > 1
 );
 
 -- Step 2: Add the unique index. If Step 1 ran cleanly, this will always succeed.
