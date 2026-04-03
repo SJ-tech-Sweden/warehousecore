@@ -26,22 +26,22 @@ const (
 
 // EventoryConfig holds Eventory API configuration
 type EventoryConfig struct {
-	APIURL              string `json:"api_url"`
+	APIURL string `json:"api_url"`
 	// APIKey is used when the Eventory instance uses a static bearer token.
-	APIKey              string `json:"api_key"`
+	APIKey string `json:"api_key"`
 	// Username and Password are used for the OAuth2 Resource Owner Password
 	// Credentials (ROPC) grant when the Eventory instance requires login.
-	Username            string `json:"username"`
-	Password            string `json:"password"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 	// TokenEndpoint is the OAuth2 token URL. Defaults to /oauth/token relative
 	// to APIURL when empty.
-	TokenEndpoint       string `json:"token_endpoint"`
+	TokenEndpoint string `json:"token_endpoint"`
 	// SupplierName is the value stored in rental_equipment.supplier_name for
 	// products imported from this Eventory account. Defaults to "Eventory".
-	SupplierName        string `json:"supplier_name"`
+	SupplierName string `json:"supplier_name"`
 	// SyncIntervalMinutes controls automatic background syncing.
 	// 0 means disabled; positive values trigger a sync every N minutes.
-	SyncIntervalMinutes int    `json:"sync_interval_minutes"`
+	SyncIntervalMinutes int `json:"sync_interval_minutes"`
 }
 
 // EffectiveSupplierName returns SupplierName or the default "Eventory".
@@ -129,6 +129,12 @@ func BootstrapEventoryFromEnv() {
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Printf("[EVENTORY] Bootstrap: failed to check existing config: %v", err)
+		return
+	}
+
+	// Validate the URL before saving to prevent seeding an unsafe address.
+	if err := ValidateEventoryURL(apiURL); err != nil {
+		log.Printf("[EVENTORY] Bootstrap: EVENTORY_API_URL is invalid/unsafe (%v), skipping seed", err)
 		return
 	}
 
@@ -301,7 +307,8 @@ func parseEventoryProductsResponse(body []byte) ([]EventoryProduct, error) {
 
 // ValidateEventoryURL checks that the given URL is safe to use for outbound
 // HTTP requests (prevents SSRF). It requires an http or https scheme, rejects
-// URLs with embedded credentials, and blocks loopback / private IP ranges.
+// URLs with embedded credentials, blocks loopback / private IP literals, and
+// resolves the hostname to catch DNS-based SSRF.
 func ValidateEventoryURL(rawURL string) error {
 	u, err := neturl.Parse(rawURL)
 	if err != nil {
@@ -325,11 +332,26 @@ func ValidateEventoryURL(rawURL string) error {
 		return errors.New("URL must not target localhost")
 	}
 
-	// Attempt IP parse to block private ranges
-	ip := net.ParseIP(host)
-	if ip != nil {
+	// If the host is a bare IP, check it directly.
+	if ip := net.ParseIP(host); ip != nil {
 		if isPrivateIP(ip) {
 			return errors.New("URL must not target a private IP address")
+		}
+		return nil
+	}
+
+	// For hostnames, resolve all A/AAAA records and reject any that are private
+	// or loopback. This prevents DNS-based SSRF even when the literal hostname
+	// looks safe.
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		// If we cannot resolve the host at validation time, reject it rather
+		// than allowing an unresolvable name through.
+		return fmt.Errorf("hostname could not be resolved: %w", err)
+	}
+	for _, addr := range addrs {
+		if ip := net.ParseIP(addr); ip != nil && isPrivateIP(ip) {
+			return fmt.Errorf("hostname resolves to a private/reserved IP address (%s)", addr)
 		}
 	}
 
@@ -344,7 +366,7 @@ func isPrivateIP(ip net.IP) bool {
 		"192.168.0.0/16",
 		"169.254.0.0/16", // link-local
 		"::1/128",
-		"fc00::/7", // ULA
+		"fc00::/7",  // ULA
 		"fe80::/10", // link-local IPv6
 	}
 	for _, cidr := range privateRanges {
@@ -356,7 +378,8 @@ func isPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsLinkLocalUnicast()
 }
 
-// joinPath safely joins a base URL and a path segment using url.JoinPath.
+// joinPath resolves elem as a URL reference against base using url.Parse,
+// which correctly handles trailing slashes and relative paths.
 func joinPath(base, elem string) (string, error) {
 	u, err := neturl.Parse(base)
 	if err != nil {
@@ -373,4 +396,3 @@ func joinPath(base, elem string) (string, error) {
 func envOrEmpty(key string) string {
 	return os.Getenv(key)
 }
-

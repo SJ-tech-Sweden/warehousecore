@@ -30,15 +30,15 @@ func GetEventorySettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"api_url":                cfg.APIURL,
-		"api_key_configured":     cfg.APIKey != "",
-		"api_key_masked":         maskedKey,
-		"username":               cfg.Username,
-		"username_configured":    cfg.Username != "",
-		"password_configured":    cfg.Password != "",
-		"token_endpoint":         cfg.TokenEndpoint,
-		"supplier_name":          cfg.EffectiveSupplierName(),
-		"sync_interval_minutes":  cfg.SyncIntervalMinutes,
+		"api_url":               cfg.APIURL,
+		"api_key_configured":    cfg.APIKey != "",
+		"api_key_masked":        maskedKey,
+		"username":              cfg.Username,
+		"username_configured":   cfg.Username != "",
+		"password_configured":   cfg.Password != "",
+		"token_endpoint":        cfg.TokenEndpoint,
+		"supplier_name":         cfg.EffectiveSupplierName(),
+		"sync_interval_minutes": cfg.SyncIntervalMinutes,
 	})
 }
 
@@ -65,10 +65,19 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// SSRF protection: validate the URL
+	// SSRF protection: validate the API URL
 	if err := services.ValidateEventoryURL(payload.APIURL); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Invalid API URL: %v", err)})
 		return
+	}
+
+	// Validate token_endpoint when provided — it is also used for outbound requests.
+	tokenEndpoint := strings.TrimSpace(payload.TokenEndpoint)
+	if tokenEndpoint != "" {
+		if err := services.ValidateEventoryURL(tokenEndpoint); err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Invalid token endpoint URL: %v", err)})
+			return
+		}
 	}
 
 	// Load existing config to preserve secrets when new values are blank
@@ -94,7 +103,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		APIKey:              apiKey,
 		Username:            strings.TrimSpace(payload.Username),
 		Password:            password,
-		TokenEndpoint:       strings.TrimSpace(payload.TokenEndpoint),
+		TokenEndpoint:       tokenEndpoint,
 		SupplierName:        strings.TrimSpace(payload.SupplierName),
 		SyncIntervalMinutes: payload.SyncIntervalMinutes,
 	}
@@ -108,9 +117,15 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	// Restart the background scheduler with the new interval
 	services.GetEventoryScheduler().Reset()
 
+	maskedKey := ""
+	if cfg.APIKey != "" {
+		maskedKey = maskAPIKey(cfg.APIKey)
+	}
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"api_url":               cfg.APIURL,
 		"api_key_configured":    cfg.APIKey != "",
+		"api_key_masked":        maskedKey,
 		"username":              cfg.Username,
 		"username_configured":   cfg.Username != "",
 		"password_configured":   cfg.Password != "",
@@ -178,12 +193,4 @@ func maskAPIKey(key string) string {
 		return strings.Repeat("*", len(key))
 	}
 	return key[:4] + strings.Repeat("*", len(key)-8) + key[len(key)-4:]
-}
-
-// nullableStr returns nil for empty strings (for nullable DB columns).
-func nullableStr(s string) interface{} {
-	if s == "" {
-		return nil
-	}
-	return s
 }

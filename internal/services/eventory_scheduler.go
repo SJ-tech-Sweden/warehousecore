@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"warehousecore/internal/repository"
@@ -14,8 +15,9 @@ import (
 // products from the Eventory API. It is a singleton; call GetEventoryScheduler()
 // to obtain the shared instance.
 type EventoryScheduler struct {
-	mu     sync.Mutex
-	stopCh chan struct{}
+	mu      sync.Mutex
+	stopCh  chan struct{}
+	running int32 // atomic flag: 1 when a sync is in progress
 	// syncFn is called by the scheduler when a sync is due. Injected so it can
 	// be overridden in tests.
 	syncFn func()
@@ -70,8 +72,14 @@ func (s *EventoryScheduler) Reset() {
 		for {
 			select {
 			case <-ticker.C:
+				// Skip tick if a sync is already in progress to avoid overlap.
+				if !atomic.CompareAndSwapInt32(&s.running, 0, 1) {
+					log.Printf("[EVENTORY] Scheduler: skipping tick, sync already in progress")
+					continue
+				}
 				log.Printf("[EVENTORY] Scheduler: running scheduled sync")
 				s.syncFn()
+				atomic.StoreInt32(&s.running, 0)
 			case <-stopCh:
 				log.Printf("[EVENTORY] Scheduler: stopped")
 				return

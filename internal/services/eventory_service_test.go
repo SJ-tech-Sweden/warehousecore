@@ -106,14 +106,16 @@ func TestParseEventoryProductsResponse_InvalidJSON(t *testing.T) {
 // ===========================
 
 func TestValidateEventoryURL_ValidHTTPS(t *testing.T) {
-	if err := ValidateEventoryURL("https://api.eventory.se"); err != nil {
-		t.Errorf("unexpected error for valid URL: %v", err)
+	// Use a public routable IP that is not private (8.8.8.8 = Google DNS)
+	// to avoid DNS lookups in environments without network access.
+	if err := ValidateEventoryURL("https://8.8.8.8/api"); err != nil {
+		t.Errorf("unexpected error for valid public IP URL: %v", err)
 	}
 }
 
 func TestValidateEventoryURL_ValidHTTP(t *testing.T) {
-	if err := ValidateEventoryURL("http://example.com"); err != nil {
-		t.Errorf("unexpected error for http URL: %v", err)
+	if err := ValidateEventoryURL("http://1.1.1.1/path"); err != nil {
+		t.Errorf("unexpected error for valid http URL: %v", err)
 	}
 }
 
@@ -129,14 +131,26 @@ func TestValidateEventoryURL_RejectsPrivateIP(t *testing.T) {
 	}
 }
 
+func TestValidateEventoryURL_RejectsLoopbackIP(t *testing.T) {
+	if err := ValidateEventoryURL("http://127.0.0.1/"); err == nil {
+		t.Error("expected error for loopback IP URL, got nil")
+	}
+}
+
+func TestValidateEventoryURL_RejectsLinkLocal(t *testing.T) {
+	if err := ValidateEventoryURL("http://169.254.169.254/latest/meta-data/"); err == nil {
+		t.Error("expected error for link-local IP URL, got nil")
+	}
+}
+
 func TestValidateEventoryURL_RejectsEmbeddedCredentials(t *testing.T) {
-	if err := ValidateEventoryURL("http://user:pass@example.com"); err == nil {
+	if err := ValidateEventoryURL("http://user:pass@1.1.1.1"); err == nil {
 		t.Error("expected error for URL with credentials, got nil")
 	}
 }
 
 func TestValidateEventoryURL_RejectsNonHTTP(t *testing.T) {
-	if err := ValidateEventoryURL("ftp://files.example.com"); err == nil {
+	if err := ValidateEventoryURL("ftp://1.1.1.1"); err == nil {
 		t.Error("expected error for ftp:// URL, got nil")
 	}
 }
