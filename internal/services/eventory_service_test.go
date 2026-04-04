@@ -236,6 +236,31 @@ func TestFetchEventoryProducts_BearerAuth(t *testing.T) {
 	}
 }
 
+// TestFetchEventoryProducts_APIKeyHeaders verifies that when only an API key is
+// configured, X-API-Key is set to the API key (not the OAuth token).
+func TestFetchEventoryProducts_APIKeyHeaders(t *testing.T) {
+	var gotAPIKey, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotAPIKey = r.Header.Get("X-API-Key")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]EventoryProduct{{Name: "Product"}})
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL, APIKey: "static-api-key"}
+	_, err := FetchEventoryProducts(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotAuth != "Bearer static-api-key" {
+		t.Errorf("expected Authorization: Bearer static-api-key, got %q", gotAuth)
+	}
+	if gotAPIKey != "static-api-key" {
+		t.Errorf("expected X-API-Key: static-api-key, got %q", gotAPIKey)
+	}
+}
+
 // ===========================
 // EffectiveSupplierName tests
 // ===========================

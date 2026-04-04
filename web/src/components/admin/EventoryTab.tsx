@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Save, RefreshCcw, AlertCircle, Link2, Package, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { eventoryApi, type EventoryProduct, type EventorySettingsPayload } from '../../lib/api';
 import { useTranslation } from 'react-i18next';
@@ -39,11 +39,7 @@ export function EventoryTab() {
 
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const { data } = await eventoryApi.getSettings();
       setApiUrl(data.api_url || '');
@@ -60,7 +56,11 @@ export function EventoryTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     const trimmedUrl = apiUrl.trim();

@@ -46,35 +46,36 @@ func GetEventorySettings(w http.ResponseWriter, r *http.Request) {
 
 // UpdateEventorySettings saves the Eventory connection settings.
 // Empty api_key / password fields leave the existing stored values unchanged.
+// Missing sync_interval_minutes (null in JSON) preserves the existing value.
 func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
-	var payload struct {
+	var rawPayload struct {
 		APIURL              string `json:"api_url"`
 		APIKey              string `json:"api_key"`
 		Username            string `json:"username"`
 		Password            string `json:"password"`
 		TokenEndpoint       string `json:"token_endpoint"`
 		SupplierName        string `json:"supplier_name"`
-		SyncIntervalMinutes int    `json:"sync_interval_minutes"`
+		SyncIntervalMinutes *int   `json:"sync_interval_minutes"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&rawPayload); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
-	payload.APIURL = strings.TrimSpace(payload.APIURL)
-	if payload.APIURL == "" {
+	rawPayload.APIURL = strings.TrimSpace(rawPayload.APIURL)
+	if rawPayload.APIURL == "" {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "API URL is required"})
 		return
 	}
 
 	// SSRF protection: validate the API URL
-	if err := services.ValidateEventoryURL(payload.APIURL); err != nil {
+	if err := services.ValidateEventoryURL(rawPayload.APIURL); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Invalid API URL: %v", err)})
 		return
 	}
 
 	// Validate token_endpoint when provided — it is also used for outbound requests.
-	tokenEndpoint := strings.TrimSpace(payload.TokenEndpoint)
+	tokenEndpoint := strings.TrimSpace(rawPayload.TokenEndpoint)
 	if tokenEndpoint != "" {
 		if err := services.ValidateEventoryURL(tokenEndpoint); err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Invalid token endpoint URL: %v", err)})
@@ -82,7 +83,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Load existing config to preserve secrets when new values are blank
+	// Load existing config to preserve secrets and interval when new values are blank/absent
 	existing, err := services.GetEventoryConfig()
 	if err != nil {
 		log.Printf("[EVENTORY] Failed to load existing config while preserving secrets: %v", err)
@@ -90,24 +91,30 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := strings.TrimSpace(payload.APIKey)
+	apiKey := strings.TrimSpace(rawPayload.APIKey)
 	if apiKey == "" {
 		apiKey = existing.APIKey
 	}
 
-	password := strings.TrimSpace(payload.Password)
+	password := strings.TrimSpace(rawPayload.Password)
 	if password == "" {
 		password = existing.Password
 	}
 
+	// Preserve existing sync interval if the field was omitted from the payload.
+	syncIntervalMinutes := existing.SyncIntervalMinutes
+	if rawPayload.SyncIntervalMinutes != nil {
+		syncIntervalMinutes = *rawPayload.SyncIntervalMinutes
+	}
+
 	cfg := &services.EventoryConfig{
-		APIURL:              payload.APIURL,
+		APIURL:              rawPayload.APIURL,
 		APIKey:              apiKey,
-		Username:            strings.TrimSpace(payload.Username),
+		Username:            strings.TrimSpace(rawPayload.Username),
 		Password:            password,
 		TokenEndpoint:       tokenEndpoint,
-		SupplierName:        strings.TrimSpace(payload.SupplierName),
-		SyncIntervalMinutes: payload.SyncIntervalMinutes,
+		SupplierName:        strings.TrimSpace(rawPayload.SupplierName),
+		SyncIntervalMinutes: syncIntervalMinutes,
 	}
 
 	if err := services.SaveEventoryConfig(cfg); err != nil {

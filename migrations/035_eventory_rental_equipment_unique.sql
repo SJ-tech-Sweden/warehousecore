@@ -22,6 +22,9 @@ WHERE equipment_id IN (
     WHERE rn > 1
 );
 
--- Step 2: Add the unique index. If Step 1 ran cleanly, this will always succeed.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_rental_equipment_name_supplier
+-- Step 2: Add the unique index using CONCURRENTLY to avoid blocking writes to
+-- rental_equipment during index creation. Note: CONCURRENTLY cannot run inside
+-- a transaction, so this script must be applied outside of a transaction block
+-- (psql default behavior applies the file outside a transaction).
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uq_rental_equipment_name_supplier
     ON rental_equipment (product_name, supplier_name);

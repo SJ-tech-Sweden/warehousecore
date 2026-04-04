@@ -627,11 +627,11 @@ export interface EventorySyncResult {
 export interface EventorySettingsPayload {
   api_url: string;
   api_key?: string;
-  username?: string;
+  username: string;
   password?: string;
-  token_endpoint?: string;
-  supplier_name?: string;
-  sync_interval_minutes?: number;
+  token_endpoint: string;
+  supplier_name: string;
+  sync_interval_minutes: number;
 }
 
 export const eventoryApi = {

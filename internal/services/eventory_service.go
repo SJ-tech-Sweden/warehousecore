@@ -156,14 +156,16 @@ func FetchEventoryProducts(cfg *EventoryConfig) ([]EventoryProduct, error) {
 
 	client := &http.Client{Timeout: 15 * time.Second}
 
-	// Obtain access token via OAuth2 ROPC when credentials are provided
-	bearerToken := cfg.APIKey
+	// Obtain access token via OAuth2 ROPC when credentials are provided.
+	// The OAuth token is used for Authorization: Bearer; the API key (if set)
+	// is always sent as X-API-Key regardless of which auth method is used.
+	oauthToken := ""
 	if cfg.Username != "" && cfg.Password != "" {
 		token, err := fetchOAuthToken(client, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain Eventory access token: %w", err)
 		}
-		bearerToken = token
+		oauthToken = token
 	}
 
 	// Try common product endpoint paths
@@ -175,7 +177,7 @@ func FetchEventoryProducts(cfg *EventoryConfig) ([]EventoryProduct, error) {
 
 	var lastErr error
 	for _, endpoint := range endpoints {
-		products, err := fetchFromEndpoint(client, cfg.APIURL, endpoint, bearerToken)
+		products, err := fetchFromEndpoint(client, cfg.APIURL, endpoint, oauthToken, cfg.APIKey)
 		if err == nil {
 			return products, nil
 		}
@@ -240,7 +242,10 @@ func fetchOAuthToken(client *http.Client, cfg *EventoryConfig) (string, error) {
 	return tokenResp.AccessToken, nil
 }
 
-func fetchFromEndpoint(client *http.Client, baseURL, endpoint, bearerToken string) ([]EventoryProduct, error) {
+// fetchFromEndpoint fetches products from a single endpoint path.
+// oauthToken is used for Authorization: Bearer (OAuth2 access token).
+// apiKey is sent as X-API-Key (static API key). Either may be empty.
+func fetchFromEndpoint(client *http.Client, baseURL, endpoint, oauthToken, apiKey string) ([]EventoryProduct, error) {
 	fullURL, err := joinPath(baseURL, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct request URL: %w", err)
@@ -251,9 +256,16 @@ func fetchFromEndpoint(client *http.Client, baseURL, endpoint, bearerToken strin
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+bearerToken)
-		req.Header.Set("X-API-Key", bearerToken)
+	// Set Authorization: Bearer from the OAuth access token when available.
+	// Fall back to the API key as the bearer value when no OAuth token is present.
+	if oauthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+oauthToken)
+	} else if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	// Always send X-API-Key from the configured API key (never from the OAuth token).
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -342,15 +354,12 @@ func ValidateEventoryURL(rawURL string) error {
 
 	// For hostnames, resolve all A/AAAA records and reject any that are private
 	// or loopback. This prevents DNS-based SSRF even when the literal hostname
-	// looks safe.
-	// If DNS resolution fails (network unavailable, air-gapped env, etc.) we log
-	// a warning but allow the URL through so admins can still configure the
-	// integration. The actual HTTP client call will fail at runtime if the host
-	// is truly unreachable.
+	// looks safe. Fail closed: if DNS resolution fails we cannot verify that the
+	// host is safe, so we reject the URL to prevent SSRF via unresolvable names
+	// that could later resolve to private ranges.
 	addrs, err := net.LookupHost(host)
 	if err != nil {
-		log.Printf("[EVENTORY] Warning: could not resolve %q during URL validation: %v (proceeding)", host, err)
-		return nil
+		return fmt.Errorf("URL hostname could not be resolved during validation: %w", err)
 	}
 	for _, addr := range addrs {
 		if ip := net.ParseIP(addr); ip != nil && isPrivateIP(ip) {
