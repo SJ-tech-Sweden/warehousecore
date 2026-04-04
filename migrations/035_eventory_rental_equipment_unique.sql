@@ -5,8 +5,9 @@
 -- Step 1: Remove duplicate rows, keeping the row with the highest equipment_id
 -- (i.e. the most recently inserted). Note: this uses ROW_NUMBER() OVER to rank
 -- rows within each (product_name, supplier_name) group, but it still requires
--- a full scan and partitioning of the entire rental_equipment table and may be
--- slow/locking on large datasets. Run during a maintenance window if needed.
+-- a full scan and partitioning of the entire rental_equipment table. On large
+-- datasets this can be a long-running operation that blocks concurrent writes
+-- to the table. Run during a maintenance window if needed.
 DELETE FROM rental_equipment
 WHERE equipment_id IN (
     SELECT equipment_id

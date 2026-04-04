@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"log"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -81,7 +82,7 @@ func (s *EventoryScheduler) Reset() {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							log.Printf("[EVENTORY] Scheduler: sync panicked: %v", r)
+							log.Printf("[EVENTORY] Scheduler: sync panicked: %v\n%s", r, debug.Stack())
 						}
 						atomic.StoreInt32(&s.running, 0)
 					}()
