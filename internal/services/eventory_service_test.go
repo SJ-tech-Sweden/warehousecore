@@ -188,7 +188,7 @@ func TestFetchEventoryProducts_EndpointFallback(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &EventoryConfig{APIURL: srv.URL}
-	products, err := FetchEventoryProducts(cfg)
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestFetchEventoryProducts_AllFail(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &EventoryConfig{APIURL: srv.URL}
-	_, err := FetchEventoryProducts(cfg)
+	_, err := fetchEventoryProductsWith(cfg, srv.Client())
 	if err == nil {
 		t.Fatal("expected error when all endpoints fail, got nil")
 	}
@@ -227,7 +227,7 @@ func TestFetchEventoryProducts_BearerAuth(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &EventoryConfig{APIURL: srv.URL, APIKey: "my-token"}
-	_, err := FetchEventoryProducts(cfg)
+	_, err := fetchEventoryProductsWith(cfg, srv.Client())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestFetchEventoryProducts_APIKeyHeaders(t *testing.T) {
 	defer srv.Close()
 
 	cfg := &EventoryConfig{APIURL: srv.URL, APIKey: "static-api-key"}
-	_, err := FetchEventoryProducts(cfg)
+	_, err := fetchEventoryProductsWith(cfg, srv.Client())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

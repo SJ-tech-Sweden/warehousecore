@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -148,13 +149,20 @@ func BootstrapEventoryFromEnv() {
 
 // FetchEventoryProducts obtains an access token when credentials are configured,
 // then fetches the product list from the Eventory API. It tries multiple common
-// endpoint paths and handles various response JSON shapes.
+// endpoint paths and handles various response JSON shapes. Outbound requests use
+// a custom transport that rejects connections to private/reserved IPs at dial
+// time, preventing DNS rebinding attacks.
 func FetchEventoryProducts(cfg *EventoryConfig) ([]EventoryProduct, error) {
+	return fetchEventoryProductsWith(cfg, newSSRFSafeClient())
+}
+
+// fetchEventoryProductsWith is the testable core of FetchEventoryProducts.
+// The caller supplies the HTTP client, allowing tests to inject a plain client
+// targeting a local httptest.Server without triggering SSRF guards.
+func fetchEventoryProductsWith(cfg *EventoryConfig, client *http.Client) ([]EventoryProduct, error) {
 	if cfg.APIURL == "" {
 		return nil, errors.New("Eventory API URL is not configured")
 	}
-
-	client := &http.Client{Timeout: 15 * time.Second}
 
 	// Obtain access token via OAuth2 ROPC when credentials are provided.
 	// The OAuth token is used for Authorization: Bearer; the API key (if set)
@@ -168,11 +176,13 @@ func FetchEventoryProducts(cfg *EventoryConfig) ([]EventoryProduct, error) {
 		oauthToken = token
 	}
 
-	// Try common product endpoint paths
+	// Try common product endpoint paths. Paths are relative (no leading slash)
+	// so that any configured path prefix in cfg.APIURL is preserved when the
+	// final request URL is built by joinPath.
 	endpoints := []string{
-		"/api/v1/products",
-		"/api/products",
-		"/products",
+		"api/v1/products",
+		"api/products",
+		"products",
 	}
 
 	var lastErr error
@@ -193,7 +203,7 @@ func FetchEventoryProducts(cfg *EventoryConfig) ([]EventoryProduct, error) {
 func fetchOAuthToken(client *http.Client, cfg *EventoryConfig) (string, error) {
 	tokenEndpoint := strings.TrimSpace(cfg.TokenEndpoint)
 	if tokenEndpoint == "" {
-		u, err := joinPath(cfg.APIURL, "/oauth/token")
+		u, err := joinPath(cfg.APIURL, "oauth/token")
 		if err != nil {
 			return "", fmt.Errorf("failed to construct token endpoint URL: %w", err)
 		}
@@ -401,18 +411,65 @@ func isPrivateIP(ip net.IP) bool {
 	return false
 }
 
-// joinPath resolves elem as a URL reference against base using url.Parse,
-// which correctly handles trailing slashes and relative paths.
+// newSSRFSafeClient returns an *http.Client whose DialContext rejects connections
+// to private, loopback, and other non-global-unicast addresses at connect time.
+// This defends against DNS rebinding: even if ValidateEventoryURL allowed a host
+// at configuration time, a rebind that resolves to a private IP at request time
+// will be blocked here before any data is sent.
+func newSSRFSafeClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// addr is "host:port"; split off the port
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address %q: %w", addr, err)
+			}
+			// Resolve the host to IPs. Fail if resolution fails.
+			addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve %q: %w", host, err)
+			}
+			// Find the first safe (non-private) address and dial it.
+			// If ANY resolved address is private we log it, but we only block
+			// when no safe address is available to prevent the caller from
+			// falling back to a private IP via round-robin.
+			var safeAddr string
+			for _, a := range addrs {
+				ip := net.ParseIP(a)
+				if ip != nil && isPrivateIP(ip) {
+					continue // skip private addresses
+				}
+				safeAddr = a
+				break
+			}
+			if safeAddr == "" {
+				return nil, fmt.Errorf("blocked: all resolved addresses for %s are private/reserved", host)
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(safeAddr, port))
+		},
+	}
+	return &http.Client{Timeout: 15 * time.Second, Transport: transport}
+}
+
+// joinPath appends the relative path elem to the base URL, preserving any path
+// prefix already present in base. elem must be a relative path without a leading
+// slash. A trailing slash is added to the base path before resolving so that the
+// relative reference is appended rather than replacing the last path segment.
 func joinPath(base, elem string) (string, error) {
 	u, err := neturl.Parse(base)
 	if err != nil {
 		return "", err
 	}
-	result, err := u.Parse(elem)
+	// Ensure base path ends with "/" so relative resolution appends correctly.
+	if !strings.HasSuffix(u.Path, "/") {
+		u.Path += "/"
+	}
+	ref, err := neturl.Parse(elem)
 	if err != nil {
 		return "", err
 	}
-	return result.String(), nil
+	return u.ResolveReference(ref).String(), nil
 }
 
 // envOrEmpty returns os.Getenv(key).

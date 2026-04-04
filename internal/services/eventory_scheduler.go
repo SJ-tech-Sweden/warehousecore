@@ -18,7 +18,8 @@ import (
 type EventoryScheduler struct {
 	mu      sync.Mutex
 	stopCh  chan struct{}
-	running int32 // atomic flag: 1 when a sync is in progress
+	wg      sync.WaitGroup // tracks goroutines running syncFn so Stop() can wait
+	running int32          // atomic flag: 1 when a sync is in progress
 	// syncFn is called by the scheduler when a sync is due. Injected so it can
 	// be overridden in tests.
 	syncFn func()
@@ -79,7 +80,11 @@ func (s *EventoryScheduler) Reset() {
 					continue
 				}
 				log.Printf("[EVENTORY] Scheduler: running scheduled sync")
-				func() {
+				// Add to WaitGroup before launching the goroutine so that
+				// Stop()/wg.Wait() cannot return before the sync starts.
+				s.wg.Add(1)
+				go func() {
+					defer s.wg.Done()
 					defer func() {
 						if r := recover(); r != nil {
 							log.Printf("[EVENTORY] Scheduler: sync panicked: %v\n%s", r, debug.Stack())
@@ -96,26 +101,39 @@ func (s *EventoryScheduler) Reset() {
 	}()
 }
 
-// Stop terminates the running scheduler goroutine if active.
+// Stop terminates the running scheduler goroutine if active, then waits for
+// any in-progress sync to finish before returning. This ensures that an
+// in-flight RunEventorySync call completes (and its DB transaction is
+// committed or rolled back) before the caller proceeds with teardown such as
+// closing the database connection.
 func (s *EventoryScheduler) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.stopCh = nil
 	}
+	s.mu.Unlock()
+	// Wait outside the mutex so in-flight syncs can complete without deadlock.
+	s.wg.Wait()
 }
 
-// TryAcquireSync attempts to set the in-progress flag (CAS 0→1).
+// TryAcquireSync attempts to set the in-progress flag (CAS 0→1) and increments
+// the WaitGroup so that Stop() will wait for this manual sync too.
 // Returns true if the caller now owns the flag and must call ReleaseSync when done.
-// Returns false if a sync is already running.
+// Returns false if a sync is already running (WaitGroup is not incremented).
 func (s *EventoryScheduler) TryAcquireSync() bool {
-	return atomic.CompareAndSwapInt32(&s.running, 0, 1)
+	if !atomic.CompareAndSwapInt32(&s.running, 0, 1) {
+		return false
+	}
+	s.wg.Add(1)
+	return true
 }
 
-// ReleaseSync clears the in-progress flag. Must be called after TryAcquireSync returned true.
+// ReleaseSync clears the in-progress flag and signals the WaitGroup.
+// Must be called after TryAcquireSync returned true.
 func (s *EventoryScheduler) ReleaseSync() {
 	atomic.StoreInt32(&s.running, 0)
+	s.wg.Done()
 }
 
 // defaultEventorySync performs the actual product sync and logs the result.
