@@ -401,3 +401,44 @@ func TestEncryptDecryptCredential_Base64Key(t *testing.T) {
 		t.Errorf("expected %q, got %q", plaintext, dec)
 	}
 }
+
+// TestEncryptCredential_PrefixCollision verifies that a plaintext API key that
+// starts with "enc:" is safely round-tripped when encryption is disabled. Without
+// the rawEscapePrefix guard, decryptCredential would attempt (and fail) to decrypt
+// what is actually plain text.
+func TestEncryptCredential_PrefixCollision(t *testing.T) {
+	colliding := "enc:looks-like-encrypted-but-isnt"
+	// Encryption disabled (nil key): should be escaped, not returned as-is.
+	out, err := encryptCredential(colliding, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.HasPrefix(out, rawEscapePrefix) {
+		t.Fatalf("expected rawEscapePrefix %q on collision value, got %q", rawEscapePrefix, out)
+	}
+	// Decrypt (with nil key) should recover original.
+	dec, err := decryptCredential(out, nil)
+	if err != nil {
+		t.Fatalf("unexpected error on decrypt: %v", err)
+	}
+	if dec != colliding {
+		t.Errorf("expected %q, got %q", colliding, dec)
+	}
+}
+
+// TestEventoryCredentialKey_Base64WrongLength verifies that a base64 string that
+// decodes to a length other than 32 returns an error referencing the decoded
+// length rather than silently falling back to a raw-byte length check.
+func TestEventoryCredentialKey_Base64WrongLength(t *testing.T) {
+	// 16 raw bytes base64-encoded → decodes to 16, not 32
+	shortKey := base64.StdEncoding.EncodeToString(make([]byte, 16))
+	t.Setenv("EVENTORY_CREDENTIAL_KEY", shortKey)
+	_, err := eventoryCredentialKey()
+	if err == nil {
+		t.Fatal("expected error for base64-decoded key of wrong length, got nil")
+	}
+	// Error should mention the decoded byte count (16), not the raw string length.
+	if !strings.Contains(err.Error(), "16") {
+		t.Errorf("expected error to mention decoded length 16, got: %v", err)
+	}
+}

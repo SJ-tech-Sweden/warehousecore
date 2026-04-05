@@ -205,6 +205,10 @@ func GetEventoryProducts(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load Eventory settings"})
 		return
 	}
+	if strings.TrimSpace(cfg.APIURL) == "" {
+		respondJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "Eventory API URL is not configured. Set it in the Eventory settings."})
+		return
+	}
 
 	products, err := services.FetchEventoryProducts(cfg)
 	if err != nil {
@@ -233,6 +237,10 @@ func SyncEventoryProducts(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[EVENTORY] Failed to get config: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load Eventory settings"})
+		return
+	}
+	if strings.TrimSpace(cfg.APIURL) == "" {
+		respondJSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "Eventory API URL is not configured. Set it in the Eventory settings."})
 		return
 	}
 

@@ -71,6 +71,13 @@ type EventoryProduct struct {
 // still be read transparently.
 const encryptedPrefix = "enc:"
 
+// rawEscapePrefix is prepended to plaintext credential values that begin with
+// encryptedPrefix (or rawEscapePrefix itself) to prevent the dec rypt path from
+// misidentifying them as encrypted. This avoids the "enc:" prefix-collision
+// edge case: if an API key literally starts with "enc:", it would otherwise be
+// treated as an encrypted blob and fail to decrypt.
+const rawEscapePrefix = "raw:"
+
 // eventoryCredentialKey returns the 32-byte AES-256 key read from the
 // EVENTORY_CREDENTIAL_KEY environment variable. It returns (nil, nil) when the
 // variable is not set (credentials are stored as plain text, with a warning).
@@ -84,22 +91,35 @@ func eventoryCredentialKey() ([]byte, error) {
 		return nil, nil
 	}
 	// Attempt base64 decoding first so operators can store a high-entropy key.
-	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil && len(decoded) == 32 {
+	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil {
+		// Base64 decoded successfully — require exactly 32 bytes. Report the
+		// decoded length rather than the raw string length so the error is
+		// actionable (operators know they need to regenerate the key).
+		if len(decoded) != 32 {
+			return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY base64-decoded to %d bytes; expected exactly 32 (use `openssl rand -base64 32` to generate a suitable value)", len(decoded))
+		}
 		return decoded, nil
 	}
 	// Fall back to treating the raw string as bytes (legacy / simple 32-char ASCII key).
 	key := []byte(raw)
 	if len(key) != 32 {
-		return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY must decode to exactly 32 bytes (use `openssl rand -base64 32` to generate a suitable value); got %d bytes", len(key))
+		return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY must be exactly 32 bytes (use `openssl rand -base64 32` to generate a suitable value); got %d bytes", len(key))
 	}
 	return key, nil
 }
 
 // encryptCredential encrypts plaintext using AES-256-GCM and returns a
 // base64url-encoded string prefixed with encryptedPrefix. If key is nil the
-// original plaintext is returned unchanged.
+// original plaintext is returned, with rawEscapePrefix prepended when the
+// value starts with encryptedPrefix or rawEscapePrefix to prevent the decrypt
+// path from misidentifying it as an encrypted blob.
 func encryptCredential(plaintext string, key []byte) (string, error) {
 	if len(key) == 0 || plaintext == "" {
+		// No encryption key: store as plaintext, but escape values that start
+		// with the encrypted or escape prefix to avoid collision on read-back.
+		if strings.HasPrefix(plaintext, encryptedPrefix) || strings.HasPrefix(plaintext, rawEscapePrefix) {
+			return rawEscapePrefix + plaintext, nil
+		}
 		return plaintext, nil
 	}
 	block, err := aes.NewCipher(key)
@@ -118,10 +138,17 @@ func encryptCredential(plaintext string, key []byte) (string, error) {
 	return encryptedPrefix + base64.URLEncoding.EncodeToString(ciphertext), nil
 }
 
-// decryptCredential reverses encryptCredential. Values that do not carry the
-// encryptedPrefix (i.e., plain text stored before encryption was enabled) are
-// returned as-is so that existing configurations continue to work.
+// decryptCredential reverses encryptCredential. Values prefixed with
+// encryptedPrefix are decrypted. Values prefixed with rawEscapePrefix (written
+// by encryptCredential when encryption is disabled and the plaintext itself
+// started with a reserved prefix) have the escape prefix stripped. All other
+// values (plain text stored before encryption/escaping was introduced) are
+// returned as-is for backward compatibility.
 func decryptCredential(stored string, key []byte) (string, error) {
+	if strings.HasPrefix(stored, rawEscapePrefix) {
+		// Strip the escape prefix; the remainder is the original plaintext.
+		return stored[len(rawEscapePrefix):], nil
+	}
 	if !strings.HasPrefix(stored, encryptedPrefix) {
 		return stored, nil
 	}
@@ -553,44 +580,46 @@ func isPrivateIP(ip net.IP) bool {
 // will be blocked here before any data is sent.
 func newSSRFSafeClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			// addr is "host:port"; split off the port
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid address %q: %w", addr, err)
+	// Clone DefaultTransport to preserve important production settings (TLS
+	// config, proxy support, idle-connection limits, keep-alive timeouts, etc.)
+	// and only override the fields required for SSRF protection.
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// addr is "host:port"; split off the port
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address %q: %w", addr, err)
+		}
+		// Resolve the host to IPs. Fail if resolution fails.
+		addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve %q: %w", host, err)
+		}
+		// Try each safe (non-private) resolved address in order.
+		// Private/reserved addresses are skipped; we only block when no
+		// safe address is available, preventing the caller from falling back
+		// to a private IP via round-robin. If multiple safe addresses are
+		// returned, each is attempted until one succeeds.
+		var (
+			foundSafe bool
+			dialErrs  []error
+		)
+		for _, a := range addrs {
+			ip := net.ParseIP(a)
+			if ip != nil && isPrivateIP(ip) {
+				continue // skip private addresses
 			}
-			// Resolve the host to IPs. Fail if resolution fails.
-			addrs, err := net.DefaultResolver.LookupHost(ctx, host)
-			if err != nil {
-				return nil, fmt.Errorf("failed to resolve %q: %w", host, err)
+			foundSafe = true
+			conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(a, port))
+			if err == nil {
+				return conn, nil
 			}
-			// Try each safe (non-private) resolved address in order.
-			// Private/reserved addresses are skipped; we only block when no
-			// safe address is available, preventing the caller from falling back
-			// to a private IP via round-robin. If multiple safe addresses are
-			// returned, each is attempted until one succeeds.
-			var (
-				foundSafe bool
-				dialErrs  []error
-			)
-			for _, a := range addrs {
-				ip := net.ParseIP(a)
-				if ip != nil && isPrivateIP(ip) {
-					continue // skip private addresses
-				}
-				foundSafe = true
-				conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(a, port))
-				if err == nil {
-					return conn, nil
-				}
-				dialErrs = append(dialErrs, fmt.Errorf("dial %s: %w", a, err))
-			}
-			if !foundSafe {
-				return nil, fmt.Errorf("blocked: all resolved addresses for %s are private/reserved", host)
-			}
-			return nil, fmt.Errorf("failed to connect to any resolved public address for %s: %w", host, errors.Join(dialErrs...))
-		},
+			dialErrs = append(dialErrs, fmt.Errorf("dial %s: %w", a, err))
+		}
+		if !foundSafe {
+			return nil, fmt.Errorf("blocked: all resolved addresses for %s are private/reserved", host)
+		}
+		return nil, fmt.Errorf("failed to connect to any resolved public address for %s: %w", host, errors.Join(dialErrs...))
 	}
 	return &http.Client{
 		Timeout:   15 * time.Second,
