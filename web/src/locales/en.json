@@ -376,6 +376,7 @@
       "saveError": "Failed to save Eventory settings",
       "actions": "Actions",
       "actionsDesc": "Fetch a preview of products from Eventory, or sync them directly into your rental products list.",
+      "actionsUnsavedHint": "Save your settings before fetching or syncing.",
       "fetchProducts": "Fetch Products",
       "fetching": "Fetching…",
       "fetchedProducts": "{{count}} products fetched from Eventory",

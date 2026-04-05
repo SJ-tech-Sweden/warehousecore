@@ -33,6 +33,7 @@ export function EventoryTab() {
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [products, setProducts] = useState<EventoryProduct[] | null>(null);
   const [productCount, setProductCount] = useState<number | null>(null);
@@ -50,6 +51,7 @@ export function EventoryTab() {
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
+      setHasUnsavedChanges(false);
     } catch (err) {
       console.error('Failed to load Eventory settings:', err);
       setMessage({ type: 'error', text: t('admin.eventory.loadError') });
@@ -94,6 +96,7 @@ export function EventoryTab() {
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
+      setHasUnsavedChanges(false);
       setMessage({ type: 'success', text: t('admin.eventory.settingsSaved') });
     } catch (err) {
       console.error('Failed to save Eventory settings:', err);
@@ -201,7 +204,7 @@ export function EventoryTab() {
           <input
             type="url"
             value={apiUrl}
-            onChange={e => setApiUrl(e.target.value)}
+            onChange={e => { setApiUrl(e.target.value); setHasUnsavedChanges(true); }}
             placeholder="https://api.eventory.se"
             className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
@@ -217,7 +220,7 @@ export function EventoryTab() {
             <input
               type="text"
               value={username}
-              onChange={e => setUsername(e.target.value)}
+              onChange={e => { setUsername(e.target.value); setHasUnsavedChanges(true); }}
               placeholder={t('admin.eventory.usernamePlaceholder')}
               autoComplete="off"
               className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
@@ -236,7 +239,7 @@ export function EventoryTab() {
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => { setPassword(e.target.value); setHasUnsavedChanges(true); }}
               placeholder={passwordConfigured ? t('admin.eventory.passwordPlaceholderUpdate') : t('admin.eventory.passwordPlaceholder')}
               autoComplete="new-password"
               className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
@@ -265,7 +268,7 @@ export function EventoryTab() {
           <input
             type="password"
             value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
+            onChange={e => { setApiKey(e.target.value); setHasUnsavedChanges(true); }}
             placeholder={apiKeyConfigured ? t('admin.eventory.keyPlaceholderUpdate') : t('admin.eventory.keyPlaceholder')}
             className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
@@ -280,7 +283,7 @@ export function EventoryTab() {
           <input
             type="url"
             value={tokenEndpoint}
-            onChange={e => setTokenEndpoint(e.target.value)}
+            onChange={e => { setTokenEndpoint(e.target.value); setHasUnsavedChanges(true); }}
             placeholder="https://api.eventory.se/oauth/token"
             className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
@@ -295,7 +298,7 @@ export function EventoryTab() {
           <input
             type="text"
             value={supplierName}
-            onChange={e => setSupplierName(e.target.value)}
+            onChange={e => { setSupplierName(e.target.value); setHasUnsavedChanges(true); }}
             placeholder="Eventory"
             className="w-full sm:w-64 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
           />
@@ -310,7 +313,7 @@ export function EventoryTab() {
           </label>
           <select
             value={syncInterval}
-            onChange={e => setSyncInterval(Number(e.target.value))}
+            onChange={e => { setSyncInterval(Number(e.target.value)); setHasUnsavedChanges(true); }}
             className="w-full sm:w-64 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors"
           >
             {SYNC_INTERVAL_OPTIONS.map(opt => (
@@ -340,11 +343,15 @@ export function EventoryTab() {
         <h3 className="text-lg font-semibold text-white">{t('admin.eventory.actions')}</h3>
         <p className="text-sm text-gray-400">{t('admin.eventory.actionsDesc')}</p>
 
+        {hasUnsavedChanges && (
+          <p className="text-sm text-yellow-400">{t('admin.eventory.actionsUnsavedHint')}</p>
+        )}
+
         <div className="flex flex-wrap gap-3">
           {/* Fetch / preview */}
           <button
             onClick={handleFetchProducts}
-            disabled={fetching || !apiUrl.trim()}
+            disabled={fetching || !apiUrl.trim() || hasUnsavedChanges}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
             <RefreshCcw className={`w-4 h-4 ${fetching ? 'animate-spin' : ''}`} />
@@ -354,7 +361,7 @@ export function EventoryTab() {
           {/* Sync */}
           <button
             onClick={handleSync}
-            disabled={syncing || !apiUrl.trim()}
+            disabled={syncing || !apiUrl.trim() || hasUnsavedChanges}
             className="flex items-center gap-2 px-5 py-2.5 bg-green-700 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
             <Package className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />

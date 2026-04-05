@@ -376,6 +376,7 @@
       "saveError": "Fehler beim Speichern der Eventory-Einstellungen",
       "actions": "Aktionen",
       "actionsDesc": "Vorschau der Produkte von Eventory abrufen oder direkt in die Mietartikel-Liste synchronisieren.",
+      "actionsUnsavedHint": "Einstellungen speichern, bevor Produkte abgerufen oder synchronisiert werden.",
       "fetchProducts": "Produkte abrufen",
       "fetching": "Abrufen...",
       "fetchedProducts": "{{count}} Produkte von Eventory abgerufen",

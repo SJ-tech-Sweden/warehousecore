@@ -444,8 +444,8 @@ func newSSRFSafeClient() *http.Client {
 				return nil, fmt.Errorf("failed to resolve %q: %w", host, err)
 			}
 			// Find the first safe (non-private) address and dial it.
-			// If ANY resolved address is private we log it, but we only block
-			// when no safe address is available to prevent the caller from
+			// Private/reserved resolved addresses are skipped; we only block
+			// when no safe address is available, preventing the caller from
 			// falling back to a private IP via round-robin.
 			var safeAddr string
 			for _, a := range addrs {
@@ -462,7 +462,29 @@ func newSSRFSafeClient() *http.Client {
 			return dialer.DialContext(ctx, network, net.JoinHostPort(safeAddr, port))
 		},
 	}
-	return &http.Client{Timeout: 15 * time.Second, Transport: transport}
+	return &http.Client{
+		Timeout:   15 * time.Second,
+		Transport: transport,
+		// Block cross-host redirects to prevent sensitive request headers
+		// (e.g. X-API-Key) from being forwarded to a different origin.
+		// Go's default redirect policy strips Authorization on cross-host
+		// redirects, but does not strip custom headers. Also block scheme
+		// downgrades (e.g. HTTPS→HTTP on the same host) which would expose
+		// credentials over an unencrypted connection.
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) == 0 {
+				return nil
+			}
+			prev := via[len(via)-1]
+			if !strings.EqualFold(req.URL.Host, prev.URL.Host) {
+				return http.ErrUseLastResponse
+			}
+			if strings.ToLower(prev.URL.Scheme) == "https" && strings.ToLower(req.URL.Scheme) != "https" {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
 }
 
 // joinPath appends the relative path elem to the base URL, preserving any path
