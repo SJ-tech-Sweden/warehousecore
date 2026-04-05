@@ -101,13 +101,20 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		password = existing.Password
 	}
 
-	// Require HTTPS for token_endpoint when username or password credentials are
-	// configured: sending OAuth credentials over cleartext HTTP would expose them
-	// on the network.
+	// Require HTTPS for the effective OAuth token destination when username or
+	// password credentials are configured. If token_endpoint is explicitly set,
+	// it must be HTTPS. If it is blank, fetchOAuthToken will derive the token
+	// endpoint from api_url (appending /oauth/token), so api_url must also be
+	// HTTPS in that case to avoid sending credentials over cleartext HTTP.
 	effectiveUsername := strings.TrimSpace(rawPayload.Username)
-	if tokenEndpoint != "" && (effectiveUsername != "" || password != "") {
-		if !strings.HasPrefix(strings.ToLower(tokenEndpoint), "https://") {
-			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Token endpoint must use HTTPS when username or password credentials are configured"})
+	if effectiveUsername != "" || password != "" {
+		if tokenEndpoint != "" {
+			if !strings.HasPrefix(strings.ToLower(tokenEndpoint), "https://") {
+				respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Token endpoint must use HTTPS when username or password credentials are configured"})
+				return
+			}
+		} else if !strings.HasPrefix(strings.ToLower(rawPayload.APIURL), "https://") {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "API URL must use HTTPS when username or password credentials are configured and no token endpoint is provided"})
 			return
 		}
 	}

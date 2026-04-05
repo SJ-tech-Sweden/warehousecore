@@ -236,7 +236,7 @@ func CreateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" { // unique_violation
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == "uq_rental_equipment_name_supplier" { // unique_violation
 			respondJSON(w, http.StatusConflict, map[string]string{"error": "A rental equipment item with this product name and supplier already exists"})
 			return
 		}
@@ -353,7 +353,7 @@ func UpdateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		var pqErr *pq.Error
-		if errors.As(err, &pqErr) && pqErr.Code == "23505" { // unique_violation
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" && pqErr.Constraint == "uq_rental_equipment_name_supplier" { // unique_violation
 			respondJSON(w, http.StatusConflict, map[string]string{"error": "A rental equipment item with this product name and supplier already exists"})
 			return
 		}

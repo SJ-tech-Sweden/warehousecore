@@ -45,19 +45,40 @@ func GetEventoryScheduler() *EventoryScheduler {
 // Reset stops any running ticker, reads the current sync interval from settings,
 // and starts a new ticker if SyncIntervalMinutes > 0. Safe to call from any goroutine.
 // Reset is a no-op once Stop() has been called.
+//
+// After signalling the old ticker goroutine to stop, Reset releases s.mu and
+// waits for the goroutine to fully exit before starting a new one. This makes
+// the reset deterministic: Go's select is pseudo-random when both ticker.C and
+// stopCh are simultaneously ready, so without this wait the old goroutine could
+// still fire one extra sync after Reset returns.
 func (s *EventoryScheduler) Reset() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	// Do not start a new ticker if the scheduler has been stopped.
 	if s.stopped {
+		s.mu.Unlock()
 		return
 	}
 
-	// Stop any existing ticker goroutine
+	// Signal any existing ticker goroutine to stop.
 	if s.stopCh != nil {
 		close(s.stopCh)
 		s.stopCh = nil
+	}
+
+	s.mu.Unlock()
+
+	// Wait for the old ticker goroutine to fully exit before starting a new one.
+	// This is safe to call without the mutex: tickerWg.Add(1) only ever happens
+	// inside Reset() under s.mu, so no new Add can race with this Wait.
+	s.tickerWg.Wait()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Re-check stopped in case Stop() was called while we were waiting.
+	if s.stopped {
+		return
 	}
 
 	cfg, err := GetEventoryConfig()
