@@ -627,8 +627,10 @@ export interface EventorySyncResult {
 export interface EventorySettingsPayload {
   api_url: string;
   api_key?: string;
+  clear_api_key?: boolean;
   username: string;
   password?: string;
+  clear_password?: boolean;
   token_endpoint: string;
   supplier_name: string;
   sync_interval_minutes: number;

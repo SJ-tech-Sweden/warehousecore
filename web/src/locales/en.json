@@ -347,9 +347,9 @@
       "passwordPlaceholder": "Enter your Eventory password",
       "passwordPlaceholderUpdate": "Enter a new password to replace the existing one",
       "passwordConfigured": "Password configured",
-      "credentialsDesc": "Enter username and password to authenticate via OAuth2 password grant. Leave password blank to keep the existing one.",
+      "credentialsDesc": "Enter username and password to authenticate via OAuth2 password grant. Leave password blank to keep the existing one; use Clear to revoke it.",
       "apiKey": "API Key (alternative to username/password)",
-      "apiKeyDesc": "Use an API key instead of username/password. Leave blank to keep the existing key.",
+      "apiKeyDesc": "Use an API key instead of username/password. Leave blank to keep the existing key; use Clear to revoke it.",
       "keyConfigured": "Key configured",
       "keyNotConfigured": "No key configured",
       "keyPlaceholder": "Enter your Eventory API key",
@@ -396,7 +396,9 @@
       "infoTitle": "About this integration",
       "info1": "Products are imported into the Rental Products table under the configured supplier name.",
       "info2": "Re-running Sync updates existing products and adds new ones.",
-      "info3": "Your API key and password are stored in the database and never exposed in full in the interface."
+      "info3": "Your API key and password are stored in the database and never exposed in full in the interface.",
+      "clearKey": "Clear key",
+      "clearPassword": "Clear password"
     },
     "currencySettings": {
       "title": "Currency Settings",

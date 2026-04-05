@@ -64,13 +64,16 @@ func GetEventorySettings(w http.ResponseWriter, r *http.Request) {
 
 // UpdateEventorySettings saves the Eventory connection settings.
 // Empty api_key / password fields leave the existing stored values unchanged.
+// Set clear_api_key / clear_password to true to explicitly revoke a stored credential.
 // Missing sync_interval_minutes (null in JSON) preserves the existing value.
 func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	var rawPayload struct {
 		APIURL              string `json:"api_url"`
 		APIKey              string `json:"api_key"`
+		ClearAPIKey         bool   `json:"clear_api_key"`
 		Username            string `json:"username"`
 		Password            string `json:"password"`
+		ClearPassword       bool   `json:"clear_password"`
 		TokenEndpoint       string `json:"token_endpoint"`
 		SupplierName        string `json:"supplier_name"`
 		SyncIntervalMinutes *int   `json:"sync_interval_minutes"`
@@ -110,12 +113,16 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKey := strings.TrimSpace(rawPayload.APIKey)
-	if apiKey == "" {
+	if rawPayload.ClearAPIKey {
+		apiKey = "" // explicit revocation
+	} else if apiKey == "" {
 		apiKey = existing.APIKey
 	}
 
 	password := strings.TrimSpace(rawPayload.Password)
-	if password == "" {
+	if rawPayload.ClearPassword {
+		password = "" // explicit revocation
+	} else if password == "" {
 		password = existing.Password
 	}
 

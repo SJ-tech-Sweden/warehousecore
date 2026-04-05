@@ -347,9 +347,9 @@
       "passwordPlaceholder": "Eventory-Passwort eingeben",
       "passwordPlaceholderUpdate": "Neues Passwort eingeben, um das vorhandene zu ersetzen",
       "passwordConfigured": "Passwort konfiguriert",
-      "credentialsDesc": "Benutzername und Passwort für die OAuth2-Authentifizierung eingeben. Passwort leer lassen, um das vorhandene beizubehalten.",
+      "credentialsDesc": "Benutzername und Passwort für die OAuth2-Authentifizierung eingeben. Passwort leer lassen, um das vorhandene beizubehalten; \"Löschen\" zum Widerrufen.",
       "apiKey": "API-Schlüssel (Alternative zu Benutzername/Passwort)",
-      "apiKeyDesc": "API-Schlüssel statt Benutzername/Passwort verwenden. Leer lassen, um den vorhandenen Schlüssel beizubehalten.",
+      "apiKeyDesc": "API-Schlüssel statt Benutzername/Passwort verwenden. Leer lassen, um den vorhandenen Schlüssel beizubehalten; \"Löschen\" zum Widerrufen.",
       "keyConfigured": "Schlüssel konfiguriert",
       "keyNotConfigured": "Kein Schlüssel konfiguriert",
       "keyPlaceholder": "Eventory API-Schlüssel eingeben",
@@ -396,7 +396,9 @@
       "infoTitle": "Über diese Integration",
       "info1": "Produkte werden in die Mietartikel-Tabelle unter dem konfigurierten Lieferantennamen importiert.",
       "info2": "Ein erneuter Sync aktualisiert vorhandene Produkte und fügt neue hinzu.",
-      "info3": "API-Schlüssel und Passwort werden in der Datenbank gespeichert und niemals vollständig angezeigt."
+      "info3": "API-Schlüssel und Passwort werden in der Datenbank gespeichert und niemals vollständig angezeigt.",
+      "clearKey": "Schlüssel löschen",
+      "clearPassword": "Passwort löschen"
     },
     "currencySettings": {
       "title": "Währungseinstellungen",

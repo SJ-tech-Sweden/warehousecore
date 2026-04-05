@@ -22,9 +22,11 @@ export function EventoryTab() {
   const [apiKey, setApiKey] = useState('');
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [apiKeyMasked, setApiKeyMasked] = useState('');
+  const [clearApiKey, setClearApiKey] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfigured, setPasswordConfigured] = useState(false);
+  const [clearPassword, setClearPassword] = useState(false);
   const [tokenEndpoint, setTokenEndpoint] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [syncInterval, setSyncInterval] = useState(0);
@@ -46,8 +48,10 @@ export function EventoryTab() {
       setApiUrl(data.api_url || '');
       setApiKeyConfigured(data.api_key_configured);
       setApiKeyMasked(data.api_key_masked || '');
+      setClearApiKey(false);
       setUsername(data.username || '');
       setPasswordConfigured(data.password_configured);
+      setClearPassword(false);
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
@@ -82,17 +86,27 @@ export function EventoryTab() {
         supplier_name: supplierName.trim(),
         sync_interval_minutes: syncInterval,
       };
-      if (apiKey.trim()) payload.api_key = apiKey.trim();
-      if (password.trim()) payload.password = password.trim();
+      if (clearApiKey) {
+        payload.clear_api_key = true;
+      } else if (apiKey.trim()) {
+        payload.api_key = apiKey.trim();
+      }
+      if (clearPassword) {
+        payload.clear_password = true;
+      } else if (password.trim()) {
+        payload.password = password.trim();
+      }
 
       const { data } = await eventoryApi.updateSettings(payload);
       setApiUrl(data.api_url || trimmedUrl);
       setApiKeyConfigured(data.api_key_configured);
       setApiKeyMasked(data.api_key_masked || '');
       setApiKey('');
+      setClearApiKey(false);
       setUsername(data.username || '');
       setPasswordConfigured(data.password_configured);
       setPassword('');
+      setClearPassword(false);
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
@@ -229,21 +243,39 @@ export function EventoryTab() {
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
               {t('admin.eventory.password')}
-              {passwordConfigured && (
+              {passwordConfigured && !clearPassword && (
                 <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-400">
                   <CheckCircle2 className="w-3 h-3" />
                   {t('admin.eventory.passwordConfigured')}
                 </span>
               )}
+              {clearPassword && (
+                <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-400">
+                  <XCircle className="w-3 h-3" />
+                  {t('admin.eventory.clearPassword')}
+                </span>
+              )}
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setHasUnsavedChanges(true); }}
-              placeholder={passwordConfigured ? t('admin.eventory.passwordPlaceholderUpdate') : t('admin.eventory.passwordPlaceholder')}
-              autoComplete="new-password"
-              className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
-            />
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setClearPassword(false); setHasUnsavedChanges(true); }}
+                placeholder={passwordConfigured ? t('admin.eventory.passwordPlaceholderUpdate') : t('admin.eventory.passwordPlaceholder')}
+                autoComplete="new-password"
+                className="flex-1 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+              />
+              {passwordConfigured && !clearPassword && (
+                <button
+                  type="button"
+                  onClick={() => { setClearPassword(true); setPassword(''); setHasUnsavedChanges(true); }}
+                  className="px-3 py-2 text-xs text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition-colors whitespace-nowrap"
+                  title={t('admin.eventory.clearPassword')}
+                >
+                  <XCircle className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <p className="text-xs text-gray-500">{t('admin.eventory.credentialsDesc')}</p>
@@ -252,26 +284,44 @@ export function EventoryTab() {
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             {t('admin.eventory.apiKey')}
-            {apiKeyConfigured && (
+            {apiKeyConfigured && !clearApiKey && (
               <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-400">
                 <CheckCircle2 className="w-3 h-3" />
                 {t('admin.eventory.keyConfigured')} ({apiKeyMasked})
               </span>
             )}
-            {!apiKeyConfigured && (
+            {clearApiKey && (
+              <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-400">
+                <XCircle className="w-3 h-3" />
+                {t('admin.eventory.clearKey')}
+              </span>
+            )}
+            {!apiKeyConfigured && !clearApiKey && (
               <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-400">
                 <XCircle className="w-3 h-3" />
                 {t('admin.eventory.keyNotConfigured')}
               </span>
             )}
           </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={e => { setApiKey(e.target.value); setHasUnsavedChanges(true); }}
-            placeholder={apiKeyConfigured ? t('admin.eventory.keyPlaceholderUpdate') : t('admin.eventory.keyPlaceholder')}
-            className="w-full px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
-          />
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => { setApiKey(e.target.value); setClearApiKey(false); setHasUnsavedChanges(true); }}
+              placeholder={apiKeyConfigured ? t('admin.eventory.keyPlaceholderUpdate') : t('admin.eventory.keyPlaceholder')}
+              className="flex-1 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+            />
+            {apiKeyConfigured && !clearApiKey && (
+              <button
+                type="button"
+                onClick={() => { setClearApiKey(true); setApiKey(''); setHasUnsavedChanges(true); }}
+                className="px-3 py-2 text-xs text-red-400 border border-red-400/30 rounded-lg hover:bg-red-400/10 transition-colors whitespace-nowrap"
+                title={t('admin.eventory.clearKey')}
+              >
+                <XCircle className="w-4 h-4" />
+              </button>
+            )}
+          </div>
           <p className="mt-1 text-xs text-gray-500">{t('admin.eventory.apiKeyDesc')}</p>
         </div>
 

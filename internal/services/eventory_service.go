@@ -79,7 +79,7 @@ const encryptedPrefix = "enc:"
 // Accepting base64 allows callers to use full 256-bit entropy rather than being
 // limited to printable characters.
 func eventoryCredentialKey() ([]byte, error) {
-	raw := os.Getenv("EVENTORY_CREDENTIAL_KEY")
+	raw := strings.TrimSpace(os.Getenv("EVENTORY_CREDENTIAL_KEY"))
 	if raw == "" {
 		return nil, nil
 	}
@@ -565,23 +565,31 @@ func newSSRFSafeClient() *http.Client {
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve %q: %w", host, err)
 			}
-			// Find the first safe (non-private) address and dial it.
-			// Private/reserved resolved addresses are skipped; we only block
-			// when no safe address is available, preventing the caller from
-			// falling back to a private IP via round-robin.
-			var safeAddr string
+			// Try each safe (non-private) resolved address in order.
+			// Private/reserved addresses are skipped; we only block when no
+			// safe address is available, preventing the caller from falling back
+			// to a private IP via round-robin. If multiple safe addresses are
+			// returned, each is attempted until one succeeds.
+			var (
+				foundSafe bool
+				dialErrs  []error
+			)
 			for _, a := range addrs {
 				ip := net.ParseIP(a)
 				if ip != nil && isPrivateIP(ip) {
 					continue // skip private addresses
 				}
-				safeAddr = a
-				break
+				foundSafe = true
+				conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(a, port))
+				if err == nil {
+					return conn, nil
+				}
+				dialErrs = append(dialErrs, fmt.Errorf("dial %s: %w", a, err))
 			}
-			if safeAddr == "" {
+			if !foundSafe {
 				return nil, fmt.Errorf("blocked: all resolved addresses for %s are private/reserved", host)
 			}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(safeAddr, port))
+			return nil, fmt.Errorf("failed to connect to any resolved public address for %s: %w", host, errors.Join(dialErrs...))
 		},
 	}
 	return &http.Client{
