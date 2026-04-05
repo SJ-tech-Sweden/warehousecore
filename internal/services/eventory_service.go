@@ -72,7 +72,7 @@ type EventoryProduct struct {
 const encryptedPrefix = "enc:"
 
 // rawEscapePrefix is prepended to plaintext credential values that begin with
-// encryptedPrefix (or rawEscapePrefix itself) to prevent the dec rypt path from
+// encryptedPrefix (or rawEscapePrefix itself) to prevent the decrypt path from
 // misidentifying them as encrypted. This avoids the "enc:" prefix-collision
 // edge case: if an API key literally starts with "enc:", it would otherwise be
 // treated as an encrypted blob and fail to decrypt.
