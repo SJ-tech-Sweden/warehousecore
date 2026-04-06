@@ -26,6 +26,9 @@ type EventoryScheduler struct {
 	// syncFn is called by the scheduler when a sync is due. Injected so it can
 	// be overridden in tests.
 	syncFn func()
+	// configFn reads the Eventory config. Defaults to GetEventoryConfig; can be
+	// overridden in tests to avoid a real database connection.
+	configFn func() (*EventoryConfig, error)
 }
 
 var (
@@ -59,7 +62,8 @@ func IsAllowedSyncInterval(n int) bool {
 func GetEventoryScheduler() *EventoryScheduler {
 	globalSchedulerOnce.Do(func() {
 		globalScheduler = &EventoryScheduler{
-			syncFn: defaultEventorySync,
+			syncFn:   defaultEventorySync,
+			configFn: GetEventoryConfig,
 		}
 	})
 	return globalScheduler
@@ -114,7 +118,7 @@ func (s *EventoryScheduler) Reset() {
 		return
 	}
 
-	cfg, err := GetEventoryConfig()
+	cfg, err := s.configFn()
 	if err != nil {
 		log.Printf("[EVENTORY] Scheduler: failed to read config: %v", err)
 		return

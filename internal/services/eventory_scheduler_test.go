@@ -8,12 +8,18 @@ import (
 )
 
 // newTestScheduler creates a fresh, isolated EventoryScheduler for unit tests.
-// It injects a no-op syncFn so tests never touch the database or network.
+// It injects a no-op syncFn and a configFn that returns sync disabled (interval 0)
+// so tests never touch the database or network.
 func newTestScheduler(syncFn func()) *EventoryScheduler {
 	if syncFn == nil {
 		syncFn = func() {}
 	}
-	return &EventoryScheduler{syncFn: syncFn}
+	return &EventoryScheduler{
+		syncFn: syncFn,
+		configFn: func() (*EventoryConfig, error) {
+			return &EventoryConfig{SyncIntervalMinutes: 0}, nil
+		},
+	}
 }
 
 // startTestTicker is a helper that wires a fast ticker into a scheduler using
@@ -188,38 +194,27 @@ func TestScheduler_NoOverlap(t *testing.T) {
 // ===========================
 
 func TestReset_ConcurrentCallsDoNotPanic(t *testing.T) {
-	// Override GetEventoryConfig calls inside Reset by testing the scheduler's
-	// reset concurrency guard independently. We use Stop() immediately after
-	// to avoid the real config-read path.
-	s := newTestScheduler(nil)
+	// Inject a configFn that returns a valid (but very long) sync interval so
+	// Reset() exercises the full code path — including tickerWg.Add(1) and
+	// goroutine launch — without the ticker ever actually firing during the test.
+	s := &EventoryScheduler{
+		syncFn: func() {},
+		configFn: func() (*EventoryConfig, error) {
+			// 1440 min = 24 h; the ticker will not fire within the test.
+			return &EventoryConfig{SyncIntervalMinutes: 1440}, nil
+		},
+	}
 
+	const goroutines = 8
 	var wg sync.WaitGroup
-	const goroutines = 10
 	wg.Add(goroutines)
 
-	// We test that calling Stop concurrently with concurrent Resets does not
-	// panic (WaitGroup misuse) or deadlock.
 	for i := 0; i < goroutines; i++ {
 		go func() {
 			defer wg.Done()
-			// stopCh and tickerWg manipulation is the concurrency-sensitive part.
-			// Start then stop a ticker goroutine directly.
-			s.mu.Lock()
-			if s.stopped {
-				s.mu.Unlock()
-				return
-			}
-			if s.stopCh != nil {
-				close(s.stopCh)
-				s.stopCh = nil
-			}
-			s.mu.Unlock()
-			s.tickerWg.Wait()
+			s.Reset()
 		}()
 	}
-
-	// Also call Stop concurrently.
-	go s.Stop()
 
 	done := make(chan struct{})
 	go func() {
@@ -230,8 +225,11 @@ func TestReset_ConcurrentCallsDoNotPanic(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("concurrent Reset/Stop calls deadlocked or panicked")
+		t.Fatal("concurrent Reset() calls deadlocked or panicked")
 	}
+
+	// Clean up: Stop the scheduler so the ticker goroutine exits.
+	s.Stop()
 }
 
 // ===========================

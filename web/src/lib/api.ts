@@ -609,7 +609,7 @@ export interface EventorySettings {
 }
 
 export interface EventoryProduct {
-  id: string | number;
+  id: string | number | null | undefined;
   name: string;
   description: string;
   category: string;

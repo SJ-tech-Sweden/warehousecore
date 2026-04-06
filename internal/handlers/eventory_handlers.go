@@ -108,7 +108,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	existing, err := services.GetEventoryConfig()
 	if err != nil {
 		log.Printf("[EVENTORY] Failed to load existing config while preserving secrets: %v", err)
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load existing Eventory settings"})
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": eventoryConfigLoadErrorMsg(err)})
 		return
 	}
 

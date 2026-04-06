@@ -451,7 +451,7 @@ export function EventoryTab() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {products.slice(0, 50).map((p, i) => (
-                    <tr key={p.id ?? i} className="hover:bg-white/5 transition-colors">
+                    <tr key={p.id != null ? String(p.id) : `row-${i}`} className="hover:bg-white/5 transition-colors">
                       <td className="py-2 pr-4 text-white font-medium">{p.name || '—'}</td>
                       <td className="py-2 pr-4 text-gray-300">{p.category || '—'}</td>
                       <td className="py-2 pr-4 text-gray-300">{p.price != null ? p.price : '—'}</td>

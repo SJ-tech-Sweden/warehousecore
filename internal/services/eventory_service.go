@@ -531,8 +531,10 @@ func ValidateEventoryURL(rawURL string) error {
 
 // isPrivateIP reports whether ip should be blocked from outbound SSRF checks.
 // It rejects loopback, link-local, private RFC-1918/RFC-4193, unspecified
-// (0.0.0.0 / ::), multicast, and all other RFC 6890 special-use ranges —
-// in other words, any address that is not publicly routable.
+// (0.0.0.0 / ::), multicast, and a broad set of RFC 6890 special-use ranges
+// that are not publicly routable. The list covers the most common non-routable
+// blocks; exhaustive coverage of every conceivable special-purpose range is
+// handled as a defence-in-depth measure alongside the IsGlobalUnicast() check.
 func isPrivateIP(ip net.IP) bool {
 	// Reject anything that is not a global unicast address first.
 	// This covers 0.0.0.0/::, multicast (224.0.0.0/4, ff00::/8),
@@ -550,6 +552,7 @@ func isPrivateIP(ip net.IP) bool {
 		"192.168.0.0/16",  // RFC 1918 private
 		"169.254.0.0/16",  // link-local (belt-and-suspenders)
 		"100.64.0.0/10",   // RFC 6598 shared address space (CGNAT)
+		"192.88.99.0/24",  // RFC 7526 formerly 6to4 relay anycast (deprecated; still block)
 		"198.18.0.0/15",   // RFC 2544 benchmarking
 		"192.0.0.0/24",    // RFC 6890 IETF protocol assignments
 		"192.0.2.0/24",    // RFC 5737 TEST-NET-1
@@ -642,14 +645,24 @@ func newSSRFSafeClient() *http.Client {
 				return nil
 			}
 			prev := via[len(via)-1]
-			// Block cross-origin redirects: compare effective host (Hostname +
-			// default-port-normalised port) so that a redirect from
-			// https://example.com/a to https://example.com:443/b (explicit
-			// default port) is not incorrectly treated as cross-host.
-			if !sameEffectiveHost(prev.URL, req.URL) {
+			prevScheme := strings.ToLower(prev.URL.Scheme)
+			reqScheme := strings.ToLower(req.URL.Scheme)
+
+			// Block https→http scheme downgrade even on the same host.
+			if prevScheme == "https" && reqScheme != "https" {
 				return http.ErrUseLastResponse
 			}
-			if strings.ToLower(prev.URL.Scheme) == "https" && strings.ToLower(req.URL.Scheme) != "https" {
+
+			// Block cross-host redirects. When the scheme changes (http→https
+			// upgrade) the effective ports differ (80 vs 443), so we compare
+			// only the hostname — not the scheme-normalised port — to avoid
+			// spuriously blocking a legitimate http→https upgrade on the same
+			// origin. For same-scheme redirects we also check the effective
+			// port (which handles explicit-port vs implicit-port normalisation).
+			if !strings.EqualFold(prev.URL.Hostname(), req.URL.Hostname()) {
+				return http.ErrUseLastResponse
+			}
+			if prevScheme == reqScheme && !sameEffectiveHost(prev.URL, req.URL) {
 				return http.ErrUseLastResponse
 			}
 			return nil
