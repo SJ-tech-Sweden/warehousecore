@@ -90,22 +90,23 @@ func eventoryCredentialKey() ([]byte, error) {
 	if raw == "" {
 		return nil, nil
 	}
-	// Attempt base64 decoding first so operators can store a high-entropy key.
-	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil {
-		// Base64 decoded successfully — require exactly 32 bytes. Report the
-		// decoded length rather than the raw string length so the error is
-		// actionable (operators know they need to regenerate the key).
+	// Prefer a raw 32-byte key to avoid ambiguity: a 32-character ASCII string
+	// is always a multiple of 4 and may be valid base64, so attempting base64
+	// first would silently decode it to 24 bytes and reject a legitimate key.
+	if key := []byte(raw); len(key) == 32 {
+		return key, nil
+	}
+	// Not 32 raw bytes — try base64 so operators can store a high-entropy key
+	// generated with e.g. `openssl rand -base64 32`.
+	decoded, err := base64.StdEncoding.DecodeString(raw)
+	if err == nil {
 		if len(decoded) != 32 {
 			return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY base64-decoded to %d bytes; expected exactly 32 (use `openssl rand -base64 32` to generate a suitable value)", len(decoded))
 		}
 		return decoded, nil
 	}
-	// Fall back to treating the raw string as bytes (legacy / simple 32-char ASCII key).
-	key := []byte(raw)
-	if len(key) != 32 {
-		return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY must be exactly 32 bytes (use `openssl rand -base64 32` to generate a suitable value); got %d bytes", len(key))
-	}
-	return key, nil
+	// Neither raw 32 bytes nor valid base64 — report the raw byte length.
+	return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY must be exactly 32 bytes or a base64-encoded 32-byte key (use `openssl rand -base64 32` to generate a suitable value); got %d raw bytes", len([]byte(raw)))
 }
 
 // encryptCredential encrypts plaintext using AES-256-GCM and returns a
