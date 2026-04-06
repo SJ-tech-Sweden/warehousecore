@@ -197,11 +197,11 @@ func TestReset_ConcurrentCallsDoNotPanic(t *testing.T) {
 	// Inject a configFn that returns a valid (but very long) sync interval so
 	// Reset() exercises the full code path — including tickerWg.Add(1) and
 	// goroutine launch — without the ticker ever actually firing during the test.
+	const testLongIntervalMinutes = 1440 // 24 h — ticker will never fire in a unit test
 	s := &EventoryScheduler{
 		syncFn: func() {},
 		configFn: func() (*EventoryConfig, error) {
-			// 1440 min = 24 h; the ticker will not fire within the test.
-			return &EventoryConfig{SyncIntervalMinutes: 1440}, nil
+			return &EventoryConfig{SyncIntervalMinutes: testLongIntervalMinutes}, nil
 		},
 	}
 
