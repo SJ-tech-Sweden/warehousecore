@@ -144,8 +144,8 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	// endpoint from api_url (appending /oauth/token), so api_url must also be
 	// HTTPS in that case to avoid sending credentials over cleartext HTTP.
 	effectiveUsername := strings.TrimSpace(rawPayload.Username)
-	apiURLLower := strings.ToLower(rawPayload.APIURL)
 	if effectiveUsername != "" || password != "" {
+		apiURLLower := strings.ToLower(rawPayload.APIURL)
 		if tokenEndpoint != "" {
 			if !strings.HasPrefix(strings.ToLower(tokenEndpoint), "https://") {
 				respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Token endpoint must use HTTPS when username or password credentials are configured"})
@@ -159,7 +159,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 
 	// Also require HTTPS for api_url when an API key is set, since the key is
 	// transmitted in request headers on every API call and would leak over HTTP.
-	if apiKey != "" && !strings.HasPrefix(apiURLLower, "https://") {
+	if apiKey != "" && !strings.HasPrefix(strings.ToLower(rawPayload.APIURL), "https://") {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "API URL must use HTTPS when an API key is configured"})
 		return
 	}
