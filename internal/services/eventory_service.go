@@ -582,9 +582,15 @@ func isPrivateIP(ip net.IP) bool {
 func newSSRFSafeClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	// Clone DefaultTransport to preserve important production settings (TLS
-	// config, proxy support, idle-connection limits, keep-alive timeouts, etc.)
-	// and only override the fields required for SSRF protection.
+	// config, idle-connection limits, keep-alive timeouts, etc.) and only
+	// override the fields required for SSRF protection.
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// Disable proxying so all requests are dialled directly. If a proxy were
+	// allowed, the transport would connect to the (potentially public) proxy
+	// host — bypassing the private-IP DialContext checks below — and the proxy
+	// could then forward the request to any internal address, defeating SSRF
+	// protection entirely.
+	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		// addr is "host:port"; split off the port
 		host, port, err := net.SplitHostPort(addr)
