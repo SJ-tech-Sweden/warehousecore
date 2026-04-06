@@ -104,22 +104,32 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Load existing config to preserve secrets and interval when new values are blank/absent
+	apiKey := strings.TrimSpace(rawPayload.APIKey)
+	password := strings.TrimSpace(rawPayload.Password)
+	apiKeyExplicit := rawPayload.ClearAPIKey || apiKey != ""
+	passwordExplicit := rawPayload.ClearPassword || password != ""
+
+	// Load existing config only when needed to preserve omitted secrets. If the
+	// request explicitly replaces or clears both credentials, allow recovery to
+	// proceed even when previously stored encrypted credentials cannot be
+	// decrypted due to a missing/incorrect EVENTORY_CREDENTIAL_KEY.
 	existing, err := services.GetEventoryConfig()
 	if err != nil {
-		log.Printf("[EVENTORY] Failed to load existing config while preserving secrets: %v", err)
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": eventoryConfigLoadErrorMsg(err)})
-		return
+		needsExistingSecrets := !apiKeyExplicit || !passwordExplicit
+		if needsExistingSecrets {
+			log.Printf("[EVENTORY] Failed to load existing config while preserving secrets: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": eventoryConfigLoadErrorMsg(err)})
+			return
+		}
+
+		log.Printf("[EVENTORY] Failed to load existing config, but proceeding because request explicitly updates/clears stored credentials: %v", err)
 	}
 
-	apiKey := strings.TrimSpace(rawPayload.APIKey)
 	if rawPayload.ClearAPIKey {
 		apiKey = "" // explicit revocation
 	} else if apiKey == "" {
 		apiKey = existing.APIKey
 	}
-
-	password := strings.TrimSpace(rawPayload.Password)
 	if rawPayload.ClearPassword {
 		password = "" // explicit revocation
 	} else if password == "" {
