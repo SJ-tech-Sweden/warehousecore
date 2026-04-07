@@ -130,7 +130,8 @@ export function EventoryTab() {
       }
 
       const { data } = await eventoryApi.updateSettings(payload);
-      setApiUrl(data.api_url || trimmedUrl);
+      const savedApiUrl = data.api_url || '';
+      setApiUrl(savedApiUrl || trimmedUrl);
       setApiKeyConfigured(data.api_key_configured);
       setApiKeyMasked(data.api_key_masked || '');
       setApiKey('');
@@ -143,7 +144,7 @@ export function EventoryTab() {
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
       setSavedSettings({
-        apiUrl: data.api_url || trimmedUrl,
+        apiUrl: savedApiUrl,
         username: data.username || '',
         tokenEndpoint: data.token_endpoint || '',
         supplierName: data.supplier_name || '',
