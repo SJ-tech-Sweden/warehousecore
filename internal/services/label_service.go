@@ -323,7 +323,7 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 		fields["product_weight"] = ""
 	}
 	if device.ProductWidth > 0 && device.ProductHeight > 0 && device.ProductDepth > 0 {
-		fields["product_dimensions"] = fmt.Sprintf("%.0fx%.0fx%.0f cm", device.ProductWidth, device.ProductHeight, device.ProductDepth)
+		fields["product_dimensions"] = fmt.Sprintf("%.1fx%.1fx%.1f cm", device.ProductWidth, device.ProductHeight, device.ProductDepth)
 	} else {
 		fields["product_dimensions"] = ""
 	}

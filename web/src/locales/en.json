@@ -276,7 +276,7 @@
     "missingShort": "Missing",
     "allShort": "All",
     "generatingCount": "Generating {{count}}...",
-    "generateAllWithCount": "Generate All Labels ({{devices}} Devices + {{cases}} Cases)",
+    "generateAllWithCount": "Generate All Labels ({{devices}} Devices + {{cases}} Cases + {{zones}} Zones)",
     "exportShort": "Export",
     "exportShortLoading": "Export...",
     "contentGroups": {

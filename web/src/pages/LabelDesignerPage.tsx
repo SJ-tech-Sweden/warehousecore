@@ -281,7 +281,7 @@ export default function LabelDesignerPage() {
       manufacturer_name: '',
       brand: '',
       brand_name: '',
-      condition_rating: previewDevice.condition_rating !== undefined ? String(previewDevice.condition_rating) : '',
+      condition_rating: previewDevice.condition_rating !== undefined ? previewDevice.condition_rating.toFixed(1) : '',
       usage_hours: previewDevice.usage_hours !== undefined ? `${previewDevice.usage_hours} h` : '',
       product_weight: '',
       product_dimensions: '',
@@ -1166,7 +1166,7 @@ export default function LabelDesignerPage() {
                 <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generating') : t('labels.generateMissing')}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.missingShort')}</span>
               </button>
               <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0 && zones.length === 0)} className="btn-action btn-primary">
-                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generatingCount', { count: devices.length + cases.length + zones.length }) : t('labels.generateAllWithCount', { devices: devices.length, cases: cases.length })}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.allShort')}</span>
+                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generatingCount', { count: devices.length + cases.length + zones.length }) : t('labels.generateAllWithCount', { devices: devices.length, cases: cases.length, zones: zones.length })}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.allShort')}</span>
               </button>
               <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0 && zones.length === 0)} className="btn-action">
                 <Download size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.exporting') : t('labels.exportAll')}</span><span className="sm:hidden">{exporting ? t('labels.exportShortLoading') : t('labels.exportShort')}</span>
