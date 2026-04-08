@@ -674,12 +674,15 @@ func fetchInventoryRentals(client *http.Client, baseURL, oauthToken, apiKey stri
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, errInventoryRentalsNotFound
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("inventory-rentals: unauthorized – check your credentials")
 	}
 	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("inventory-rentals: unexpected status %d", resp.StatusCode)
 	}
 
