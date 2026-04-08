@@ -72,11 +72,11 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 
 	// Determine the device ID prefix and the next available counter via the
 	// shared helpers in device_id.go (see that file for full documentation):
-	//   - deriveDeviceIDPrefix honours a caller-supplied device_prefix or derives
+	//   - DeriveDeviceIDPrefix honours a caller-supplied device_prefix or derives
 	//     one from subcategory abbreviation + pos_in_category, with a
 	//     "P{productID}" fallback for products without an abbreviation.
-	//   - allocateDeviceCounter acquires a pg_advisory_xact_lock keyed on a
-	//     FNV-64a hash of the prefix and scans existing IDs with an index-friendly
+	//   - AllocateDeviceCounter acquires a pg_advisory_xact_lock keyed on an
+	//     FNV-32a hash of the prefix and scans existing IDs with an index-friendly
 	//     LIKE predicate to find the next counter value.
 	manualPrefix := ""
 	if input.DevicePrefix != nil {
