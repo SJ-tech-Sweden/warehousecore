@@ -762,10 +762,17 @@ func collectLeaves(rawNodes []json.RawMessage, categoryPath string, out *[]inven
 
 // fetchRentalDetail fetches GET /rentals/{id} and returns (description, dailyRate).
 // On failure it logs the error and returns ("", 0) so that a single failed fetch
-// does not abort the entire sync. id is treated as a single opaque path segment:
-// neturl.PathEscape encodes any embedded slashes or other special characters so
-// they cannot traverse directory boundaries or change the request host.
+// does not abort the entire sync. id is validated to be a non-empty, non-dot-segment
+// string; empty and dot-segment IDs (".", "..") are rejected up front because
+// PathEscape leaves them unchanged and ResolveReference would path-clean them
+// (e.g. "rentals/.." collapses to the parent path). Non-dot special characters
+// are encoded by neturl.PathEscape so they cannot traverse directory boundaries
+// or change the request host.
 func fetchRentalDetail(client *http.Client, baseURL, id, oauthToken, apiKey string) (description string, dailyRate float64) {
+	if id == "" || id == "." || id == ".." {
+		log.Printf("[EVENTORY] Invalid rental id %q", id)
+		return "", 0
+	}
 	escapedID := neturl.PathEscape(id)
 	fullURL, err := joinPath(baseURL, "rentals/"+escapedID)
 	if err != nil {
