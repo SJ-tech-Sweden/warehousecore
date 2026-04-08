@@ -71,22 +71,73 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		_ = tx.Rollback()
 	}()
 
+	// Determine the device ID prefix from the product's subcategory abbreviation
+	// and pos_in_category, mirroring the logic in the DB trigger so that device
+	// creation works even when the trigger has not yet been applied.
+	var abbreviation sql.NullString
+	var posInCategory sql.NullInt64
+	err = tx.QueryRowContext(ctx, `
+		SELECT s.abbreviation, p.pos_in_category
+		FROM products p
+		LEFT JOIN subcategories s ON p.subcategoryID = s.subcategoryID
+		WHERE p.productID = $1
+	`, input.ProductID).Scan(&abbreviation, &posInCategory)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("product %d not found", input.ProductID)
+		}
+		return nil, fmt.Errorf("failed to fetch product info: %w", err)
+	}
+
+	var prefix string
+	if abbreviation.Valid && abbreviation.String != "" {
+		posStr := "0"
+		if posInCategory.Valid {
+			posStr = fmt.Sprintf("%d", posInCategory.Int64)
+		}
+		prefix = abbreviation.String + posStr
+	} else {
+		prefix = fmt.Sprintf("P%d", input.ProductID)
+	}
+
+	// Find the highest existing counter for this prefix to avoid collisions.
+	// Extract the numeric suffix starting right after the prefix so that counters
+	// of any length (e.g. 1000+) are handled correctly.
+	prefixLen := len(prefix) + 1 // SUBSTRING position is 1-based
+	var nextCounter int
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(
+			CASE
+				WHEN SUBSTRING(deviceID FROM $2) ~ '^[0-9]+$'
+				THEN CAST(SUBSTRING(deviceID FROM $2) AS INTEGER)
+				ELSE 0
+			END
+		), 0) + 1
+		FROM devices
+		WHERE deviceID LIKE $1
+	`, prefix+"%", prefixLen).Scan(&nextCounter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine next device counter: %w", err)
+	}
+
 	createdIDs := make([]string, 0, input.Quantity)
 	providedBarcode := input.Barcode != nil && strings.TrimSpace(*input.Barcode) != ""
 	providedQRCode := input.QRCode != nil && strings.TrimSpace(*input.QRCode) != ""
 
 	for i := 0; i < input.Quantity; i++ {
+		deviceID := fmt.Sprintf("%s%03d", prefix, nextCounter+i)
 		serialValue := serialForIndex(input.SerialNumber, input.StartingSerial, input.IncrementSerial, i)
 
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO devices (
-				productID, serialnumber, rfid, status, current_location, zone_id,
+				deviceID, productID, serialnumber, rfid, status, current_location, zone_id,
 				condition_rating, usage_hours, purchaseDate, retire_date, warranty_end_date,
 				lastmaintenance, nextmaintenance,
 				notes, barcode, qr_code
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		`,
+			deviceID,
 			input.ProductID,
 			nullableString(serialValue),
 			nullableString(trimPtr(input.RFID)),
@@ -106,18 +157,6 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert device: %w", err)
-		}
-
-		var deviceID string
-		err = tx.QueryRowContext(ctx, `
-			SELECT deviceID
-			FROM devices
-			WHERE productID = $1
-			ORDER BY deviceID DESC
-			LIMIT 1
-		`, input.ProductID).Scan(&deviceID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch device id: %w", err)
 		}
 
 		if err := s.ensureDeviceCodes(ctx, tx, deviceID, providedBarcode, providedQRCode, regenerateCodes); err != nil {
