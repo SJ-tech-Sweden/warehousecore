@@ -442,7 +442,7 @@ export function EventoryTab() {
           {/* Fetch / preview */}
           <button
             onClick={handleFetchProducts}
-            disabled={fetching || !apiUrl.trim() || hasUnsavedChanges}
+            disabled={fetching || !apiUrl.trim() || hasUnsavedChanges || savedSettings === null}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
             <RefreshCcw className={`w-4 h-4 ${fetching ? 'animate-spin' : ''}`} />
@@ -452,7 +452,7 @@ export function EventoryTab() {
           {/* Sync */}
           <button
             onClick={handleSync}
-            disabled={syncing || !apiUrl.trim() || hasUnsavedChanges}
+            disabled={syncing || !apiUrl.trim() || hasUnsavedChanges || savedSettings === null}
             className="flex items-center gap-2 px-5 py-2.5 bg-green-700 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
           >
             <Package className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
