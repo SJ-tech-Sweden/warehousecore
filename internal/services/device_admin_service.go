@@ -82,12 +82,12 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 	if input.DevicePrefix != nil {
 		manualPrefix = *input.DevicePrefix
 	}
-	prefix, err := deriveDeviceIDPrefix(ctx, tx, input.ProductID, manualPrefix)
+	prefix, err := DeriveDeviceIDPrefix(ctx, tx, input.ProductID, manualPrefix)
 	if err != nil {
 		return nil, err
 	}
 
-	nextCounter, err := allocateDeviceCounter(ctx, tx, prefix)
+	nextCounter, err := AllocateDeviceCounter(ctx, tx, prefix)
 	if err != nil {
 		return nil, err
 	}

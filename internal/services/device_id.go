@@ -18,7 +18,13 @@ var deviceIDLikeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 // whether the suffix after the device ID prefix is a pure decimal integer.
 const numericSuffixPattern = `^[0-9]+$`
 
-// deriveDeviceIDPrefix returns the device ID prefix for a given product.
+// deviceIDLockNamespace is the fixed first key passed to
+// pg_advisory_xact_lock(key1, key2). Using a two-key form ensures that
+// device-ID allocation locks are in a distinct namespace and cannot
+// accidentally collide with advisory locks taken by other subsystems.
+const deviceIDLockNamespace int32 = 1
+
+// DeriveDeviceIDPrefix returns the device ID prefix for a given product.
 // If manualPrefix is non-empty it is returned verbatim (after trimming).
 // Otherwise the prefix is derived from the product's subcategory abbreviation
 // + pos_in_category (e.g. "LED1"). If no abbreviation is found the function
@@ -26,7 +32,7 @@ const numericSuffixPattern = `^[0-9]+$`
 // diverging from the DB trigger (migration 030) which raises in that case.
 //
 // The caller must hold an open transaction (tx).
-func deriveDeviceIDPrefix(ctx context.Context, tx *sql.Tx, productID int, manualPrefix string) (string, error) {
+func DeriveDeviceIDPrefix(ctx context.Context, tx *sql.Tx, productID int, manualPrefix string) (string, error) {
 	if p := strings.TrimSpace(manualPrefix); p != "" {
 		return p, nil
 	}
@@ -56,14 +62,21 @@ func deriveDeviceIDPrefix(ctx context.Context, tx *sql.Tx, productID int, manual
 	return fmt.Sprintf("P%d", productID), nil
 }
 
-// allocateDeviceCounter acquires a pg_advisory_xact_lock keyed on a FNV-64a
-// hash of the prefix to serialize concurrent allocation, then returns the next
-// available numeric counter for device IDs that start with prefix.
+// AllocateDeviceCounter acquires a pg_advisory_xact_lock keyed on a
+// per-namespace FNV-32a hash of the prefix to serialize concurrent allocation,
+// then returns the next available numeric counter for device IDs that start
+// with prefix.
 //
-// The existing counter is found by scanning deviceIDs with an index-friendly
-// LIKE predicate (enabling use of the btree index on deviceID). Wildcard
-// characters (\, %, _) in the prefix are escaped so they are treated as
-// literals. The numeric suffix after the prefix can be any length; counters
+// Locking uses the two-key form pg_advisory_xact_lock(key1, key2): key1 is a
+// fixed namespace constant (deviceIDLockNamespace) that scopes these locks to
+// device-ID allocation; key2 is a FNV-32a hash of the prefix so concurrent
+// allocations for different prefixes do not block each other unnecessarily.
+//
+// The existing counter is found by scanning deviceIDs using a LIKE predicate
+// with migration-037's varchar_pattern_ops index, which enables efficient
+// prefix scans under any database collation. Wildcard characters (\, %, _) in
+// the prefix are escaped before building the LIKE pattern so they are treated
+// as literals. The numeric suffix after the prefix can be any length; counters
 // above 999 are handled naturally.
 //
 // New IDs should be formatted with fmt.Sprintf("%s%03d", prefix, counter+i)
@@ -71,26 +84,26 @@ func deriveDeviceIDPrefix(ctx context.Context, tx *sql.Tx, productID int, manual
 // the DB trigger's LPAD(..., 3, '0') behaviour.
 //
 // The caller must hold an open transaction (tx).
-func allocateDeviceCounter(ctx context.Context, tx *sql.Tx, prefix string) (int64, error) {
-	// Serialize concurrent calls for the same prefix: key the advisory lock on
-	// the FNV-64a hash of the prefix so different products that share the same
-	// prefix namespace are also correctly serialized.  We mask the hash to the
-	// non-negative int64 range so the lock key is always positive and
-	// unambiguously scoped to device-ID allocation (avoiding any accidental
-	// overlap with locks that might use negative keys for other purposes).
-	h := fnv.New64a()
+func AllocateDeviceCounter(ctx context.Context, tx *sql.Tx, prefix string) (int64, error) {
+	// Two-key advisory lock: namespace key 1 scopes the lock family to
+	// device-ID allocation; the FNV-32a hash of the prefix serializes
+	// concurrent allocations that share the same prefix namespace without
+	// blocking unrelated advisory-lock users or unrelated prefixes.
+	h := fnv.New32a()
 	h.Write([]byte(prefix))
-	lockKey := int64(h.Sum64() & 0x7fffffffffffffff)
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, lockKey); err != nil {
+	prefixKey := int32(h.Sum32())
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1, $2)`, deviceIDLockNamespace, prefixKey); err != nil {
 		return 0, fmt.Errorf("failed to acquire device creation lock: %w", err)
 	}
 
 	// Build a LIKE pattern that treats the prefix as a literal string.
 	// We escape \, %, and _ so they are not interpreted as wildcard characters
 	// by PostgreSQL, then append % so the predicate matches any device ID that
-	// starts with the prefix. Using LIKE allows PostgreSQL to use the btree
-	// index on deviceID for a prefix scan, unlike the non-sargable
-	// LEFT(deviceID, CHAR_LENGTH(prefix)) = prefix form.
+	// starts with the prefix.
+	// Migration 037 adds a varchar_pattern_ops index on devices(deviceID) so
+	// PostgreSQL can use a btree prefix scan for this LIKE query regardless of
+	// the database collation (plain btree indexes are not used for LIKE under
+	// non-C locales without varchar_pattern_ops).
 	escapedPrefix := deviceIDLikeEscaper.Replace(prefix)
 	pattern := escapedPrefix + "%"
 
