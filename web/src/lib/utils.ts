@@ -26,3 +26,15 @@ export function getStatusColor(status: string): string {
 export function formatStatus(status: string): string {
   return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
+
+export function formatDateISO(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  return dateStr.slice(0, 10);
+}
+
+export function formatDateTimeISO(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 16).replace('T', ' ');
+}

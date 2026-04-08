@@ -15,6 +15,7 @@ import { api } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
 import { useTranslation } from 'react-i18next';
 import { useCurrencySymbol } from '../../hooks/useCurrencySymbol';
+import { formatDateTimeISO } from '../../lib/utils';
 
 interface RentalEquipment {
   equipment_id: number;
@@ -857,8 +858,8 @@ export function RentedProductsTab() {
                 </div>
 
                 <div className="text-xs text-gray-500">
-                  <p>{t('admin.rentedProducts.createdAt')}: {new Date(viewEquipment.created_at).toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-GB')}</p>
-                  <p>{t('admin.rentedProducts.updatedAt')}: {new Date(viewEquipment.updated_at).toLocaleString(i18n.language === 'de' ? 'de-DE' : 'en-GB')}</p>
+                  <p>{t('admin.rentedProducts.createdAt')}: {formatDateTimeISO(viewEquipment.created_at)}</p>
+                  <p>{t('admin.rentedProducts.updatedAt')}: {formatDateTimeISO(viewEquipment.updated_at)}</p>
                 </div>
               </div>
 

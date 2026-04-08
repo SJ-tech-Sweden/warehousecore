@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyRound, Plus, Trash2, ToggleLeft, ToggleRight, RefreshCcw, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { apiKeysAdminApi, type APIKeyItem } from '../../lib/api';
+import { formatDateTimeISO } from '../../lib/utils';
 
 export function APIKeysTab() {
   const { t } = useTranslation();
@@ -165,7 +166,7 @@ export function APIKeysTab() {
                 </button>
               </div>
               <div className="col-span-3 text-gray-300 text-sm">
-                {k.last_used_at ? new Date(k.last_used_at).toLocaleString() : t('admin.apiKeys.neverUsed')}
+                {k.last_used_at ? formatDateTimeISO(k.last_used_at) : t('admin.apiKeys.neverUsed')}
               </div>
               <div className="col-span-2 flex justify-end gap-2">
                 <button

@@ -4,6 +4,7 @@ import { Package, CheckCircle, XCircle, Calendar, User, ArrowRight, Lightbulb, L
 import { useTranslation } from 'react-i18next';
 import { jobsApi, scansApi, ledApi } from '../lib/api';
 import type { Job, JobSummary, JobDevice, LEDStatus, ProductRequirement } from '../lib/api';
+import { formatDateISO } from '../lib/utils';
 
 const JOB_CODE_PATTERN = /^JOB\d+$/i;
 
@@ -324,7 +325,7 @@ export function JobsPage() {
                     {job.start_date && (
                       <div className="flex items-center gap-2 text-gray-400">
                         <Calendar className="w-4 h-4" />
-                        <span>{new Date(job.start_date).toLocaleDateString('de-DE')}</span>
+                        <span>{formatDateISO(job.start_date)}</span>
                       </div>
                     )}
 
@@ -402,7 +403,7 @@ export function JobsPage() {
                   <div>
                     <p className="text-xs text-gray-500">{t('jobsPage.date')}</p>
                     <p className="text-white font-semibold">
-                      {new Date(selectedJob.start_date).toLocaleDateString('de-DE')}
+                      {formatDateISO(selectedJob.start_date)}
                     </p>
                   </div>
                 </div>
