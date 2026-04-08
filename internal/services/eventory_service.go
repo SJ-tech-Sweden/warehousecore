@@ -656,9 +656,8 @@ func fetchInventoryRentals(client *http.Client, baseURL, oauthToken, apiKey stri
 
 	// Fetch /rentals/{id} for each leaf concurrently.
 	type result struct {
-		index int
-		desc  string
-		rate  float64
+		desc string
+		rate float64
 	}
 
 	results := make([]result, len(leaves))
@@ -672,7 +671,7 @@ func fetchInventoryRentals(client *http.Client, baseURL, oauthToken, apiKey stri
 			defer wg.Done()
 			defer func() { <-sem }()
 			desc, rate := fetchRentalDetail(client, baseURL, leaf.id, oauthToken, apiKey)
-			results[i] = result{index: i, desc: desc, rate: rate}
+			results[i] = result{desc: desc, rate: rate}
 		}()
 	}
 	wg.Wait()
@@ -697,8 +696,7 @@ func collectLeaves(rawNodes []json.RawMessage, categoryPath string, out *[]inven
 	for _, raw := range rawNodes {
 		var node eventoryInventoryNode
 		if err := json.Unmarshal(raw, &node); err != nil {
-			log.Printf("[EVENTORY] Failed to parse inventory node: %v", err)
-			continue
+			log.Panicf("[EVENTORY] Failed to parse inventory node: %v", err)
 		}
 
 		if node.Children != nil {
@@ -744,6 +742,7 @@ func fetchRentalDetail(client *http.Client, baseURL, id, oauthToken, apiKey stri
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("[EVENTORY] rentals/%s returned status %d", id, resp.StatusCode)
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return "", 0
 	}
 
