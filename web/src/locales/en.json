@@ -448,7 +448,7 @@
       "generateKey": "Generate",
       "generateAndSave": "Generate & Save",
       "saveKey": "Save Key",
-      "clearKey2": "Clear Key",
+      "clearCredentialKey": "Clear Key",
       "keyGenerated": "New key generated. Copy it and save it securely before saving — it will not be shown again.",
       "keyGeneratedSaved": "New key generated and saved to the database.",
       "keySaved": "Encryption key saved.",

@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	eventorySettingScope      = "warehousecore"
-	eventorySettingKey        = "eventory.config"
-	eventoryCredentialKeySKey = "eventory.credential_key"
+	eventorySettingScope            = "warehousecore"
+	eventorySettingKey              = "eventory.config"
+	eventoryCredentialKeySettingKey = "eventory.credential_key"
 
 	// inventoryRentalsConcurrency is the maximum number of concurrent
 	// GET /rentals/{id} requests issued during a single inventory sync.
@@ -225,7 +225,7 @@ func eventoryCredentialKeyFromDB() ([]byte, error) {
 		return nil, nil
 	}
 	adminSvc := NewAdminService()
-	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySKey)
+	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySettingKey)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -266,7 +266,7 @@ func GetEventoryCredentialKeyStatus() EventoryCredentialKeyStatus {
 		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
 	}
 	adminSvc := NewAdminService()
-	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySKey)
+	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySettingKey)
 	if err != nil {
 		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
 	}
@@ -302,7 +302,7 @@ func SetEventoryCredentialKey(keyBase64 string) error {
 		}
 	}
 	adminSvc := NewAdminService()
-	return adminSvc.SetSetting(eventorySettingScope, eventoryCredentialKeySKey, models.JSONMap{"key": keyBase64})
+	return adminSvc.SetSetting(eventorySettingScope, eventoryCredentialKeySettingKey, models.JSONMap{"key": keyBase64})
 }
 
 // encryptCredential encrypts plaintext using AES-256-GCM and returns a

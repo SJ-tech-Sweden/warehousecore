@@ -448,7 +448,7 @@
       "generateKey": "Generieren",
       "generateAndSave": "Generieren & Speichern",
       "saveKey": "Schlüssel speichern",
-      "clearKey2": "Schlüssel löschen",
+      "clearCredentialKey": "Schlüssel löschen",
       "keyGenerated": "Neuer Schlüssel generiert. Kopieren und sicher speichern — er wird nicht erneut angezeigt.",
       "keyGeneratedSaved": "Neuer Schlüssel generiert und in der Datenbank gespeichert.",
       "keySaved": "Verschlüsselungsschlüssel gespeichert.",
