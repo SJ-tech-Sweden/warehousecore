@@ -137,6 +137,12 @@ func main() {
 		}
 	}()
 
+	// Bootstrap Eventory config from environment variables (if any and not yet stored)
+	services.BootstrapEventoryFromEnv()
+
+	// Start Eventory background scheduler (no-op if sync_interval_minutes == 0)
+	services.GetEventoryScheduler().Reset()
+
 	// Setup router
 	router := mux.NewRouter()
 
@@ -367,6 +373,12 @@ func main() {
 	admin.HandleFunc("/currency", handlers.GetCurrencySettings).Methods("GET")
 	admin.HandleFunc("/currency", handlers.UpdateCurrencySettings).Methods("PUT")
 
+	// Eventory integration endpoints (admin-only write + read)
+	admin.HandleFunc("/eventory/settings", handlers.GetEventorySettings).Methods("GET")
+	admin.HandleFunc("/eventory/settings", handlers.UpdateEventorySettings).Methods("PUT")
+	admin.HandleFunc("/eventory/products", handlers.GetEventoryProducts).Methods("GET")
+	admin.HandleFunc("/eventory/sync", handlers.SyncEventoryProducts).Methods("POST")
+
 	// CSV Export endpoints (read-only, admin or manager)
 	adminRead.HandleFunc("/export/{type}", handlers.ExportCSV).Methods("GET")
 
@@ -423,6 +435,7 @@ func main() {
 	if controllerListener != nil {
 		controllerListener.Close()
 	}
+	services.GetEventoryScheduler().Stop()
 	repository.CloseDatabase()
 	log.Println("Server stopped")
 }

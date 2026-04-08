@@ -596,52 +596,6 @@ func serialForIndex(base *string, starting *int, increment bool, index int) *str
 	return &serial
 }
 
-func nullableString(value *string) interface{} {
-	if value == nil {
-		return nil
-	}
-	trimmed := strings.TrimSpace(*value)
-	if trimmed == "" {
-		return nil
-	}
-	return trimmed
-}
-
-func nullableStringPtr(value *string) interface{} {
-	if value == nil {
-		return nil
-	}
-	trimmed := strings.TrimSpace(*value)
-	if trimmed == "" {
-		return nil
-	}
-	return trimmed
-}
-
-func nullableText(value *string) interface{} {
-	if value == nil {
-		return nil
-	}
-	if strings.TrimSpace(*value) == "" {
-		return nil
-	}
-	return *value
-}
-
-func nullableInt(value *int) interface{} {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
-func nullableFloat(value *float64) interface{} {
-	if value == nil {
-		return nil
-	}
-	return *value
-}
-
 func parseDatePtr(value *string) interface{} {
 	if value == nil {
 		return nil
