@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	eventorySettingScope = "warehousecore"
-	eventorySettingKey   = "eventory.config"
+	eventorySettingScope      = "warehousecore"
+	eventorySettingKey        = "eventory.config"
+	eventoryCredentialKeySKey = "eventory.credential_key"
 
 	// inventoryRentalsConcurrency is the maximum number of concurrent
 	// GET /rentals/{id} requests issued during a single inventory sync.
@@ -172,18 +173,31 @@ const encryptedPrefix = "enc:"
 // treated as an encrypted blob and fail to decrypt.
 const rawEscapePrefix = "raw:"
 
-// eventoryCredentialKey returns the 32-byte AES-256 key read from the
-// EVENTORY_CREDENTIAL_KEY environment variable. It returns (nil, nil) when the
-// variable is not set (credentials are stored as plain text, with a warning).
-// The value may be either a base64-encoded 32-byte key (recommended, produced
-// by e.g. `openssl rand -base64 32`) or exactly 32 raw printable ASCII bytes.
-// Accepting base64 allows callers to use full 256-bit entropy rather than being
-// limited to printable characters.
+// eventoryCredentialKey returns the 32-byte AES-256 key used to encrypt stored
+// Eventory credentials. It checks, in order:
+//  1. The EVENTORY_CREDENTIAL_KEY environment variable (recommended for
+//     production; takes precedence over the database value).
+//  2. The eventory.credential_key setting in app_settings (set via the admin UI).
+//
+// Returns (nil, nil) when neither source is available, which causes credentials
+// to be stored as plain text with a warning.
 func eventoryCredentialKey() ([]byte, error) {
 	raw := strings.TrimSpace(os.Getenv("EVENTORY_CREDENTIAL_KEY"))
-	if raw == "" {
-		return nil, nil
+	if raw != "" {
+		return parseCredentialKey(raw, "EVENTORY_CREDENTIAL_KEY")
 	}
+	// Env var not set — try the value stored in the database via the admin UI.
+	if key, err := eventoryCredentialKeyFromDB(); err != nil {
+		return nil, fmt.Errorf("failed to read credential key from database: %w", err)
+	} else if key != nil {
+		return key, nil
+	}
+	return nil, nil
+}
+
+// parseCredentialKey decodes a credential key string (raw 32 bytes or base64)
+// and returns the 32-byte key. source is used only in error messages.
+func parseCredentialKey(raw, source string) ([]byte, error) {
 	// Prefer a raw 32-byte key to avoid ambiguity: a 32-character ASCII string
 	// is always a multiple of 4 and may be valid base64, so attempting base64
 	// first would silently decode it to 24 bytes and reject a legitimate key.
@@ -195,12 +209,100 @@ func eventoryCredentialKey() ([]byte, error) {
 	decoded, err := base64.StdEncoding.DecodeString(raw)
 	if err == nil {
 		if len(decoded) != 32 {
-			return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY base64-decoded to %d bytes; expected exactly 32 (use `openssl rand -base64 32` to generate a suitable value)", len(decoded))
+			return nil, fmt.Errorf("%s base64-decoded to %d bytes; expected exactly 32 (use `openssl rand -base64 32` to generate a suitable value)", source, len(decoded))
 		}
 		return decoded, nil
 	}
 	// Neither raw 32 bytes nor valid base64 — report both failure conditions.
-	return nil, fmt.Errorf("EVENTORY_CREDENTIAL_KEY must be exactly 32 bytes or a base64 encoding of 32 bytes (use `openssl rand -base64 32` to generate a suitable value); got %d raw bytes and base64 decode failed", len([]byte(raw)))
+	return nil, fmt.Errorf("%s must be exactly 32 bytes or a base64 encoding of 32 bytes (use `openssl rand -base64 32` to generate a suitable value); got %d raw bytes and base64 decode failed", source, len([]byte(raw)))
+}
+
+// eventoryCredentialKeyFromDB reads the credential key stored in app_settings
+// by the admin UI. Returns (nil, nil) when the setting is absent.
+func eventoryCredentialKeyFromDB() ([]byte, error) {
+	db := repository.GetDB()
+	if db == nil {
+		return nil, nil
+	}
+	adminSvc := NewAdminService()
+	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySKey)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	raw, _ := setting.Value["key"].(string)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	return parseCredentialKey(raw, "admin UI credential key")
+}
+
+// CredentialKeySource describes where the active credential key comes from.
+type CredentialKeySource string
+
+const (
+	CredentialKeySourceNone     CredentialKeySource = "none"
+	CredentialKeySourceEnv      CredentialKeySource = "env"
+	CredentialKeySourceDatabase CredentialKeySource = "database"
+)
+
+// EventoryCredentialKeyStatus describes the state of the Eventory credential key.
+type EventoryCredentialKeyStatus struct {
+	Configured bool                `json:"configured"`
+	Source     CredentialKeySource `json:"source"`
+}
+
+// GetEventoryCredentialKeyStatus returns whether a credential key is configured
+// and where it comes from (env var takes precedence over the database).
+func GetEventoryCredentialKeyStatus() EventoryCredentialKeyStatus {
+	if raw := strings.TrimSpace(os.Getenv("EVENTORY_CREDENTIAL_KEY")); raw != "" {
+		return EventoryCredentialKeyStatus{Configured: true, Source: CredentialKeySourceEnv}
+	}
+	db := repository.GetDB()
+	if db == nil {
+		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
+	}
+	adminSvc := NewAdminService()
+	setting, err := adminSvc.GetSetting(eventorySettingScope, eventoryCredentialKeySKey)
+	if err != nil {
+		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
+	}
+	raw, _ := setting.Value["key"].(string)
+	if strings.TrimSpace(raw) == "" {
+		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
+	}
+	return EventoryCredentialKeyStatus{Configured: true, Source: CredentialKeySourceDatabase}
+}
+
+// GenerateCredentialKey generates a cryptographically-random 32-byte key and
+// returns it as a base64-encoded string suitable for use as a credential key.
+func GenerateCredentialKey() (string, error) {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return "", fmt.Errorf("failed to generate credential key: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(key), nil
+}
+
+// SetEventoryCredentialKey validates keyBase64 and stores it in app_settings.
+// Passing an empty string clears the stored key.
+func SetEventoryCredentialKey(keyBase64 string) error {
+	db := repository.GetDB()
+	if db == nil {
+		return ErrDatabaseNotAvailable
+	}
+	keyBase64 = strings.TrimSpace(keyBase64)
+	if keyBase64 != "" {
+		// Validate before storing.
+		if _, err := parseCredentialKey(keyBase64, "credential key"); err != nil {
+			return err
+		}
+	}
+	adminSvc := NewAdminService()
+	return adminSvc.SetSetting(eventorySettingScope, eventoryCredentialKeySKey, models.JSONMap{"key": keyBase64})
 }
 
 // encryptCredential encrypts plaintext using AES-256-GCM and returns a

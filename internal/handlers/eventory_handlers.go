@@ -289,6 +289,62 @@ func SyncEventoryProducts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetEventoryCredentialKeyStatus returns whether and from where the Eventory
+// credential encryption key is configured (env var, database, or not set).
+func GetEventoryCredentialKeyStatusHandler(w http.ResponseWriter, r *http.Request) {
+	status := services.GetEventoryCredentialKeyStatus()
+	respondJSON(w, http.StatusOK, status)
+}
+
+// UpdateEventoryCredentialKey sets or clears the credential key stored in the
+// database. Pass {"key": "<base64>"} to set it, or {"key": ""} to clear it.
+// Has no effect on the env-var source, which always takes precedence.
+func UpdateEventoryCredentialKey(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Key string `json:"key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+	if err := services.SetEventoryCredentialKey(payload.Key); err != nil {
+		log.Printf("[EVENTORY] Failed to save credential key: %v", err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Failed to save credential key: %v", err)})
+		return
+	}
+	status := services.GetEventoryCredentialKeyStatus()
+	respondJSON(w, http.StatusOK, status)
+}
+
+// GenerateEventoryCredentialKey generates a new random 32-byte AES-256 key,
+// returns it as a base64 string, and optionally saves it to the database when
+// the request body contains {"save": true}.
+func GenerateEventoryCredentialKey(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Save bool `json:"save"`
+	}
+	// Ignore decode errors — an empty body means save=false.
+	_ = json.NewDecoder(r.Body).Decode(&payload)
+
+	generated, err := services.GenerateCredentialKey()
+	if err != nil {
+		log.Printf("[EVENTORY] Failed to generate credential key: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to generate credential key"})
+		return
+	}
+	if payload.Save {
+		if err := services.SetEventoryCredentialKey(generated); err != nil {
+			log.Printf("[EVENTORY] Failed to save generated credential key: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save generated credential key"})
+			return
+		}
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"key":   generated,
+		"saved": payload.Save,
+	})
+}
+
 // maskAPIKey returns a masked version of an API key, showing only the first 4 and last 4 chars.
 func maskAPIKey(key string) string {
 	if len(key) <= 8 {
