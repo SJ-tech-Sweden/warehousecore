@@ -1619,7 +1619,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 			GROUP BY d2.productid
 		) assigned_counts ON assigned_counts.productid = jpr.product_id
 		WHERE jpr.job_id = $1
-		ORDER BY p.name
+		ORDER BY COALESCE(p.name, ''), jpr.product_id
 	`, jobID)
 
 	productRequirements := []ProductRequirement{}
