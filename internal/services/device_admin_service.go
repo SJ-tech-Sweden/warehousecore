@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"os"
 	"path/filepath"
@@ -71,81 +70,26 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		_ = tx.Rollback()
 	}()
 
-	// Determine the device ID prefix.  If the caller supplies a non-empty
-	// device_prefix it is used verbatim (after trimming whitespace), giving the
-	// web admin UI full control over the prefix.  Otherwise the prefix is derived
-	// from the product's subcategory abbreviation + pos_in_category, mirroring the
-	// DB trigger (migration 030) with two intentional divergences:
-	//   1. When no subcategory abbreviation is found the trigger raises an error;
-	//      here we fall back to "P{productID}" to support legacy products.
-	//   2. The trigger has a special-case for pre-set "PKG_*" IDs (used for
-	//      virtual package devices).  That case is not needed here because
-	//      DeviceCreateInput has no deviceID field -- PKG_ devices are created
-	//      through a separate code path that supplies the ID explicitly.
-	var prefix string
-	if input.DevicePrefix != nil && strings.TrimSpace(*input.DevicePrefix) != "" {
-		prefix = strings.TrimSpace(*input.DevicePrefix)
-	} else {
-		var abbreviation sql.NullString
-		var posInCategory sql.NullInt64
-		err = tx.QueryRowContext(ctx, `
-			SELECT s.abbreviation, p.pos_in_category
-			FROM products p
-			LEFT JOIN subcategories s ON p.subcategoryID = s.subcategoryID
-			WHERE p.productID = $1
-		`, input.ProductID).Scan(&abbreviation, &posInCategory)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return nil, fmt.Errorf("product %d not found", input.ProductID)
-			}
-			return nil, fmt.Errorf("failed to fetch product info: %w", err)
-		}
-
-		if abbreviation.Valid && abbreviation.String != "" {
-			posStr := "0"
-			if posInCategory.Valid {
-				posStr = fmt.Sprintf("%d", posInCategory.Int64)
-			}
-			prefix = abbreviation.String + posStr
-		} else {
-			prefix = fmt.Sprintf("P%d", input.ProductID)
-		}
+	// Determine the device ID prefix and the next available counter via the
+	// shared helpers in device_id.go (see that file for full documentation):
+	//   - deriveDeviceIDPrefix honours a caller-supplied device_prefix or derives
+	//     one from subcategory abbreviation + pos_in_category, with a
+	//     "P{productID}" fallback for products without an abbreviation.
+	//   - allocateDeviceCounter acquires a pg_advisory_xact_lock keyed on a
+	//     FNV-64a hash of the prefix and scans existing IDs with an index-friendly
+	//     LIKE predicate to find the next counter value.
+	manualPrefix := ""
+	if input.DevicePrefix != nil {
+		manualPrefix = *input.DevicePrefix
 	}
-
-	// Serialize concurrent CreateDevices calls that share the same prefix so that
-	// two transactions cannot read the same max counter and produce duplicate IDs.
-	// The lock key is derived from the prefix (not productID) because two different
-	// products can share the same prefix (same abbreviation + pos_in_category), and
-	// the counter scan below is scoped to the prefix across the whole devices table.
-	h := fnv.New64a()
-	h.Write([]byte(prefix))
-	lockKey := int64(h.Sum64())
-	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, lockKey); err != nil {
-		return nil, fmt.Errorf("failed to acquire device creation lock: %w", err)
-	}
-
-	// Find the highest existing counter for this prefix to avoid collisions.
-	// The prefix is matched literally via LEFT(deviceID, CHAR_LENGTH(prefix)) = prefix
-	// (rather than LIKE) to avoid misinterpreting SQL wildcard characters that may
-	// appear in the abbreviation.
-	// The numeric suffix after the prefix can be any length; we extract it with
-	// SUBSTRING and cast to BIGINT so counters above 999 are handled naturally.
-	// New IDs are formatted with %03d (minimum 3 digits) to preserve leading zeros
-	// for counters below 1000, matching the DB trigger's LPAD(..., 3, '0') behaviour.
-	var nextCounter int64
-	err = tx.QueryRowContext(ctx, `
-		SELECT COALESCE(MAX(
-			CASE
-				WHEN SUBSTRING(deviceID FROM CHAR_LENGTH($1) + 1) ~ '^[0-9]+$'
-				THEN CAST(SUBSTRING(deviceID FROM CHAR_LENGTH($1) + 1) AS BIGINT)
-				ELSE 0
-			END
-		), 0) + 1
-		FROM devices
-		WHERE LEFT(deviceID, CHAR_LENGTH($1)) = $1
-	`, prefix).Scan(&nextCounter)
+	prefix, err := deriveDeviceIDPrefix(ctx, tx, input.ProductID, manualPrefix)
 	if err != nil {
-		return nil, fmt.Errorf("failed to determine next device counter: %w", err)
+		return nil, err
+	}
+
+	nextCounter, err := allocateDeviceCounter(ctx, tx, prefix)
+	if err != nil {
+		return nil, err
 	}
 
 	createdIDs := make([]string, 0, input.Quantity)
