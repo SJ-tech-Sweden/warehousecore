@@ -176,14 +176,38 @@ export function JobsPage() {
 
   // Start/stop scanners when input method changes
   useEffect(() => {
+    let active = true;
+
     if (inputMethod !== 'camera') barcodeScanner.stopScanning();
     if (inputMethod !== 'nfc') nfcScanner.stopScanning();
 
     if (inputMethod === 'camera') {
-      barcodeScanner.startScanning();
+      Promise.resolve(barcodeScanner.startScanning())
+        .then(() => {
+          if (!active || inputMethod !== 'camera') {
+            barcodeScanner.stopScanning();
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to start barcode scanner:', error);
+        });
     } else if (inputMethod === 'nfc') {
-      nfcScanner.startScanning();
+      Promise.resolve(nfcScanner.startScanning())
+        .then(() => {
+          if (!active || inputMethod !== 'nfc') {
+            nfcScanner.stopScanning();
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to start NFC scanner:', error);
+        });
     }
+
+    return () => {
+      active = false;
+      barcodeScanner.stopScanning();
+      nfcScanner.stopScanning();
+    };
     // Intentionally not including scanner methods in deps to avoid loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputMethod]);
