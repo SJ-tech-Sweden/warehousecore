@@ -138,6 +138,7 @@ export interface Zone {
   description?: string | null;
   parent_zone_id?: number | null;
   capacity?: number | null;
+  location?: string | null;
   is_active: boolean;
   label_path?: string | null;
 }

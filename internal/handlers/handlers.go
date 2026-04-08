@@ -954,7 +954,7 @@ func GetDeviceMovements(w http.ResponseWriter, r *http.Request) {
 func GetZones(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	rows, err := db.Query(`
-		SELECT z.zone_id, z.code, z.barcode, z.name, z.type, z.description, z.parent_zone_id, z.capacity, z.is_active
+		SELECT z.zone_id, z.code, z.barcode, z.name, z.type, z.description, z.parent_zone_id, z.capacity, z.is_active, z.label_path
 		FROM storage_zones z
 		LEFT JOIN storage_zones parent ON parent.zone_id = z.parent_zone_id
 		WHERE z.is_active = TRUE
@@ -978,12 +978,13 @@ func GetZones(w http.ResponseWriter, r *http.Request) {
 		ParentZoneID *int64  `json:"parent_zone_id,omitempty"`
 		Capacity     *int64  `json:"capacity,omitempty"`
 		IsActive     bool    `json:"is_active"`
+		LabelPath    *string `json:"label_path,omitempty"`
 	}
 
 	zones := []ZoneResponse{}
 	for rows.Next() {
 		var z models.Zone
-		if err := rows.Scan(&z.ZoneID, &z.Code, &z.Barcode, &z.Name, &z.Type, &z.Description, &z.ParentZoneID, &z.Capacity, &z.IsActive); err != nil {
+		if err := rows.Scan(&z.ZoneID, &z.Code, &z.Barcode, &z.Name, &z.Type, &z.Description, &z.ParentZoneID, &z.Capacity, &z.IsActive, &z.LabelPath); err != nil {
 			log.Printf("Error scanning zone row: %v", err)
 			continue
 		}
@@ -1008,6 +1009,9 @@ func GetZones(w http.ResponseWriter, r *http.Request) {
 		}
 		if z.Capacity.Valid {
 			resp.Capacity = &z.Capacity.Int64
+		}
+		if z.LabelPath.Valid {
+			resp.LabelPath = &z.LabelPath.String
 		}
 
 		zones = append(zones, resp)

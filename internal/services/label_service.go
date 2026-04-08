@@ -274,10 +274,11 @@ func (s *LabelService) GenerateLabelForDevice(deviceID string, templateID int) (
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN subbiercategories sb ON p.subbiercategoryID = sb.subbiercategoryID
 		LEFT JOIN categories c ON p.categoryID = c.categoryID
-		LEFT JOIN manufacturers m ON p.manufacturerID = m.manufacturerID
+		LEFT JOIN manufacturer m ON p.manufacturerID = m.manufacturerID
 		LEFT JOIN brands b ON p.brandID = b.brandID
-		LEFT JOIN zones z ON d.zone_id = z.zone_id
-		LEFT JOIN cases ca ON d.case_id = ca.caseID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
+		LEFT JOIN cases ca ON dc.caseID = ca.caseID
 		WHERE d.deviceID = $1
 	`
 
@@ -453,7 +454,7 @@ func (s *LabelService) GenerateLabelForCase(caseID int, templateID int) (map[str
 			COALESCE(z.name, '') as zone_name,
 			COALESCE(z.code, '') as zone_code
 		FROM cases c
-		LEFT JOIN zones z ON c.zone_id = z.zone_id
+		LEFT JOIN storage_zones z ON c.zone_id = z.zone_id
 		WHERE c.caseID = $1
 	`
 
@@ -596,8 +597,8 @@ func (s *LabelService) GenerateLabelForZone(zoneID int64, templateID int) (map[s
 			COALESCE(z.capacity, 0) as capacity,
 			COALESCE(pz.name, '') as parent_name,
 			COALESCE(pz.code, '') as parent_code
-		FROM zones z
-		LEFT JOIN zones pz ON z.parent_zone_id = pz.zone_id
+		FROM storage_zones z
+		LEFT JOIN storage_zones pz ON z.parent_zone_id = pz.zone_id
 		WHERE z.zone_id = $1
 	`
 
@@ -797,7 +798,7 @@ func (s *LabelService) SaveZoneLabelImage(zoneID int64, base64Image string) (str
 	// Update zone record with label path
 	labelPath := fmt.Sprintf("/labels/zones/%s", filename)
 	db := repository.GetDB()
-	result := db.Exec("UPDATE zones SET label_path = $1 WHERE zone_id = $2", labelPath, zoneID)
+	result := db.Exec("UPDATE storage_zones SET label_path = $1 WHERE zone_id = $2", labelPath, zoneID)
 	if result.Error != nil {
 		return "", fmt.Errorf("failed to update zone label path: %w", result.Error)
 	}

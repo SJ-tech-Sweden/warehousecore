@@ -257,8 +257,24 @@ export default function LabelDesignerPage() {
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, width, height);
 
-    // Build field map from preview device (mirrors backend field resolution)
+    // Determine if we're previewing a zone or case to enrich the field map
+    const isZone = previewDevice.device_id.startsWith('ZONE-');
+    const isCase = previewDevice.device_id.startsWith('CASE-');
+    const previewZone = isZone
+      ? zones.find(z => z.zone_id === previewDevice.zone_id)
+      : undefined;
+    const previewCase = isCase
+      ? cases.find(c => `CASE-${c.case_id}` === previewDevice.device_id)
+      : undefined;
+
+    // Resolve parent zone name/code for zone preview
+    const parentZone = previewZone?.parent_zone_id
+      ? zones.find(z => z.zone_id === previewZone.parent_zone_id)
+      : undefined;
+
+    // Build field map from preview device/case/zone (mirrors backend field resolution)
     const fieldMap: Record<string, string> = {
+      // Device fields
       device_id: previewDevice.device_id,
       device_name: previewDevice.device_id,
       name: previewDevice.product_name || '',
@@ -289,20 +305,21 @@ export default function LabelDesignerPage() {
       power_consumption: '',
       // Case fields
       case_id: previewDevice.device_id,
-      description: '',
-      dimensions: '',
-      weight: '',
+      description: previewCase?.description || '',
+      dimensions: previewCase?.width && previewCase?.height && previewCase?.depth
+        ? `${previewCase.width.toFixed(1)}x${previewCase.height.toFixed(1)}x${previewCase.depth.toFixed(1)} cm`
+        : '',
+      weight: previewCase?.weight !== undefined ? `${previewCase.weight.toFixed(1)} kg` : '',
       rfid_tag: previewDevice.rfid || '',
       // Zone fields
-      code: previewDevice.zone_code || '',
-      zone_code: previewDevice.zone_code || '',
+      code: isZone ? (previewZone?.code || previewDevice.zone_code || '') : (previewDevice.zone_code || ''),
       zone_id: previewDevice.zone_id !== undefined ? String(previewDevice.zone_id) : '',
-      type: '',
-      zone_type: '',
-      location: '',
-      parent_name: '',
-      parent_code: '',
-      capacity: '',
+      type: previewZone?.type || '',
+      zone_type: previewZone?.type || '',
+      location: previewZone?.location || '',
+      capacity: previewZone?.capacity !== undefined && previewZone.capacity !== null ? String(previewZone.capacity) : '',
+      parent_name: parentZone?.name || '',
+      parent_code: parentZone?.code || '',
     };
 
     // Render elements
@@ -500,7 +517,9 @@ export default function LabelDesignerPage() {
     // Filter devices and cases without labels
     const devicesWithoutLabels = devices.filter(d => !d.label_path);
     const casesWithoutLabels = cases.filter(c => !c.label_path);
-    const zonesWithoutLabels = zones.filter(z => !z.label_path);
+    // Only filter zones if the API returns label_path; otherwise treat all zones as needing labels
+    const zonesIncludeLabelPath = zones.some(z => Object.prototype.hasOwnProperty.call(z, 'label_path'));
+    const zonesWithoutLabels = zonesIncludeLabelPath ? zones.filter(z => !z.label_path) : [];
     const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length + zonesWithoutLabels.length;
 
     if (totalMissing === 0) {
