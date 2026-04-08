@@ -10,7 +10,7 @@ import { useNFCScanner } from '../hooks/useNFCScanner';
 
 const JOB_CODE_PATTERN = /^JOB\d+$/i;
 
-type InputMethod = 'keyboard' | 'camera' | 'nfc';
+import type { InputMethod } from '../types/scanTypes';
 
 export function JobsPage() {
   const { t } = useTranslation();
