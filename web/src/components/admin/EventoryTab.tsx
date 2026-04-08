@@ -439,11 +439,13 @@ export function EventoryTab() {
 
         {/* Sync interval */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="eventory-sync-interval" className="block text-sm font-medium text-gray-300 mb-2">
             <Clock className="w-4 h-4 inline mr-1" />
             {t('admin.eventory.syncInterval')}
           </label>
           <select
+            id="eventory-sync-interval"
+            name="eventorySyncInterval"
             value={syncInterval}
             onChange={e => setSyncInterval(Number(e.target.value))}
             className="w-full sm:w-64 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white focus:outline-none focus:border-accent-red transition-colors"
