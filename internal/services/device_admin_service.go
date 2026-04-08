@@ -18,7 +18,8 @@ import (
 	"warehousecore/internal/repository"
 )
 
-// DeviceAdminService provides administrative CRUD helpers for warehouse devices.
+const maxDeviceCounter = 999
+
 type DeviceAdminService struct {
 	db           *sql.DB
 	labelService *LabelService
@@ -72,8 +73,14 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 	}()
 
 	// Determine the device ID prefix from the product's subcategory abbreviation
-	// and pos_in_category, mirroring the logic in the DB trigger so that device
-	// creation works even when the trigger has not yet been applied.
+	// and pos_in_category.  This diverges from the DB trigger (migration 030)
+	// in two intentional ways:
+	//   1. When no subcategory abbreviation is found the trigger raises an error;
+	//      here we fall back to "P{productID}" to support legacy products.
+	//   2. The trigger has a special-case for pre-set "PKG_*" IDs (used for
+	//      virtual package devices).  That case is not needed here because
+	//      DeviceCreateInput has no deviceID field -- PKG_ devices are created
+	//      through a separate code path that supplies the ID explicitly.
 	var abbreviation sql.NullString
 	var posInCategory sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
@@ -100,24 +107,36 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		prefix = fmt.Sprintf("P%d", input.ProductID)
 	}
 
-	// Find the highest existing counter for this prefix to avoid collisions.
-	// Extract the numeric suffix starting right after the prefix so that counters
-	// of any length (e.g. 1000+) are handled correctly.
-	prefixLen := len(prefix) + 1 // SUBSTRING position is 1-based
+	// Serialize concurrent CreateDevices calls for the same product so that
+	// two transactions cannot read the same max counter and produce duplicate IDs.
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, input.ProductID); err != nil {
+		return nil, fmt.Errorf("failed to acquire device creation lock: %w", err)
+	}
+
+	// Find the highest existing 3-digit counter for this prefix to avoid collisions.
+	// Device IDs are generated as prefix + %03d, so we only consider IDs whose
+	// total length equals len(prefix)+3 and whose last 3 characters are digits.
+	// This avoids false matches when one prefix is a prefix of another (e.g. "P1"
+	// vs "P10").
+	expectedLen := len(prefix) + 3
 	var nextCounter int
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(MAX(
 			CASE
-				WHEN SUBSTRING(deviceID FROM $2) ~ '^[0-9]+$'
-				THEN CAST(SUBSTRING(deviceID FROM $2) AS INTEGER)
+				WHEN RIGHT(deviceID, 3) ~ '^[0-9]{3}$'
+				THEN CAST(RIGHT(deviceID, 3) AS INTEGER)
 				ELSE 0
 			END
 		), 0) + 1
 		FROM devices
 		WHERE deviceID LIKE $1
-	`, prefix+"%", prefixLen).Scan(&nextCounter)
+		  AND CHAR_LENGTH(deviceID) = $2
+	`, prefix+"%", expectedLen).Scan(&nextCounter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine next device counter: %w", err)
+	}
+	if nextCounter+input.Quantity-1 > maxDeviceCounter {
+		return nil, fmt.Errorf("device ID counter would exceed 3-digit limit (%d) for prefix %q", maxDeviceCounter, prefix)
 	}
 
 	createdIDs := make([]string, 0, input.Quantity)
