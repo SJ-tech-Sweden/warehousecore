@@ -30,7 +30,10 @@ export function JobsPage() {
   // clearing a newer result when scans happen in quick succession.
   const resultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scheduleScanResultDismiss = () => {
+  // Re-entrancy guard – prevents overlapping async scan requests
+  const inFlightRef = useRef(false);
+
+  const scheduleScanResultDismiss = useCallback(() => {
     if (resultTimeoutRef.current !== null) {
       clearTimeout(resultTimeoutRef.current);
     }
@@ -38,12 +41,44 @@ export function JobsPage() {
       setScanResult(null);
       resultTimeoutRef.current = null;
     }, 3000);
-  };
+  }, []);
 
   // LED state
   const [ledActive, setLedActive] = useState(false);
   const [ledStatus, setLedStatus] = useState<LEDStatus | null>(null);
   const [ledLoading, setLedLoading] = useState(false);
+
+  const loadJobDetails = useCallback(async (jobId: number, options: { highlight?: boolean } = {}) => {
+    try {
+      setLoading(true);
+      const { data } = await jobsApi.getById(jobId);
+      setSelectedJob(data);
+
+      if (options.highlight !== false) {
+        setLedActive(false);
+        try {
+          await ledApi.highlightJob(jobId);
+          setLedActive(true);
+        } catch (error) {
+          console.error('Failed to highlight job LEDs:', error);
+          setLedActive(false);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load job details:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refreshJobDetails = useCallback(async (jobId: number) => {
+    try {
+      const { data } = await jobsApi.getById(jobId);
+      setSelectedJob(data);
+    } catch (error) {
+      console.error('Failed to refresh job:', error);
+    }
+  }, []);
 
   // Load open jobs and LED status on mount
   useEffect(() => {
@@ -59,7 +94,7 @@ export function JobsPage() {
         loadJobDetails(jobId, { highlight: true });
       }
     }
-  }, [urlJobId]);
+  }, [urlJobId, loadJobDetails]);
 
   const loadLEDStatus = async () => {
     try {
@@ -79,7 +114,7 @@ export function JobsPage() {
 
       return () => clearInterval(interval);
     }
-  }, [selectedJob]);
+  }, [selectedJob, refreshJobDetails]);
 
   // Cleanup LEDs when leaving the page or unmounting
   useEffect(() => {
@@ -125,38 +160,6 @@ export function JobsPage() {
       console.error('Failed to load jobs:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadJobDetails = async (jobId: number, options: { highlight?: boolean } = {}) => {
-    try {
-      setLoading(true);
-      const { data } = await jobsApi.getById(jobId);
-      setSelectedJob(data);
-
-      if (options.highlight !== false) {
-        setLedActive(false);
-        try {
-          await ledApi.highlightJob(jobId);
-          setLedActive(true);
-        } catch (error) {
-          console.error('Failed to highlight job LEDs:', error);
-          setLedActive(false);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load job details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshJobDetails = async (jobId: number) => {
-    try {
-      const { data } = await jobsApi.getById(jobId);
-      setSelectedJob(data);
-    } catch (error) {
-      console.error('Failed to refresh job:', error);
     }
   };
 
@@ -235,7 +238,10 @@ export function JobsPage() {
   }, []);
 
   // Keep ref pointing to the latest processCode so camera/NFC callbacks are never stale
-  const processCode = async (code: string) => {
+  const processCode = useCallback(async (code: string) => {
+    // Re-entrancy guard: ignore new detections while a scan is already in-flight
+    if (inFlightRef.current) return;
+
     const rawCode = code.trim();
     if (!rawCode) {
       return;
@@ -245,6 +251,7 @@ export function JobsPage() {
 
     // Detect job code scans (e.g., JOB0001)
     if (JOB_CODE_PATTERN.test(normalizedCode)) {
+      inFlightRef.current = true;
       setScanLoading(true);
       setScanResult(null);
 
@@ -265,6 +272,7 @@ export function JobsPage() {
       } finally {
         setScanCode('');
         setScanLoading(false);
+        inFlightRef.current = false;
         scheduleScanResultDismiss();
       }
 
@@ -281,6 +289,7 @@ export function JobsPage() {
       return;
     }
 
+    inFlightRef.current = true;
     setScanLoading(true);
     setScanResult(null);
 
@@ -311,13 +320,17 @@ export function JobsPage() {
       });
     } finally {
       setScanLoading(false);
+      inFlightRef.current = false;
       // Clear result after 3 seconds
       scheduleScanResultDismiss();
     }
-  };
+  }, [t, selectedJob, loadJobDetails, refreshJobDetails, scheduleScanResultDismiss]);
 
-  // Update ref on every render so camera/NFC callbacks always use the latest closure
-  processCodeRef.current = processCode;
+  // Keep submitCodeRef in sync with the latest processCode so scanner callbacks
+  // (which are memoised on mount) can always reach the current state closure.
+  useEffect(() => {
+    processCodeRef.current = processCode;
+  }, [processCode]);
 
   const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
