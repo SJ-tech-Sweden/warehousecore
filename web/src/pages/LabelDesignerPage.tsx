@@ -306,10 +306,10 @@ export default function LabelDesignerPage() {
       // Case fields
       case_id: previewDevice.device_id,
       description: previewCase?.description || '',
-      dimensions: previewCase?.width && previewCase?.height && previewCase?.depth
+      dimensions: previewCase?.width != null && previewCase?.height != null && previewCase?.depth != null
         ? `${previewCase.width.toFixed(1)}x${previewCase.height.toFixed(1)}x${previewCase.depth.toFixed(1)} cm`
         : '',
-      weight: previewCase?.weight !== undefined ? `${previewCase.weight.toFixed(1)} kg` : '',
+      weight: previewCase?.weight != null ? `${previewCase.weight.toFixed(1)} kg` : '',
       rfid_tag: previewDevice.rfid || '',
       // Zone fields
       code: isZone ? (previewZone?.code || previewDevice.zone_code || '') : (previewDevice.zone_code || ''),
@@ -518,7 +518,7 @@ export default function LabelDesignerPage() {
     const devicesWithoutLabels = devices.filter(d => !d.label_path);
     const casesWithoutLabels = cases.filter(c => !c.label_path);
     // Only filter zones if the API returns label_path; otherwise treat all zones as needing labels
-    const zonesIncludeLabelPath = zones.some(z => Object.prototype.hasOwnProperty.call(z, 'label_path'));
+    const zonesIncludeLabelPath = zones.some(z => 'label_path' in z);
     const zonesWithoutLabels = zonesIncludeLabelPath ? zones.filter(z => !z.label_path) : [];
     const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length + zonesWithoutLabels.length;
 
