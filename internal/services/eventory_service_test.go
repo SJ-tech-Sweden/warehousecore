@@ -218,7 +218,11 @@ func TestFetchEventoryProducts_EndpointFallback(t *testing.T) {
 	if len(products) != 1 || products[0].Name != "From fallback" {
 		t.Errorf("unexpected products: %+v", products)
 	}
-	// /api/v1/products should have been tried first and returned 404
+	// /inventory-rentals should have been tried first and returned 404
+	if callCounts["/inventory-rentals"] == 0 {
+		t.Error("expected /inventory-rentals to have been tried")
+	}
+	// legacy endpoints should also have been tried
 	if callCounts["/api/v1/products"] == 0 {
 		t.Error("expected /api/v1/products to have been tried")
 	}
@@ -237,6 +241,254 @@ func TestFetchEventoryProducts_AllFail(t *testing.T) {
 	_, err := fetchEventoryProductsWith(cfg, srv.Client())
 	if err == nil {
 		t.Fatal("expected error when all endpoints fail, got nil")
+	}
+}
+
+// ===========================
+// /inventory-rentals tree tests
+// ===========================
+
+// TestFetchInventoryRentals_Tree verifies that fetchInventoryRentals correctly
+// parses a hierarchical category/item tree and enriches each leaf with price and
+// description fetched from /rentals/{id}.
+func TestFetchInventoryRentals_Tree(t *testing.T) {
+	inventoryBody := `[
+		{
+			"id": "cat-1",
+			"name": "Sound",
+			"children": [
+				{
+					"id": "item-1",
+					"name": "Mixer",
+					"articleNumber": "S001",
+					"stockLevel": 2,
+					"is_pack": false
+				}
+			]
+		},
+		{
+			"id": "cat-2",
+			"name": "Lights",
+			"children": [
+				{
+					"id": "cat-2-1",
+					"name": "LED",
+					"children": [
+						{
+							"id": "item-2",
+							"name": "LED Bar",
+							"articleNumber": "L001",
+							"stockLevel": null,
+							"is_pack": false
+						}
+					]
+				}
+			]
+		}
+	]`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/inventory-rentals":
+			w.Write([]byte(inventoryBody)) //nolint:errcheck
+		case "/rentals/item-1":
+			w.Write([]byte(`{"rental":{"id":"item-1","name":"Mixer","description":"Audio mixer","dailyRate":150}}`)) //nolint:errcheck
+		case "/rentals/item-2":
+			w.Write([]byte(`{"rental":{"id":"item-2","name":"LED Bar","description":"Stage light","dailyRate":50}}`)) //nolint:errcheck
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL}
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(products) != 2 {
+		t.Fatalf("expected 2 products, got %d: %+v", len(products), products)
+	}
+
+	// Check Mixer
+	var mixer, ledBar EventoryProduct
+	for _, p := range products {
+		switch p.Name {
+		case "Mixer":
+			mixer = p
+		case "LED Bar":
+			ledBar = p
+		}
+	}
+	if mixer.Name != "Mixer" {
+		t.Errorf("expected Mixer product, got %+v", mixer)
+	}
+	if mixer.Category != "Sound" {
+		t.Errorf("expected Mixer category 'Sound', got %q", mixer.Category)
+	}
+	if mixer.Description != "Audio mixer" {
+		t.Errorf("expected Mixer description 'Audio mixer', got %q", mixer.Description)
+	}
+	if mixer.Price != 150 {
+		t.Errorf("expected Mixer price 150, got %f", mixer.Price)
+	}
+
+	// Check LED Bar (nested category path)
+	if ledBar.Name != "LED Bar" {
+		t.Errorf("expected LED Bar product, got %+v", ledBar)
+	}
+	if ledBar.Category != "Lights > LED" {
+		t.Errorf("expected LED Bar category 'Lights > LED', got %q", ledBar.Category)
+	}
+	if ledBar.Description != "Stage light" {
+		t.Errorf("expected LED Bar description 'Stage light', got %q", ledBar.Description)
+	}
+	if ledBar.Price != 50 {
+		t.Errorf("expected LED Bar price 50, got %f", ledBar.Price)
+	}
+}
+
+// TestFetchInventoryRentals_EmptyCategory verifies that category nodes with no
+// leaf children do not produce spurious products.
+func TestFetchInventoryRentals_EmptyCategory(t *testing.T) {
+	inventoryBody := `[
+		{"id": "cat-empty", "name": "Empty Category", "children": []}
+	]`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/inventory-rentals" {
+			w.Write([]byte(inventoryBody)) //nolint:errcheck
+		} else {
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL}
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(products) != 0 {
+		t.Errorf("expected 0 products from empty category, got %d: %+v", len(products), products)
+	}
+}
+
+// TestFetchInventoryRentals_DetailFetchFailure verifies that when /rentals/{id}
+// fails for a leaf item, the product is still returned with zeroed price and
+// empty description (the sync must not abort due to a single detail failure).
+func TestFetchInventoryRentals_DetailFetchFailure(t *testing.T) {
+	inventoryBody := `[
+		{
+			"id": "cat-1",
+			"name": "Sound",
+			"children": [
+				{"id": "item-1", "name": "Speaker", "articleNumber": "S001", "stockLevel": 1, "is_pack": false}
+			]
+		}
+	]`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/inventory-rentals" {
+			w.Write([]byte(inventoryBody)) //nolint:errcheck
+		} else {
+			// All detail fetches fail
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL}
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(products) != 1 {
+		t.Fatalf("expected 1 product even when detail fetch fails, got %d", len(products))
+	}
+	if products[0].Name != "Speaker" {
+		t.Errorf("expected Speaker, got %q", products[0].Name)
+	}
+	if products[0].Price != 0 {
+		t.Errorf("expected price 0 when detail unavailable, got %f", products[0].Price)
+	}
+	if products[0].Description != "" {
+		t.Errorf("expected empty description when detail unavailable, got %q", products[0].Description)
+	}
+}
+
+// TestFetchInventoryRentals_AuthHeadersForwarded verifies that the Bearer token
+// and X-API-Key are forwarded to both /inventory-rentals and /rentals/{id}.
+func TestFetchInventoryRentals_AuthHeadersForwarded(t *testing.T) {
+	inventoryBody := `[
+		{"id": "item-1", "name": "Widget", "articleNumber": "W001", "stockLevel": 1, "is_pack": false}
+	]`
+
+	authOnInventory := ""
+	authOnDetail := ""
+	apiKeyOnInventory := ""
+	apiKeyOnDetail := ""
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/inventory-rentals":
+			authOnInventory = r.Header.Get("Authorization")
+			apiKeyOnInventory = r.Header.Get("X-API-Key")
+			w.Write([]byte(inventoryBody)) //nolint:errcheck
+		case "/rentals/item-1":
+			authOnDetail = r.Header.Get("Authorization")
+			apiKeyOnDetail = r.Header.Get("X-API-Key")
+			w.Write([]byte(`{"rental":{"id":"item-1","name":"Widget","description":"","dailyRate":0}}`)) //nolint:errcheck
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL, APIKey: "my-api-key"}
+	_, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if authOnInventory != "Bearer my-api-key" {
+		t.Errorf("inventory-rentals: Authorization = %q, want %q", authOnInventory, "Bearer my-api-key")
+	}
+	if apiKeyOnInventory != "my-api-key" {
+		t.Errorf("inventory-rentals: X-API-Key = %q, want %q", apiKeyOnInventory, "my-api-key")
+	}
+	if authOnDetail != "Bearer my-api-key" {
+		t.Errorf("rentals/{id}: Authorization = %q, want %q", authOnDetail, "Bearer my-api-key")
+	}
+	if apiKeyOnDetail != "my-api-key" {
+		t.Errorf("rentals/{id}: X-API-Key = %q, want %q", apiKeyOnDetail, "my-api-key")
+	}
+}
+
+// TestFetchInventoryRentals_FallsBackToLegacy verifies that when /inventory-rentals
+// returns 404 the legacy flat-list endpoints are tried.
+func TestFetchInventoryRentals_FallsBackToLegacy(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v1/products" {
+			json.NewEncoder(w).Encode([]EventoryProduct{{Name: "Legacy Product"}}) //nolint:errcheck
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{APIURL: srv.URL}
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(products) != 1 || products[0].Name != "Legacy Product" {
+		t.Errorf("unexpected products from legacy fallback: %+v", products)
 	}
 }
 

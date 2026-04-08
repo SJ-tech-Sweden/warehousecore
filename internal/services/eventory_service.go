@@ -118,6 +118,28 @@ type EventoryProduct struct {
 	Price       float64     `json:"price"`
 }
 
+// eventoryInventoryNode is a raw node from the /inventory-rentals tree.
+// The Eventory API returns a polymorphic array: each element is either an
+// InventoryCategoryNode (has "children") or an InventoryItem (has "articleNumber").
+// We decode everything into this struct and distinguish the two cases by checking
+// whether Children is non-nil (category) or nil (leaf item).
+type eventoryInventoryNode struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Children      []json.RawMessage `json:"children"`      // non-nil → category node
+	ArticleNumber *string           `json:"articleNumber"` // present in leaf items
+	StockLevel    *float64          `json:"stockLevel"`
+	IsPack        bool              `json:"is_pack"`
+}
+
+// eventoryRentalDetailResponse is the response shape from GET /rentals/{id}.
+type eventoryRentalDetailResponse struct {
+	Rental struct {
+		Description string  `json:"description"`
+		DailyRate   float64 `json:"dailyRate"`
+	} `json:"rental"`
+}
+
 // encryptedPrefix is prepended to credential values that have been encrypted
 // at rest so that plain-text values stored before encryption was introduced can
 // still be read transparently.
@@ -409,9 +431,18 @@ func fetchEventoryProductsWith(cfg *EventoryConfig, client *http.Client) ([]Even
 		oauthToken = token
 	}
 
-	// Try common product endpoint paths. Paths are relative (no leading slash)
-	// so that any configured path prefix in cfg.APIURL is preserved when the
-	// final request URL is built by joinPath.
+	// Try the Eventory /inventory-rentals endpoint first. This is the canonical
+	// Eventory API that returns a hierarchical category/item tree. Individual
+	// rental details (price, description) are fetched from /rentals/{id}.
+	products, err := fetchInventoryRentals(client, cfg.APIURL, oauthToken, cfg.APIKey)
+	if err == nil {
+		return products, nil
+	}
+	log.Printf("[EVENTORY] inventory-rentals endpoint failed: %v", err)
+
+	// Fall back to legacy flat-list product endpoint paths. Paths are relative
+	// (no leading slash) so that any configured path prefix in cfg.APIURL is
+	// preserved when the final request URL is built by joinPath.
 	endpoints := []string{
 		"api/v1/products",
 		"api/products",
@@ -499,17 +530,7 @@ func fetchFromEndpoint(client *http.Client, baseURL, endpoint, oauthToken, apiKe
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set Authorization: Bearer from the OAuth access token when available.
-	// Fall back to the API key as the bearer value when no OAuth token is present.
-	if oauthToken != "" {
-		req.Header.Set("Authorization", "Bearer "+oauthToken)
-	} else if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	// Always send X-API-Key from the configured API key (never from the OAuth token).
-	if apiKey != "" {
-		req.Header.Set("X-API-Key", apiKey)
-	}
+	setEventoryAuthHeaders(req, oauthToken, apiKey)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := client.Do(req)
@@ -558,6 +579,148 @@ func parseEventoryProductsResponse(body []byte) ([]EventoryProduct, error) {
 	}
 
 	return nil, errors.New("unrecognised response format from Eventory API")
+}
+
+// fetchInventoryRentals fetches the /inventory-rentals endpoint from the Eventory
+// API, walks the returned category/item tree, and returns a flat list of
+// EventoryProduct values. Price and description are fetched from /rentals/{id}
+// for each leaf item.
+func fetchInventoryRentals(client *http.Client, baseURL, oauthToken, apiKey string) ([]EventoryProduct, error) {
+	fullURL, err := joinPath(baseURL, "inventory-rentals")
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct inventory-rentals URL: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create inventory-rentals request: %w", err)
+	}
+	setEventoryAuthHeaders(req, oauthToken, apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("inventory-rentals request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("inventory-rentals endpoint not found (404)")
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("inventory-rentals: unauthorized – check your credentials")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("inventory-rentals: unexpected status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read inventory-rentals response: %w", err)
+	}
+
+	var rawNodes []json.RawMessage
+	if err := json.Unmarshal(body, &rawNodes); err != nil {
+		return nil, fmt.Errorf("failed to parse inventory-rentals response: %w", err)
+	}
+
+	var products []EventoryProduct
+	flattenInventoryNodes(rawNodes, "", &products, client, baseURL, oauthToken, apiKey)
+	return products, nil
+}
+
+// flattenInventoryNodes recursively walks the /inventory-rentals tree and appends
+// all leaf items (InventoryItem nodes) to out. For each leaf the function fetches
+// /rentals/{id} to obtain the daily rate (price) and description.
+// categoryPath is the ">"-separated chain of ancestor category names used to
+// populate EventoryProduct.Category.
+func flattenInventoryNodes(rawNodes []json.RawMessage, categoryPath string, out *[]EventoryProduct, client *http.Client, baseURL, oauthToken, apiKey string) {
+	for _, raw := range rawNodes {
+		var node eventoryInventoryNode
+		if err := json.Unmarshal(raw, &node); err != nil {
+			log.Printf("[EVENTORY] Failed to parse inventory node: %v", err)
+			continue
+		}
+
+		if node.Children != nil {
+			// Category node: recurse into children with updated path.
+			childPath := node.Name
+			if categoryPath != "" {
+				childPath = categoryPath + " > " + node.Name
+			}
+			flattenInventoryNodes(node.Children, childPath, out, client, baseURL, oauthToken, apiKey)
+			continue
+		}
+
+		// Leaf item: fetch /rentals/{id} for price and description.
+		description, dailyRate := fetchRentalDetail(client, baseURL, node.ID, oauthToken, apiKey)
+		*out = append(*out, EventoryProduct{
+			ID:          node.ID,
+			Name:        node.Name,
+			Description: description,
+			Category:    categoryPath,
+			Price:       dailyRate,
+		})
+	}
+}
+
+// fetchRentalDetail fetches GET /rentals/{id} and returns (description, dailyRate).
+// On failure it logs the error and returns ("", 0) so that a single failed fetch
+// does not abort the entire sync.
+func fetchRentalDetail(client *http.Client, baseURL, id, oauthToken, apiKey string) (description string, dailyRate float64) {
+	fullURL, err := joinPath(baseURL, "rentals/"+id)
+	if err != nil {
+		log.Printf("[EVENTORY] Failed to build rentals URL for %s: %v", id, err)
+		return "", 0
+	}
+
+	req, err := http.NewRequest(http.MethodGet, fullURL, nil)
+	if err != nil {
+		log.Printf("[EVENTORY] Failed to create rentals request for %s: %v", id, err)
+		return "", 0
+	}
+	setEventoryAuthHeaders(req, oauthToken, apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[EVENTORY] rentals/%s request failed: %v", id, err)
+		return "", 0
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[EVENTORY] rentals/%s returned status %d", id, resp.StatusCode)
+		return "", 0
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[EVENTORY] Failed to read rentals/%s response: %v", id, err)
+		return "", 0
+	}
+
+	var detail eventoryRentalDetailResponse
+	if err := json.Unmarshal(body, &detail); err != nil {
+		log.Printf("[EVENTORY] Failed to parse rentals/%s response: %v", id, err)
+		return "", 0
+	}
+
+	return detail.Rental.Description, detail.Rental.DailyRate
+}
+
+// setEventoryAuthHeaders sets the Authorization and X-API-Key headers on req.
+// oauthToken takes precedence for Authorization: Bearer; apiKey is used as
+// fallback. X-API-Key is always set from apiKey when non-empty.
+func setEventoryAuthHeaders(req *http.Request, oauthToken, apiKey string) {
+	if oauthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+oauthToken)
+	} else if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
 }
 
 // ValidateEventoryURL checks that the given URL is safe to use for outbound
