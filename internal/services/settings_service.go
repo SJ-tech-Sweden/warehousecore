@@ -32,10 +32,11 @@ func GetAPILimit(settingKey string, defaultLimit int) int {
 		Where("scope = ? AND key = ?", "warehousecore", settingKey).
 		Limit(1).
 		Take(&row).Error; err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[SETTINGS] Failed to query %s: %v", settingKey, err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[SETTINGS] Setting %s not found, using default limit: %d", settingKey, defaultLimit)
+			return defaultLimit
 		}
-		log.Printf("[SETTINGS] Setting %s not found, using default limit: %d", settingKey, defaultLimit)
+		log.Printf("[SETTINGS] Failed to query %s: %v; using default limit: %d", settingKey, err, defaultLimit)
 		return defaultLimit
 	}
 

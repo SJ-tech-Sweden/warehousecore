@@ -142,12 +142,12 @@ func formatNullFloat(f *float64) string {
 	return fmt.Sprintf("%.2f", *f)
 }
 
-// formatDate formats time as YYYY-MM-DD HH:MM
+// formatDate formats time to German date format (DD.MM.YYYY HH:MM)
 func formatDate(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.Format("2006-01-02 15:04")
+	return t.Format("02.01.2006 15:04")
 }
 
 // ============================

@@ -7,7 +7,7 @@ import { productPicturesApi, productWebsiteApi } from '../lib/api';
 import type { ChangeEvent } from 'react';
 import type { ProductPicture } from '../lib/api';
 import { useCurrencySymbol } from '../hooks/useCurrencySymbol';
-import { formatDateTimeISO } from '../lib/utils';
+import { formatLocalDateTime } from '../lib/utils';
 
 export interface ProductDetail {
   product_id: number;
@@ -246,7 +246,7 @@ export function ProductDetailModal({ product, isOpen, onClose }: ProductDetailMo
 
   const formatDate = (iso: string) => {
     if (!iso) return '—';
-    const result = formatDateTimeISO(iso);
+    const result = formatLocalDateTime(iso);
     return result || '—';
   };
 

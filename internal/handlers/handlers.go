@@ -1420,16 +1420,24 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT j.jobid,
 		       COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.jobid AS TEXT), 6, '0'))) AS job_code,
-		       j.description, j.startdate, j.enddate, COALESCE(s.status, '') AS status,
+		       j.description, j.startdate, j.enddate, COALESCE(s.status, 'open') AS status,
 		       COALESCE(c.firstname, '') as customer_first_name,
 		       COALESCE(c.lastname, '') as customer_last_name,
-		       COUNT(DISTINCT jd.deviceid) as device_count,
-		       COALESCE(SUM(jpr.quantity), 0) as requirements_count
+		       COALESCE(dc.device_count, 0) as device_count,
+		       COALESCE(rc.requirements_count, 0) as requirements_count
 		FROM jobs j
 		LEFT JOIN status s ON j.statusid = s.statusid
 		LEFT JOIN customers c ON j.customerid = c.customerid
-		LEFT JOIN jobdevices jd ON j.jobid = jd.jobid
-		LEFT JOIN job_product_requirements jpr ON jpr.job_id = j.jobid
+		LEFT JOIN (
+		    SELECT jobid, COUNT(DISTINCT deviceid) as device_count
+		    FROM jobdevices
+		    GROUP BY jobid
+		) dc ON dc.jobid = j.jobid
+		LEFT JOIN (
+		    SELECT job_id, SUM(quantity) as requirements_count
+		    FROM job_product_requirements
+		    GROUP BY job_id
+		) rc ON rc.job_id = j.jobid
 		WHERE 1=1`
 
 	args := []interface{}{}
@@ -1443,7 +1451,7 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	query += " GROUP BY j.jobid, j.description, j.startdate, j.enddate, s.status, c.firstname, c.lastname ORDER BY j.startdate ASC"
+	query += " ORDER BY j.startdate ASC"
 
 	rows, err := db.Query(query, args...)
 	if err != nil {

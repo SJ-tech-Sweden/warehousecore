@@ -29,10 +29,15 @@ export function formatStatus(status: string): string {
 
 export function formatDateISO(dateStr?: string | null): string {
   if (!dateStr) return '';
-  return dateStr.slice(0, 10);
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-export function formatDateTimeISO(dateStr?: string | null): string {
+export function formatLocalDateTime(dateStr?: string | null): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
