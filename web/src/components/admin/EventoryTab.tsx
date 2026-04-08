@@ -461,7 +461,10 @@ export function EventoryTab() {
         </div>
 
         <p className="text-xs text-gray-500">
-          {t('admin.eventory.syncNote', { supplier: (supplierName || '').trim() || 'Eventory' })}
+          {t('admin.eventory.syncNote', {
+            supplier:
+              ((hasUnsavedChanges ? savedSettings?.supplierName : supplierName) || '').trim() || 'Eventory',
+          })}
         </p>
       </div>
 

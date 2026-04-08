@@ -3,7 +3,7 @@ package services
 import "strings"
 
 // nullableString converts a *string to a SQL-compatible value: nil or an empty/
-// whitespace-only string become SQL NULL; otherwise the trimmed value is returned.
+// whitespace-only string becomes SQL NULL; otherwise the trimmed value is returned.
 func nullableString(value *string) interface{} {
 	if value == nil {
 		return nil

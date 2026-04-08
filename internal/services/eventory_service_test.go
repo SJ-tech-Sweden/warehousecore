@@ -284,6 +284,76 @@ func TestFetchEventoryProducts_APIKeyHeaders(t *testing.T) {
 	}
 }
 
+// TestFetchEventoryProducts_OAuthPasswordGrant verifies the OAuth2 Resource Owner
+// Password Credentials flow end-to-end:
+//   - the token request POSTs grant_type=password, username, and password as form fields
+//   - the returned access token is used as Authorization: Bearer on product requests
+//   - when an API key is also configured, X-API-Key is still sent with the API key
+//     (not the OAuth token) on product requests
+func TestFetchEventoryProducts_OAuthPasswordGrant(t *testing.T) {
+	const wantToken = "oauth-access-token-abc"
+	const apiKey = "static-api-key"
+
+	var (
+		gotGrantType, gotUsername, gotPassword string
+		gotProductAuth, gotProductAPIKey       string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/oauth/token":
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "bad form", http.StatusBadRequest)
+				return
+			}
+			gotGrantType = r.FormValue("grant_type")
+			gotUsername = r.FormValue("username")
+			gotPassword = r.FormValue("password")
+			json.NewEncoder(w).Encode(map[string]string{"access_token": wantToken})
+		default:
+			gotProductAuth = r.Header.Get("Authorization")
+			gotProductAPIKey = r.Header.Get("X-API-Key")
+			json.NewEncoder(w).Encode([]EventoryProduct{{Name: "Widget"}})
+		}
+	}))
+	defer srv.Close()
+
+	cfg := &EventoryConfig{
+		APIURL:   srv.URL,
+		Username: "user@example.com",
+		Password: "s3cr3t",
+		APIKey:   apiKey,
+	}
+	products, err := fetchEventoryProductsWith(cfg, srv.Client())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(products) == 0 {
+		t.Fatal("expected at least one product")
+	}
+
+	// Token request assertions.
+	if gotGrantType != "password" {
+		t.Errorf("token: grant_type = %q, want %q", gotGrantType, "password")
+	}
+	if gotUsername != cfg.Username {
+		t.Errorf("token: username = %q, want %q", gotUsername, cfg.Username)
+	}
+	if gotPassword != cfg.Password {
+		t.Errorf("token: password = %q, want %q", gotPassword, cfg.Password)
+	}
+
+	// Product request assertions.
+	wantBearer := "Bearer " + wantToken
+	if gotProductAuth != wantBearer {
+		t.Errorf("product: Authorization = %q, want %q", gotProductAuth, wantBearer)
+	}
+	if gotProductAPIKey != apiKey {
+		t.Errorf("product: X-API-Key = %q, want %q", gotProductAPIKey, apiKey)
+	}
+}
+
 // ===========================
 // EffectiveSupplierName tests
 // ===========================
