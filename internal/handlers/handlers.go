@@ -1522,7 +1522,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 
 	err = db.QueryRow(`
 		SELECT COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.jobid AS TEXT), 6, '0'))),
-		       j.description, j.startdate, j.enddate, COALESCE(s.status, '') AS status,
+		       j.description, j.startdate, j.enddate, COALESCE(s.status, 'open') AS status,
 		       COALESCE(c.firstname, '') as customer_first_name,
 		       COALESCE(c.lastname, '') as customer_last_name
 		FROM jobs j
