@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -70,16 +71,19 @@ func GetRentalEquipment(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var args []interface{}
+	argIdx := 1
 
 	if search != "" {
-		query += " AND (product_name LIKE ? OR supplier_name LIKE ? OR description LIKE ?)"
+		query += fmt.Sprintf(" AND (product_name ILIKE $%d OR supplier_name ILIKE $%d OR description ILIKE $%d)", argIdx, argIdx+1, argIdx+2)
 		searchPattern := "%" + search + "%"
 		args = append(args, searchPattern, searchPattern, searchPattern)
+		argIdx += 3
 	}
 
 	if supplierFilter != "" {
-		query += " AND supplier_name = ?"
+		query += fmt.Sprintf(" AND supplier_name = $%d", argIdx)
 		args = append(args, supplierFilter)
+		argIdx++
 	}
 
 	if activeOnly {
@@ -316,7 +320,7 @@ func UpdateRentalEquipment(w http.ResponseWriter, r *http.Request) {
 
 	// Check if exists
 	var exists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM rental_equipment WHERE equipment_id = ?)", id).Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM rental_equipment WHERE equipment_id = $1)", id).Scan(&exists)
 	if err != nil || !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Rental equipment not found"})
 		return
@@ -418,13 +422,13 @@ func DeleteRentalEquipment(w http.ResponseWriter, r *http.Request) {
 
 	// Check if exists
 	var exists bool
-	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM rental_equipment WHERE equipment_id = ?)", id).Scan(&exists)
+	err = db.QueryRow("SELECT EXISTS(SELECT 1 FROM rental_equipment WHERE equipment_id = $1)", id).Scan(&exists)
 	if err != nil || !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Rental equipment not found"})
 		return
 	}
 
-	_, err = db.Exec("DELETE FROM rental_equipment WHERE equipment_id = ?", id)
+	_, err = db.Exec("DELETE FROM rental_equipment WHERE equipment_id = $1", id)
 	if err != nil {
 		log.Printf("Failed to delete rental equipment: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete rental equipment"})
