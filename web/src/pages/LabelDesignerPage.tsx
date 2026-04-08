@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Trash2, Download, Printer, QrCode, Barcode, Type, Save, Image as ImageIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { labelsApi, devicesApi, casesApi } from '../lib/api';
-import type { LabelTemplate, LabelElement, Device, CaseSummary } from '../lib/api';
+import { labelsApi, devicesApi, casesApi, zonesApi } from '../lib/api';
+import type { LabelTemplate, LabelElement, Device, CaseSummary, Zone } from '../lib/api';
 import JSZip from 'jszip';
 import './LabelDesignerPage.css';
 
@@ -25,6 +25,7 @@ export default function LabelDesignerPage() {
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [devices, setDevices] = useState<Device[]>([]);
   const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [previewDevice, setPreviewDevice] = useState<Device | null>(null);
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,7 @@ export default function LabelDesignerPage() {
   useEffect(() => {
     loadDevices();
     loadCases();
+    loadZones();
     loadTemplates();
   }, []);
 
@@ -62,6 +64,15 @@ export default function LabelDesignerPage() {
       setCases(data.cases || []);
     } catch (error) {
       console.error('Failed to load cases:', error);
+    }
+  };
+
+  const loadZones = async () => {
+    try {
+      const { data } = await zonesApi.getAll();
+      setZones(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load zones:', error);
     }
   };
 
@@ -246,6 +257,54 @@ export default function LabelDesignerPage() {
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 0, width, height);
 
+    // Build field map from preview device (mirrors backend field resolution)
+    const fieldMap: Record<string, string> = {
+      device_id: previewDevice.device_id,
+      device_name: previewDevice.device_id,
+      name: previewDevice.product_name || '',
+      product_name: previewDevice.product_name || '',
+      product_description: '',
+      serial_number: previewDevice.serial_number || '',
+      barcode: previewDevice.barcode || '',
+      rfid: previewDevice.rfid || '',
+      qr_code: previewDevice.qr_code || '',
+      status: previewDevice.status || '',
+      zone_name: previewDevice.zone_name || '',
+      zone_code: previewDevice.zone_code || '',
+      case_name: previewDevice.case_name || '',
+      notes: previewDevice.notes || '',
+      purchase_date: previewDevice.purchase_date || '',
+      subcategory: '',
+      product: '',
+      category: previewDevice.product_category || '',
+      manufacturer: '',
+      manufacturer_name: '',
+      brand: '',
+      brand_name: '',
+      condition_rating: previewDevice.condition_rating !== undefined ? String(previewDevice.condition_rating) : '',
+      usage_hours: previewDevice.usage_hours !== undefined ? `${previewDevice.usage_hours} h` : '',
+      product_weight: '',
+      product_dimensions: '',
+      maintenance_interval: '',
+      power_consumption: '',
+      // Case fields
+      case_id: previewDevice.device_id,
+      description: '',
+      dimensions: '',
+      weight: '',
+      rfid_tag: previewDevice.rfid || '',
+      // Zone fields
+      code: previewDevice.zone_code || '',
+      zone_code: previewDevice.zone_code || '',
+      zone_id: previewDevice.zone_id !== undefined ? String(previewDevice.zone_id) : '',
+      type: '',
+      zone_type: '',
+      location: '',
+      parent_name: '',
+      parent_code: '',
+      capacity: '',
+    };
+
     // Render elements
     for (const elem of elements) {
       const x = elem.x * mmToPx;
@@ -253,11 +312,8 @@ export default function LabelDesignerPage() {
       const w = elem.width * mmToPx;
       const h = elem.height * mmToPx;
 
-      // Get content
-      let content = elem.content;
-      if (elem.content === 'device_id') content = previewDevice.device_id;
-      else if (elem.content === 'product_name') content = previewDevice.product_name || '';
-      else if (elem.content === 'device_name') content = previewDevice.device_id;
+      // Resolve content from field map
+      const content = fieldMap[elem.content] !== undefined ? fieldMap[elem.content] : elem.content;
 
       if (elem.type === 'qrcode') {
         try {
@@ -318,7 +374,7 @@ export default function LabelDesignerPage() {
   }, [elements, labelWidth, labelHeight, previewDevice]);
 
   const generateAllLabels = async () => {
-    const totalItems = devices.length + cases.length;
+    const totalItems = devices.length + cases.length + zones.length;
     if (totalItems === 0) {
       alert(t('labels.noDevicesOrCases'));
       return;
@@ -388,6 +444,33 @@ export default function LabelDesignerPage() {
         }
       }
 
+      // Generate labels for all zones
+      for (const zone of zones) {
+        const zoneAsDevice: Device = {
+          device_id: `ZONE-${zone.zone_id}`,
+          product_name: zone.name,
+          status: zone.type,
+          zone_code: zone.code,
+          zone_name: zone.name,
+          zone_id: zone.zone_id,
+        };
+
+        setPreviewDevice(zoneAsDevice);
+        await new Promise((r) => setTimeout(r, 500));
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          try {
+            await labelsApi.saveZoneLabel(zone.zone_id, imageData);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to save label for ZONE-${zone.zone_id}:`, error);
+            failCount++;
+          }
+        }
+      }
+
       alert(t('labels.labelsGenerated', {
         success: successCount,
         total: totalItems,
@@ -417,7 +500,8 @@ export default function LabelDesignerPage() {
     // Filter devices and cases without labels
     const devicesWithoutLabels = devices.filter(d => !d.label_path);
     const casesWithoutLabels = cases.filter(c => !c.label_path);
-    const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length;
+    const zonesWithoutLabels = zones.filter(z => !z.label_path);
+    const totalMissing = devicesWithoutLabels.length + casesWithoutLabels.length + zonesWithoutLabels.length;
 
     if (totalMissing === 0) {
       alert(t('labels.allHaveLabels'));
@@ -492,6 +576,33 @@ export default function LabelDesignerPage() {
         }
       }
 
+      // Generate labels for zones without labels
+      for (const zone of zonesWithoutLabels) {
+        const zoneAsDevice: Device = {
+          device_id: `ZONE-${zone.zone_id}`,
+          product_name: zone.name,
+          status: zone.type,
+          zone_code: zone.code,
+          zone_name: zone.name,
+          zone_id: zone.zone_id,
+        };
+
+        setPreviewDevice(zoneAsDevice);
+        await new Promise((r) => setTimeout(r, 500));
+
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const imageData = canvas.toDataURL('image/png');
+          try {
+            await labelsApi.saveZoneLabel(zone.zone_id, imageData);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to save label for ZONE-${zone.zone_id}:`, error);
+            failCount++;
+          }
+        }
+      }
+
       alert(t('labels.missingLabelsGenerated', {
         success: successCount,
         total: totalMissing,
@@ -500,9 +611,10 @@ export default function LabelDesignerPage() {
         errors: failCount > 0 ? `\n${t('labels.errorsCount', { count: failCount })}` : '',
       }));
 
-      // Reload devices and cases to refresh label_path info
+      // Reload devices, cases and zones to refresh label_path info
       await loadDevices();
       await loadCases();
+      await loadZones();
     } catch (error) {
       console.error('Generation failed:', error);
       alert(t('labels.generateError'));
@@ -565,6 +677,28 @@ export default function LabelDesignerPage() {
             }
           } catch (error) {
             console.error(`Error fetching label for CASE-${caseItem.case_id}:`, error);
+            skippedCount++;
+          }
+        } else {
+          skippedCount++;
+        }
+      }
+
+      // Export zone labels (only those that already have labels)
+      for (const zone of zones) {
+        if (zone.label_path) {
+          try {
+            const response = await fetch(zone.label_path);
+            if (response.ok) {
+              const blob = await response.blob();
+              zip.file(`zones/ZONE-${zone.zone_id}_label.png`, blob);
+              exportedCount++;
+            } else {
+              console.warn(`Failed to fetch label for ZONE-${zone.zone_id}`);
+              skippedCount++;
+            }
+          } catch (error) {
+            console.error(`Error fetching label for ZONE-${zone.zone_id}:`, error);
             skippedCount++;
           }
         } else {
@@ -779,9 +913,52 @@ export default function LabelDesignerPage() {
                       onChange={(e) => updateElement(selectedElem.id, { content: e.target.value })}
                       className="input-field-small"
                     >
-                      <option value="device_id">{t('labels.contentOptions.deviceId')}</option>
-                      <option value="product_name">{t('labels.contentOptions.productName')}</option>
-                      <option value="device_name">{t('labels.contentOptions.deviceName')}</option>
+                      <optgroup label={t('labels.contentGroups.device')}>
+                        <option value="device_id">{t('labels.contentOptions.deviceId')}</option>
+                        <option value="serial_number">{t('labels.contentOptions.serialNumber')}</option>
+                        <option value="barcode">{t('labels.contentOptions.barcode')}</option>
+                        <option value="rfid">{t('labels.contentOptions.rfid')}</option>
+                        <option value="qr_code">{t('labels.contentOptions.qrCode')}</option>
+                        <option value="status">{t('labels.contentOptions.status')}</option>
+                        <option value="condition_rating">{t('labels.contentOptions.conditionRating')}</option>
+                        <option value="usage_hours">{t('labels.contentOptions.usageHours')}</option>
+                        <option value="purchase_date">{t('labels.contentOptions.purchaseDate')}</option>
+                        <option value="notes">{t('labels.contentOptions.notes')}</option>
+                      </optgroup>
+                      <optgroup label={t('labels.contentGroups.product')}>
+                        <option value="product_name">{t('labels.contentOptions.productName')}</option>
+                        <option value="product_description">{t('labels.contentOptions.productDescription')}</option>
+                        <option value="subcategory">{t('labels.contentOptions.subcategory')}</option>
+                        <option value="category">{t('labels.contentOptions.category')}</option>
+                        <option value="manufacturer">{t('labels.contentOptions.manufacturer')}</option>
+                        <option value="brand">{t('labels.contentOptions.brand')}</option>
+                        <option value="product_weight">{t('labels.contentOptions.productWeight')}</option>
+                        <option value="product_dimensions">{t('labels.contentOptions.productDimensions')}</option>
+                        <option value="maintenance_interval">{t('labels.contentOptions.maintenanceInterval')}</option>
+                        <option value="power_consumption">{t('labels.contentOptions.powerConsumption')}</option>
+                      </optgroup>
+                      <optgroup label={t('labels.contentGroups.location')}>
+                        <option value="zone_name">{t('labels.contentOptions.zoneName')}</option>
+                        <option value="zone_code">{t('labels.contentOptions.zoneCode')}</option>
+                        <option value="case_name">{t('labels.contentOptions.caseName')}</option>
+                      </optgroup>
+                      <optgroup label={t('labels.contentGroups.case')}>
+                        <option value="case_id">{t('labels.contentOptions.caseId')}</option>
+                        <option value="name">{t('labels.contentOptions.caseName')}</option>
+                        <option value="description">{t('labels.contentOptions.description')}</option>
+                        <option value="rfid_tag">{t('labels.contentOptions.rfidTag')}</option>
+                        <option value="dimensions">{t('labels.contentOptions.dimensions')}</option>
+                        <option value="weight">{t('labels.contentOptions.weight')}</option>
+                      </optgroup>
+                      <optgroup label={t('labels.contentGroups.zone')}>
+                        <option value="code">{t('labels.contentOptions.zoneCode')}</option>
+                        <option value="zone_name">{t('labels.contentOptions.zoneName')}</option>
+                        <option value="zone_type">{t('labels.contentOptions.zoneType')}</option>
+                        <option value="location">{t('labels.contentOptions.location')}</option>
+                        <option value="capacity">{t('labels.contentOptions.capacity')}</option>
+                        <option value="parent_name">{t('labels.contentOptions.parentName')}</option>
+                        <option value="parent_code">{t('labels.contentOptions.parentCode')}</option>
+                      </optgroup>
                     </select>
                   </>
                 )}
@@ -896,6 +1073,21 @@ export default function LabelDesignerPage() {
                     };
                     setPreviewDevice(caseAsDevice);
                   }
+                } else if (value.startsWith('ZONE-')) {
+                  // It's a zone
+                  const zoneId = parseInt(value.replace('ZONE-', ''));
+                  const zone = zones.find((z) => z.zone_id === zoneId);
+                  if (zone) {
+                    const zoneAsDevice: Device = {
+                      device_id: `ZONE-${zone.zone_id}`,
+                      product_name: zone.name,
+                      status: zone.type,
+                      zone_code: zone.code,
+                      zone_name: zone.name,
+                      zone_id: zone.zone_id,
+                    };
+                    setPreviewDevice(zoneAsDevice);
+                  }
                 } else {
                   // It's a device
                   const device = devices.find((d) => d.device_id === value);
@@ -915,6 +1107,13 @@ export default function LabelDesignerPage() {
                 {cases.map((c) => (
                   <option key={`CASE-${c.case_id}`} value={`CASE-${c.case_id}`}>
                     CASE-{c.case_id} - {c.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label={t('labels.previewGroups.zones')}>
+                {zones.map((z) => (
+                  <option key={`ZONE-${z.zone_id}`} value={`ZONE-${z.zone_id}`}>
+                    {z.code} - {z.name}
                   </option>
                 ))}
               </optgroup>
@@ -963,13 +1162,13 @@ export default function LabelDesignerPage() {
               <button onClick={handlePrint} disabled={!previewDevice} className="btn-action">
                 <Printer size={18} /> {t('labels.printPreview')}
               </button>
-              <button onClick={generateMissingLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary" style={{ backgroundColor: '#10b981' }}>
+              <button onClick={generateMissingLabels} disabled={exporting || (devices.length === 0 && cases.length === 0 && zones.length === 0)} className="btn-action btn-primary" style={{ backgroundColor: '#10b981' }}>
                 <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generating') : t('labels.generateMissing')}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.missingShort')}</span>
               </button>
-              <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action btn-primary">
-                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generatingCount', { count: devices.length + cases.length }) : t('labels.generateAllWithCount', { devices: devices.length, cases: cases.length })}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.allShort')}</span>
+              <button onClick={generateAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0 && zones.length === 0)} className="btn-action btn-primary">
+                <Save size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.generatingCount', { count: devices.length + cases.length + zones.length }) : t('labels.generateAllWithCount', { devices: devices.length, cases: cases.length })}</span><span className="sm:hidden">{exporting ? t('labels.generating') : t('labels.allShort')}</span>
               </button>
-              <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0)} className="btn-action">
+              <button onClick={exportAllLabels} disabled={exporting || (devices.length === 0 && cases.length === 0 && zones.length === 0)} className="btn-action">
                 <Download size={18} /> <span className="hidden sm:inline">{exporting ? t('labels.exporting') : t('labels.exportAll')}</span><span className="sm:hidden">{exporting ? t('labels.exportShortLoading') : t('labels.exportShort')}</span>
               </button>
             </div>
