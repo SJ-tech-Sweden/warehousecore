@@ -590,22 +590,19 @@ func TestFetchRentalDetail_PathEscapesID(t *testing.T) {
 // and dot-segment IDs ("." and "..") are rejected without making a network
 // call, preventing path traversal via joinPath's dot-segment normalization.
 func TestFetchRentalDetail_DotSegmentIDsRejected(t *testing.T) {
-	called := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
+		t.Error("unexpected HTTP request made to server")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
 	for _, id := range []string{"", ".", ".."} {
-		desc, rate := fetchRentalDetail(srv.Client(), srv.URL, id, "", "")
-		if called {
-			t.Errorf("id=%q: unexpected HTTP request made to server", id)
-		}
-		if desc != "" || rate != 0 {
-			t.Errorf("id=%q: expected (\"\", 0), got (%q, %f)", id, desc, rate)
-		}
-		called = false // reset for next iteration
+		t.Run("id="+id, func(t *testing.T) {
+			desc, rate := fetchRentalDetail(srv.Client(), srv.URL, id, "", "")
+			if desc != "" || rate != 0 {
+				t.Errorf("expected (\"\", 0), got (%q, %f)", desc, rate)
+			}
+		})
 	}
 }
 

@@ -770,7 +770,7 @@ func collectLeaves(rawNodes []json.RawMessage, categoryPath string, out *[]inven
 // or change the request host.
 func fetchRentalDetail(client *http.Client, baseURL, id, oauthToken, apiKey string) (description string, dailyRate float64) {
 	if id == "" || id == "." || id == ".." {
-		log.Printf("[EVENTORY] Invalid rental id %q", id)
+		log.Printf("[EVENTORY] Rental ID must be non-empty and cannot be a dot-segment (. or ..): got %q", id)
 		return "", 0
 	}
 	escapedID := neturl.PathEscape(id)
