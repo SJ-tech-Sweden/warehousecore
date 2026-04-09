@@ -6,10 +6,11 @@
 -- The plain index idx_devices_deviceid_pattern (created in migration 030) is
 -- dropped here to avoid maintaining two redundant indexes on the same column.
 --
--- CREATE INDEX CONCURRENTLY is used so the index build does not take a
--- table-level lock that would block concurrent writes on a live system.
--- NOTE: CONCURRENTLY cannot run inside an explicit transaction block; apply
--- this migration outside of a BEGIN/COMMIT wrapper.
+-- IMPORTANT: CREATE INDEX CONCURRENTLY cannot run inside a transaction block.
+-- Apply this file outside of BEGIN/COMMIT (e.g. psql -f 037_...sql), NOT via
+-- a migration runner that wraps every file in a transaction. If your runner
+-- always uses transactions, replace CONCURRENTLY with a plain CREATE INDEX
+-- (which takes a stronger lock but runs inside a transaction).
 DROP INDEX IF EXISTS idx_devices_deviceid_pattern;
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_devices_deviceid_pattern_ops
     ON devices(deviceID varchar_pattern_ops);

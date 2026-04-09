@@ -102,7 +102,7 @@ func TestDeriveDeviceIDPrefix_ManualPrefixNormalized(t *testing.T) {
 		{"led", "LED"},
 		{"LED 1!", "LED1"},
 		{"Abc-123", "ABC123"},
-		{"  P1  ", "P1"}, // trimmed then normalized
+		{"  P1  ", "P1"}, // spaces are stripped by normalization (not [A-Z0-9])
 	}
 	for _, c := range cases {
 		got := normalizeDeviceIDPrefix(c.input)
