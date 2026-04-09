@@ -260,7 +260,8 @@ export function EventoryTab() {
       setCredKeyInput(data.key);
       setCredKeyVisible(true);
       if (saveImmediately) {
-        setCredKeyStatus({ configured: true, source: 'database' });
+        const statusRes = await eventoryApi.getCredentialKeyStatus();
+        setCredKeyStatus(statusRes.data);
         setCredKeyMessage({ type: 'success', text: t('admin.eventory.keyGeneratedSaved') });
       } else {
         setCredKeyMessage({ type: 'warning', text: t('admin.eventory.keyGenerated') });
@@ -549,16 +550,28 @@ export function EventoryTab() {
         <p className="text-sm text-gray-400">{t('admin.eventory.credentialKeyDesc')}</p>
 
         {/* Active key status badge */}
-        {credKeyStatus?.source === 'env' && (
+        {credKeyStatus?.source === 'env' && credKeyStatus.configured && (
           <div className="flex items-center gap-2 text-sm text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             {t('admin.eventory.credentialKeyEnvActive')}
           </div>
         )}
-        {credKeyStatus?.source === 'database' && (
+        {credKeyStatus?.source === 'env' && !credKeyStatus.configured && (
+          <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+            <XCircle className="w-4 h-4 flex-shrink-0" />
+            {t('admin.eventory.credentialKeyEnvInvalid')}
+          </div>
+        )}
+        {credKeyStatus?.source === 'database' && credKeyStatus.configured && (
           <div className="flex items-center gap-2 text-sm text-green-400 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             {t('admin.eventory.credentialKeyDbActive')}
+          </div>
+        )}
+        {credKeyStatus?.source === 'database' && !credKeyStatus.configured && (
+          <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+            <XCircle className="w-4 h-4 flex-shrink-0" />
+            {t('admin.eventory.credentialKeyDbInvalid')}
           </div>
         )}
         {credKeyStatus?.source === 'none' && (
@@ -589,8 +602,8 @@ export function EventoryTab() {
           </div>
         )}
 
-        {/* Disabled when env var is active */}
-        {credKeyStatus?.source !== 'env' && (
+        {/* Disabled when env var is active or status not yet loaded */}
+        {credKeyStatus && credKeyStatus.source !== 'env' && (
           <>
             <div>
               <label htmlFor="eventory-cred-key" className="block text-sm font-medium text-gray-300 mb-2">
