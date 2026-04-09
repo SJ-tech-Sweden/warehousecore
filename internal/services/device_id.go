@@ -111,14 +111,14 @@ func AllocateDeviceCounter(ctx context.Context, tx *sql.Tx, prefix string) (int6
 	err := tx.QueryRowContext(ctx, `
 		SELECT COALESCE(MAX(
 			CASE
-				WHEN SUBSTRING(deviceID FROM CHAR_LENGTH($1) + 1) ~ '`+numericSuffixPattern+`'
+				WHEN SUBSTRING(deviceID FROM CHAR_LENGTH($1) + 1) ~ $3
 				THEN CAST(SUBSTRING(deviceID FROM CHAR_LENGTH($1) + 1) AS BIGINT)
 				ELSE 0
 			END
 		), 0) + 1
 		FROM devices
 		WHERE deviceID LIKE $2 ESCAPE '\'
-	`, prefix, pattern).Scan(&nextCounter)
+	`, prefix, pattern, numericSuffixPattern).Scan(&nextCounter)
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine next device counter: %w", err)
 	}
