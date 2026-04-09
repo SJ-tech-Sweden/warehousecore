@@ -345,7 +345,7 @@ func (s *ScanService) findDeviceByScan(scanCode string) (*models.Device, error) 
 	var device models.Device
 	err := s.db.QueryRow(`
 		SELECT deviceID, productID, serialnumber, barcode, qr_code, status,
-		       current_location, zone_id, condition_rating, usage_hours
+		       current_location, zone_id, COALESCE(condition_rating, 0), COALESCE(usage_hours, 0)
 		FROM devices
 		WHERE barcode = $1 OR qr_code = $2 OR deviceID = $3
 		   OR serialnumber = $4 OR rfid = $5
@@ -374,7 +374,7 @@ func (s *ScanService) getDeviceWithDetails(deviceID string) *models.DeviceWithDe
 	var device models.DeviceWithDetails
 	err := s.db.QueryRow(`
 		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
-		       d.current_location, d.zone_id, d.condition_rating, d.usage_hours,
+		       d.current_location, d.zone_id, COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0),
 		       d.purchaseDate, d.retire_date, d.warranty_end_date,
 		       d.lastmaintenance, d.nextmaintenance, d.notes, d.label_path,
 		       COALESCE(p.name, '') as product_name,

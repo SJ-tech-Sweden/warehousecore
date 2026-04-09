@@ -116,8 +116,8 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 			status,
 			nullableString(trimPtr(input.CurrentLocation)),
 			nullableInt(input.ZoneID),
-			nullableFloat(input.ConditionRating),
-			nullableFloat(input.UsageHours),
+			derefFloatOr(input.ConditionRating, 0),
+			derefFloatOr(input.UsageHours, 0),
 			parseDatePtr(input.PurchaseDate),
 			parseDatePtr(input.RetireDate),
 			parseDatePtr(input.WarrantyEndDate),
@@ -261,7 +261,7 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 		if input.ConditionRating.Valid {
 			addArg("condition_rating = $%d", input.ConditionRating.Value)
 		} else {
-			addArg("condition_rating = $%d", nil)
+			addArg("condition_rating = $%d", 0.0)
 		}
 	}
 
@@ -269,7 +269,7 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 		if input.UsageHours.Valid {
 			addArg("usage_hours = $%d", input.UsageHours.Value)
 		} else {
-			addArg("usage_hours = $%d", nil)
+			addArg("usage_hours = $%d", 0.0)
 		}
 	}
 
@@ -450,7 +450,7 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 	err := s.db.QueryRowContext(ctx, `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id,
-		       d.condition_rating, d.usage_hours, d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.purchaseDate, d.retire_date, d.warranty_end_date,
 		       d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
 		       COALESCE(p.name, '') AS product_name,

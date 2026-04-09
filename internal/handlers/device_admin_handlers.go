@@ -106,7 +106,7 @@ func GetAllDevicesAdmin(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.rfid, d.barcode, d.qr_code, d.status,
 		       d.current_location, d.zone_id,
-		       d.condition_rating, d.usage_hours, d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.purchaseDate, d.retire_date, d.warranty_end_date,
 		       d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
 		       COALESCE(p.name, '') AS product_name,

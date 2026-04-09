@@ -702,7 +702,7 @@ func GetDevices(w http.ResponseWriter, r *http.Request) {
 	qb := NewQueryBuilder()
 	query := `
 		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
-		       d.zone_id, d.condition_rating, d.usage_hours, d.label_path,
+		       d.zone_id, COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.label_path,
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(z.name, '') as zone_name,
 		       COALESCE(z.code, '') as zone_code,
@@ -896,7 +896,7 @@ func GetDevice(w http.ResponseWriter, r *http.Request) {
 		       COALESCE(p.maintenanceInterval, 0) as maintenance_interval,
 		       COALESCE(p.powerconsumption, 0) as power_consumption,
 		       d.serialnumber, d.rfid, d.barcode, d.qr_code,
-		       d.status, d.zone_id, d.condition_rating, d.usage_hours, d.label_path,
+		       d.status, d.zone_id, COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.label_path,
 		       COALESCE(TO_CHAR(d.purchaseDate, 'YYYY-MM-DD'), '') as purchase_date,
 		       COALESCE(d.notes, '') as notes,
 		       COALESCE(z.name, '') as zone_name,
@@ -1278,7 +1278,7 @@ func GetZoneDevices(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 	rows, err := db.Query(`
 		SELECT d.deviceID, d.productID, d.serialnumber, d.status, d.barcode, d.qr_code,
-		       d.condition_rating, d.usage_hours,
+		       COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0),
 		       COALESCE(p.name, '') as product_name,
 		       COALESCE(m.name, '') as manufacturer,
 		       COALESCE(b.name, '') as model,
