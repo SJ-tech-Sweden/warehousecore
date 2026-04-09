@@ -397,10 +397,9 @@ export function ScanPage() {
     } else {
       setStep('device');
     }
-    // Clear the outtake job context when switching away from outtake
-    if (newAction !== 'outtake') {
-      setScannedJobId(null);
-    }
+    // Clear any previously scanned job context on action changes so a job used
+    // for LED modal/navigation flow cannot be reused implicitly in outtake mode.
+    setScannedJobId(null);
     setDeviceScanCode('');
     setConsumableQuantity(undefined);
     setScanCode('');

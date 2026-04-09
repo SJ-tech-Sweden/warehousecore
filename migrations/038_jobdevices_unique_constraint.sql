@@ -9,8 +9,9 @@
 -- is critical, run during a maintenance window.
 --
 -- The jobdevices table is shared with RentalCore; the constraint addition is
--- guarded by a column-based check (any existing UNIQUE on (deviceID, jobID),
--- regardless of constraint name) so the migration is safe to re-run.
+-- guarded by a column-based check (any existing UNIQUE constraint or UNIQUE
+-- index on (deviceID, jobID), regardless of name) so the migration is safe
+-- to re-run even if another system has already enforced uniqueness.
 BEGIN;
 
 -- Lock the table for the duration of this migration to prevent concurrent
@@ -37,19 +38,34 @@ WHERE ctid IN (
 );
 
 -- Step 2: Add the unique constraint (idempotent: skip if any unique constraint
--- already covers (deviceID, jobID) on jobdevices, regardless of constraint name).
+-- OR unique index already covers exactly (deviceID, jobID) on jobdevices,
+-- regardless of name — covers both ADD CONSTRAINT and CREATE UNIQUE INDEX paths).
 DO $$
 BEGIN
   IF NOT EXISTS (
+    -- Check for a named UNIQUE constraint on exactly (deviceID, jobID)
     SELECT 1
     FROM   pg_constraint c
-    WHERE  c.contype    = 'u'
-      AND  c.conrelid   = 'jobdevices'::regclass
+    WHERE  c.contype  = 'u'
+      AND  c.conrelid = 'jobdevices'::regclass
       AND  (
         SELECT array_agg(a.attname ORDER BY a.attname)
         FROM   pg_attribute a
         WHERE  a.attrelid = c.conrelid
           AND  a.attnum   = ANY(c.conkey)
+      ) = ARRAY['deviceid', 'jobid']
+    UNION ALL
+    -- Check for a standalone UNIQUE index on exactly (deviceID, jobID)
+    SELECT 1
+    FROM   pg_index i
+    WHERE  i.indrelid  = 'jobdevices'::regclass
+      AND  i.indisunique = true
+      AND  (
+        SELECT array_agg(a.attname ORDER BY a.attname)
+        FROM   pg_attribute a
+        WHERE  a.attrelid = i.indrelid
+          AND  a.attnum   = ANY(i.indkey)
+          AND  a.attnum   > 0
       ) = ARRAY['deviceid', 'jobid']
   ) THEN
     ALTER TABLE jobdevices
