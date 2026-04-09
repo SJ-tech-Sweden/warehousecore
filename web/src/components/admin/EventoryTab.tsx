@@ -260,8 +260,13 @@ export function EventoryTab() {
       setCredKeyInput(data.key);
       setCredKeyVisible(true);
       if (saveImmediately) {
-        const statusRes = await eventoryApi.getCredentialKeyStatus();
-        setCredKeyStatus(statusRes.data);
+        try {
+          const statusRes = await eventoryApi.getCredentialKeyStatus();
+          setCredKeyStatus(statusRes.data);
+        } catch (statusErr) {
+          console.error('Failed to refresh credential key status:', statusErr);
+          setCredKeyStatus({ configured: true, source: 'database' });
+        }
         setCredKeyMessage({ type: 'success', text: t('admin.eventory.keyGeneratedSaved') });
       } else {
         setCredKeyMessage({ type: 'warning', text: t('admin.eventory.keyGenerated') });
