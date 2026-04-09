@@ -30,6 +30,7 @@ export function EventoryTab() {
   const [tokenEndpoint, setTokenEndpoint] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [syncInterval, setSyncInterval] = useState(0);
+  const [priceMargin, setPriceMargin] = useState(0);
 
   // Credential key state
   const [credKeyStatus, setCredKeyStatus] = useState<EventoryCredentialKeyStatus | null>(null);
@@ -49,6 +50,7 @@ export function EventoryTab() {
     tokenEndpoint: string;
     supplierName: string;
     syncInterval: number;
+    priceMargin: number;
   } | null>(null);
 
   // Secrets (api_key, password) are never returned by the server, so we cannot
@@ -61,6 +63,7 @@ export function EventoryTab() {
       tokenEndpoint !== savedSettings.tokenEndpoint ||
       supplierName !== savedSettings.supplierName ||
       syncInterval !== savedSettings.syncInterval ||
+      priceMargin !== savedSettings.priceMargin ||
       apiKey !== '' ||
       clearApiKey ||
       password !== '' ||
@@ -93,12 +96,14 @@ export function EventoryTab() {
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
+      setPriceMargin(data.price_margin_percent ?? 0);
       setSavedSettings({
         apiUrl: data.api_url || '',
         username: data.username || '',
         tokenEndpoint: data.token_endpoint || '',
         supplierName: data.supplier_name || '',
         syncInterval: data.sync_interval_minutes ?? 0,
+        priceMargin: data.price_margin_percent ?? 0,
       });
       setCredKeyStatus(credKeyRes.data);
     } catch (err) {
@@ -130,6 +135,7 @@ export function EventoryTab() {
         token_endpoint: tokenEndpoint.trim(),
         supplier_name: supplierName.trim(),
         sync_interval_minutes: syncInterval,
+        price_margin_percent: priceMargin,
       };
       if (clearApiKey) {
         payload.clear_api_key = true;
@@ -156,12 +162,14 @@ export function EventoryTab() {
       setTokenEndpoint(data.token_endpoint || '');
       setSupplierName(data.supplier_name || '');
       setSyncInterval(data.sync_interval_minutes ?? 0);
+      setPriceMargin(data.price_margin_percent ?? 0);
       setSavedSettings({
         apiUrl: savedApiUrl,
         username: data.username || '',
         tokenEndpoint: data.token_endpoint || '',
         supplierName: data.supplier_name || '',
         syncInterval: data.sync_interval_minutes ?? 0,
+        priceMargin: data.price_margin_percent ?? 0,
       });
       setMessage({ type: 'success', text: t('admin.eventory.settingsSaved') });
     } catch (err) {
@@ -531,6 +539,27 @@ export function EventoryTab() {
             ))}
           </select>
           <p className="mt-1 text-xs text-gray-500">{t('admin.eventory.syncIntervalDesc')}</p>
+        </div>
+
+        {/* Price margin */}
+        <div>
+          <label htmlFor="eventory-price-margin" className="block text-sm font-medium text-gray-300 mb-2">
+            {t('admin.eventory.priceMargin')}
+          </label>
+          <div className="flex items-center gap-2 w-full sm:w-64">
+            <input
+              id="eventory-price-margin"
+              name="eventoryPriceMargin"
+              type="number"
+              min="0"
+              step="0.1"
+              value={priceMargin}
+              onChange={e => setPriceMargin(Math.max(0, parseFloat(e.target.value) || 0))}
+              className="flex-1 px-4 py-3 bg-dark-light border border-white/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-accent-red transition-colors"
+            />
+            <span className="text-gray-400 font-medium">%</span>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">{t('admin.eventory.priceMarginDesc')}</p>
         </div>
 
         {/* Save button */}

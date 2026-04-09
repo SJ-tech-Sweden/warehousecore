@@ -282,7 +282,42 @@ func RunEventorySync(cfg *EventoryConfig) (imported, updated, skipped, total int
 	}
 
 	supplierName := cfg.EffectiveSupplierName()
+	applyMargin := cfg.PriceMarginPercent > 0
 	now := time.Now()
+
+	// Build the upsert query once outside the loop. When a price margin is
+	// configured, customer_price is computed from rental_price and also updated
+	// on conflict. When margin is 0, customer_price is left at 0 on insert and
+	// not touched on subsequent syncs so manually-set prices are preserved.
+	var upsertQuery string
+	if applyMargin {
+		upsertQuery = `
+			INSERT INTO rental_equipment
+				(product_name, supplier_name, rental_price, customer_price, category, description, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $7)
+			ON CONFLICT (product_name, supplier_name)
+			DO UPDATE SET
+				rental_price   = EXCLUDED.rental_price,
+				customer_price = EXCLUDED.customer_price,
+				category       = EXCLUDED.category,
+				description    = EXCLUDED.description,
+				updated_at     = EXCLUDED.updated_at
+			RETURNING (xmax = 0) AS inserted
+		`
+	} else {
+		upsertQuery = `
+			INSERT INTO rental_equipment
+				(product_name, supplier_name, rental_price, customer_price, category, description, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, 0, $4, $5, TRUE, $6, $6)
+			ON CONFLICT (product_name, supplier_name)
+			DO UPDATE SET
+				rental_price = EXCLUDED.rental_price,
+				category     = EXCLUDED.category,
+				description  = EXCLUDED.description,
+				updated_at   = EXCLUDED.updated_at
+			RETURNING (xmax = 0) AS inserted
+		`
+	}
 
 	for _, p := range products {
 		name := strings.TrimSpace(p.Name)
@@ -295,18 +330,15 @@ func RunEventorySync(cfg *EventoryConfig) (imported, updated, skipped, total int
 		description := strings.TrimSpace(p.Description)
 
 		var inserted bool
-		upsertErr := tx.QueryRow(`
-			INSERT INTO rental_equipment
-				(product_name, supplier_name, rental_price, customer_price, category, description, is_active, created_at, updated_at)
-			VALUES ($1, $2, $3, 0, $4, $5, TRUE, $6, $6)
-			ON CONFLICT (product_name, supplier_name)
-			DO UPDATE SET
-				rental_price = EXCLUDED.rental_price,
-				category     = EXCLUDED.category,
-				description  = EXCLUDED.description,
-				updated_at   = EXCLUDED.updated_at
-			RETURNING (xmax = 0) AS inserted
-		`, name, supplierName, p.Price, nullableString(&category), nullableString(&description), now).Scan(&inserted)
+		var upsertErr error
+		if applyMargin {
+			customerPrice := p.Price * (1 + cfg.PriceMarginPercent/100)
+			upsertErr = tx.QueryRow(upsertQuery, name, supplierName, p.Price, customerPrice,
+				nullableString(&category), nullableString(&description), now).Scan(&inserted)
+		} else {
+			upsertErr = tx.QueryRow(upsertQuery, name, supplierName, p.Price,
+				nullableString(&category), nullableString(&description), now).Scan(&inserted)
+		}
 
 		if upsertErr != nil {
 			log.Printf("[EVENTORY] Failed to upsert product %q: %v", name, upsertErr)

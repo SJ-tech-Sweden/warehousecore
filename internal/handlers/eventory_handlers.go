@@ -61,6 +61,7 @@ func GetEventorySettings(w http.ResponseWriter, r *http.Request) {
 		"supplier_name_configured": strings.TrimSpace(cfg.SupplierName) != "",
 		"supplier_name_effective":  cfg.EffectiveSupplierName(),
 		"sync_interval_minutes":    cfg.SyncIntervalMinutes,
+		"price_margin_percent":     cfg.PriceMarginPercent,
 	})
 }
 
@@ -70,15 +71,16 @@ func GetEventorySettings(w http.ResponseWriter, r *http.Request) {
 // Missing sync_interval_minutes (null in JSON) preserves the existing value.
 func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 	var rawPayload struct {
-		APIURL              string `json:"api_url"`
-		APIKey              string `json:"api_key"`
-		ClearAPIKey         bool   `json:"clear_api_key"`
-		Username            string `json:"username"`
-		Password            string `json:"password"`
-		ClearPassword       bool   `json:"clear_password"`
-		TokenEndpoint       string `json:"token_endpoint"`
-		SupplierName        string `json:"supplier_name"`
-		SyncIntervalMinutes *int   `json:"sync_interval_minutes"`
+		APIURL              string   `json:"api_url"`
+		APIKey              string   `json:"api_key"`
+		ClearAPIKey         bool     `json:"clear_api_key"`
+		Username            string   `json:"username"`
+		Password            string   `json:"password"`
+		ClearPassword       bool     `json:"clear_password"`
+		TokenEndpoint       string   `json:"token_endpoint"`
+		SupplierName        string   `json:"supplier_name"`
+		SyncIntervalMinutes *int     `json:"sync_interval_minutes"`
+		PriceMarginPercent  *float64 `json:"price_margin_percent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&rawPayload); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
@@ -185,6 +187,16 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Preserve existing price margin if the field was omitted from the payload.
+	priceMarginPercent := existing.PriceMarginPercent
+	if rawPayload.PriceMarginPercent != nil {
+		priceMarginPercent = *rawPayload.PriceMarginPercent
+	}
+	if priceMarginPercent < 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "price_margin_percent must be 0 or a positive number"})
+		return
+	}
+
 	cfg := &services.EventoryConfig{
 		APIURL:              rawPayload.APIURL,
 		APIKey:              apiKey,
@@ -193,6 +205,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		TokenEndpoint:       tokenEndpoint,
 		SupplierName:        strings.TrimSpace(rawPayload.SupplierName),
 		SyncIntervalMinutes: syncIntervalMinutes,
+		PriceMarginPercent:  priceMarginPercent,
 	}
 
 	if err := services.SaveEventoryConfig(cfg); err != nil {
@@ -221,6 +234,7 @@ func UpdateEventorySettings(w http.ResponseWriter, r *http.Request) {
 		"supplier_name_configured": strings.TrimSpace(cfg.SupplierName) != "",
 		"supplier_name_effective":  cfg.EffectiveSupplierName(),
 		"sync_interval_minutes":    cfg.SyncIntervalMinutes,
+		"price_margin_percent":     cfg.PriceMarginPercent,
 		"message":                  "Eventory settings saved successfully",
 	})
 }

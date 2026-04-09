@@ -114,6 +114,10 @@ type EventoryConfig struct {
 	// SyncIntervalMinutes controls automatic background syncing.
 	// 0 means disabled; positive values trigger a sync every N minutes.
 	SyncIntervalMinutes int `json:"sync_interval_minutes"`
+	// PriceMarginPercent is applied to the Eventory rental_price to derive the
+	// customer_price on import: customer_price = rental_price * (1 + margin/100).
+	// 0 means automatic customer price calculation is disabled.
+	PriceMarginPercent float64 `json:"price_margin_percent"`
 }
 
 // EffectiveSupplierName returns SupplierName or the default "Eventory".

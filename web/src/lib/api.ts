@@ -632,6 +632,7 @@ export interface EventorySettings {
   supplier_name_configured: boolean;
   supplier_name_effective: string;
   sync_interval_minutes: number;
+  price_margin_percent: number;
 }
 
 export interface EventoryProduct {
@@ -660,6 +661,7 @@ export interface EventorySettingsPayload {
   token_endpoint: string;
   supplier_name: string;
   sync_interval_minutes: number;
+  price_margin_percent: number;
 }
 
 export interface EventoryCredentialKeyStatus {
