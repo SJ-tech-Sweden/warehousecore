@@ -285,13 +285,14 @@ export function ScanPage() {
             action: 'check',
           });
 
-          const isConsumable = !!(checkResponse.data.product && checkResponse.data.product.unit);
+          const product = checkResponse.data.product;
+          const isConsumable = !!(product && product.unit);
 
           if (isConsumable) {
             // Consumable/accessory: ask for quantity
             const promptText = action === 'intake'
-              ? t('scan.prompts.intakeQuantity', { unit: checkResponse.data.product!.unit })
-              : t('scan.prompts.outtakeQuantity', { unit: checkResponse.data.product!.unit });
+              ? t('scan.prompts.intakeQuantity', { unit: product!.unit })
+              : t('scan.prompts.outtakeQuantity', { unit: product!.unit });
             const quantityStr = window.prompt(promptText);
 
             if (!quantityStr || isNaN(Number(quantityStr)) || Number(quantityStr) <= 0) {

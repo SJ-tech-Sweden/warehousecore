@@ -1182,7 +1182,7 @@
     "outtake": {
       "jobSelected": "Job #{{id}} ausgewählt – jetzt das Gerät scannen zum Ausgeben.",
       "noJobSelected": "Zuerst einen Job-Barcode (JOB######) scannen, dann das Gerät.",
-      "clearJob": "Job löschen"
+      "clearJob": "Job abwählen"
     },
     "ledModal": {
       "title": "LED-Licht aktivieren?",
