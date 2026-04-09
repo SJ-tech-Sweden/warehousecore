@@ -121,7 +121,7 @@ export function ScanPage() {
         setResult({
           success: true,
           message: t('scan.outtake.jobSelected', { id: jobId }),
-          action: 'check',
+          action: 'outtake',
           duplicate: false,
         });
         return;
@@ -322,7 +322,7 @@ export function ScanPage() {
 
         // For outtake of a regular device, pass the selected job id.
         // For consumables, pass the quantity via job_id (backend workaround).
-        const jobIdParam = action === 'outtake' && quantity === undefined
+        const jobIdOrQuantity = action === 'outtake' && quantity === undefined
           ? scannedJobId ?? undefined
           : quantity;
 
@@ -330,7 +330,7 @@ export function ScanPage() {
         const { data } = await scansApi.process({
           scan_code: code,
           action: action,
-          job_id: jobIdParam,
+          job_id: jobIdOrQuantity,
         });
         setResult(data);
         setScanCode('');

@@ -6,14 +6,23 @@
 -- the migration is safe to re-run and does not break existing data.
 
 -- Step 1: Remove any duplicate (deviceID, jobID) pairs that would violate the
--- constraint, keeping the row with the highest rowid / ctid (most recent insert).
-DELETE FROM jobdevices a
-USING jobdevices b
-WHERE a.ctid < b.ctid
-  AND a.deviceID = b.deviceID
-  AND a.jobID    = b.jobID;
+-- constraint, keeping the row with the newest pack_ts and using ctid only as a
+-- deterministic tie-breaker when pack_ts values are equal or NULL.
+DELETE FROM jobdevices
+WHERE ctid IN (
+  SELECT ctid
+  FROM (
+    SELECT ctid,
+           ROW_NUMBER() OVER (
+             PARTITION BY deviceID, jobID
+             ORDER BY (pack_ts IS NULL), pack_ts DESC, ctid DESC
+           ) AS rn
+    FROM jobdevices
+  ) ranked
+  WHERE rn > 1
+);
 
--- Step 2: Add the unique constraint (idempotent via DO NOTHING on duplicate name).
+-- Step 2: Add the unique constraint (idempotent via IF NOT EXISTS guard on pg_constraint).
 DO $$
 BEGIN
   IF NOT EXISTS (
