@@ -1016,6 +1016,19 @@ func TestGetEventoryCredentialKeyStatus_NoneWhenEnvEmpty(t *testing.T) {
 	// Configured may be false when no DB is available; just check no panic.
 }
 
+// TestGetEventoryCredentialKeyStatus_InvalidEnvKey verifies that an invalid
+// (non-32-byte, non-base64) env var value is reported as Configured=false.
+func TestGetEventoryCredentialKeyStatus_InvalidEnvKey(t *testing.T) {
+	t.Setenv("EVENTORY_CREDENTIAL_KEY", "not-a-valid-key")
+	status := GetEventoryCredentialKeyStatus()
+	if status.Configured {
+		t.Error("expected Configured=false for an invalid env var key")
+	}
+	if status.Source == CredentialKeySourceEnv {
+		t.Errorf("expected source != %q for an invalid env var key", CredentialKeySourceEnv)
+	}
+}
+
 // TestCollectLeaves_NilIDSkipped verifies that a leaf node with a null ID is
 // skipped with a log message and does not produce a "<nil>" inventory item.
 func TestCollectLeaves_NilIDSkipped(t *testing.T) {

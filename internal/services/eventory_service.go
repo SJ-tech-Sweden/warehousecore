@@ -263,6 +263,10 @@ type EventoryCredentialKeyStatus struct {
 // and where it comes from (env var takes precedence over the database).
 func GetEventoryCredentialKeyStatus() EventoryCredentialKeyStatus {
 	if raw := strings.TrimSpace(os.Getenv("EVENTORY_CREDENTIAL_KEY")); raw != "" {
+		if _, err := parseCredentialKey(raw, "EVENTORY_CREDENTIAL_KEY"); err != nil {
+			log.Printf("[EVENTORY] EVENTORY_CREDENTIAL_KEY env var is set but invalid: %v", err)
+			return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
+		}
 		return EventoryCredentialKeyStatus{Configured: true, Source: CredentialKeySourceEnv}
 	}
 	db := repository.GetDB()
@@ -282,6 +286,11 @@ func GetEventoryCredentialKeyStatus() EventoryCredentialKeyStatus {
 	if strings.TrimSpace(raw) == "" {
 		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
 	}
+	if _, err := parseCredentialKey(raw, "admin UI credential key"); err != nil {
+		log.Printf("[EVENTORY] invalid credential key stored in database (scope=%q key=%q): %v",
+			eventorySettingScope, eventoryCredentialKeySettingKey, err)
+		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
+	}
 	return EventoryCredentialKeyStatus{Configured: true, Source: CredentialKeySourceDatabase}
 }
 
@@ -295,24 +304,26 @@ func GenerateCredentialKey() (string, error) {
 	return base64.StdEncoding.EncodeToString(key), nil
 }
 
-// SetEventoryCredentialKey validates keyBase64 and stores it in app_settings.
+// SetEventoryCredentialKey validates key and stores it in app_settings.
+// The key may be a raw 32-byte string or a base64-encoded 32-byte key (any
+// format accepted by parseCredentialKey).
 // Passing an empty string clears the stored key.
 // Returns ErrCredentialKeyInvalid if the key fails validation, ErrDatabaseNotAvailable
 // if the database is not reachable, or an error wrapping the database write failure.
-func SetEventoryCredentialKey(keyBase64 string) error {
+func SetEventoryCredentialKey(key string) error {
 	db := repository.GetDB()
 	if db == nil {
 		return ErrDatabaseNotAvailable
 	}
-	keyBase64 = strings.TrimSpace(keyBase64)
-	if keyBase64 != "" {
+	key = strings.TrimSpace(key)
+	if key != "" {
 		// Validate before storing.
-		if _, err := parseCredentialKey(keyBase64, "credential key"); err != nil {
+		if _, err := parseCredentialKey(key, "credential key"); err != nil {
 			return fmt.Errorf("%w: %v", ErrCredentialKeyInvalid, err)
 		}
 	}
 	adminSvc := NewAdminService()
-	return adminSvc.SetSetting(eventorySettingScope, eventoryCredentialKeySettingKey, models.JSONMap{"key": keyBase64})
+	return adminSvc.SetSetting(eventorySettingScope, eventoryCredentialKeySettingKey, models.JSONMap{"key": key})
 }
 
 // encryptCredential encrypts plaintext using AES-256-GCM and returns a
