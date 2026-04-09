@@ -18,7 +18,6 @@ import (
 	"warehousecore/internal/repository"
 )
 
-// DeviceAdminService provides administrative CRUD helpers for warehouse devices.
 type DeviceAdminService struct {
 	db           *sql.DB
 	labelService *LabelService
@@ -71,22 +70,46 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		_ = tx.Rollback()
 	}()
 
+	// Determine the device ID prefix and the next available counter via the
+	// shared helpers in device_id.go (see that file for full documentation):
+	//   - DeriveDeviceIDPrefix honours a caller-supplied device_prefix or derives
+	//     one from subcategory abbreviation + pos_in_category, with a
+	//     "P{productID}" fallback for products without an abbreviation.
+	//   - AllocateDeviceCounter acquires a pg_advisory_xact_lock keyed on an
+	//     FNV-32a hash of the prefix and scans existing IDs with an index-friendly
+	//     LIKE predicate to find the next counter value.
+	manualPrefix := ""
+	if input.DevicePrefix != nil {
+		manualPrefix = *input.DevicePrefix
+	}
+	prefix, err := DeriveDeviceIDPrefix(ctx, tx, input.ProductID, manualPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	nextCounter, err := AllocateDeviceCounter(ctx, tx, prefix)
+	if err != nil {
+		return nil, err
+	}
+
 	createdIDs := make([]string, 0, input.Quantity)
 	providedBarcode := input.Barcode != nil && strings.TrimSpace(*input.Barcode) != ""
 	providedQRCode := input.QRCode != nil && strings.TrimSpace(*input.QRCode) != ""
 
 	for i := 0; i < input.Quantity; i++ {
+		deviceID := fmt.Sprintf("%s%03d", prefix, nextCounter+int64(i))
 		serialValue := serialForIndex(input.SerialNumber, input.StartingSerial, input.IncrementSerial, i)
 
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO devices (
-				productID, serialnumber, rfid, status, current_location, zone_id,
+				deviceID, productID, serialnumber, rfid, status, current_location, zone_id,
 				condition_rating, usage_hours, purchaseDate, retire_date, warranty_end_date,
 				lastmaintenance, nextmaintenance,
 				notes, barcode, qr_code
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		`,
+			deviceID,
 			input.ProductID,
 			nullableString(serialValue),
 			nullableString(trimPtr(input.RFID)),
@@ -106,18 +129,6 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to insert device: %w", err)
-		}
-
-		var deviceID string
-		err = tx.QueryRowContext(ctx, `
-			SELECT deviceID
-			FROM devices
-			WHERE productID = $1
-			ORDER BY deviceID DESC
-			LIMIT 1
-		`, input.ProductID).Scan(&deviceID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch device id: %w", err)
 		}
 
 		if err := s.ensureDeviceCodes(ctx, tx, deviceID, providedBarcode, providedQRCode, regenerateCodes); err != nil {
