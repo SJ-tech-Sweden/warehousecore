@@ -283,12 +283,11 @@ func GetEventoryCredentialKeyStatus() EventoryCredentialKeyStatus {
 		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
 	}
 	raw, _ := setting.Value["key"].(string)
-	if strings.TrimSpace(raw) == "" {
-		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
-	}
-	if _, err := parseCredentialKey(raw, "admin UI credential key"); err != nil {
-		log.Printf("[EVENTORY] invalid credential key stored in database (scope=%q key=%q): %v",
-			eventorySettingScope, eventoryCredentialKeySettingKey, err)
+	if _, err := parseCredentialKey(strings.TrimSpace(raw), "admin UI credential key"); err != nil {
+		if strings.TrimSpace(raw) != "" {
+			log.Printf("[EVENTORY] invalid credential key stored in database (scope=%q key=%q): %v",
+				eventorySettingScope, eventoryCredentialKeySettingKey, err)
+		}
 		return EventoryCredentialKeyStatus{Configured: false, Source: CredentialKeySourceNone}
 	}
 	return EventoryCredentialKeyStatus{Configured: true, Source: CredentialKeySourceDatabase}
