@@ -10,7 +10,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { useNFCScanner } from '../hooks/useNFCScanner';
 
 import type { InputMethod } from '../types/scanTypes';
-type ScanStep = 'device' | 'zone' | 'case' | 'device-for-case';
+type ScanStep = 'device' | 'zone' | 'case' | 'device-for-case' | 'job';
 
 export function ScanPage() {
   const { t } = useTranslation();
@@ -114,16 +114,11 @@ export function ScanPage() {
       // First, verify job exists
       await jobsApi.getById(jobId);
 
-      // When action is outtake: stay on the scan page and keep the job context
-      // so the user can immediately scan the device to check out.
+      // When action is outtake: advance to device scan step
       if (action === 'outtake') {
         setScannedJobId(jobId);
-        setResult({
-          success: true,
-          message: t('scan.outtake.jobSelected', { id: jobId }),
-          action: 'outtake',
-          duplicate: false,
-        });
+        setStep('device');
+        setResult(null);
         return;
       }
 
@@ -274,6 +269,16 @@ export function ScanPage() {
         setStep('device');
       }
       // All other actions (outtake, check) - single step
+      else if (action === 'outtake' && step === 'job') {
+        // A non-job code was scanned before selecting a job – guide the user
+        setResult({
+          success: false,
+          message: t('scan.outtake.noJobSelected'),
+          action,
+          duplicate: false,
+        });
+        setScanCode('');
+      }
       else if (action !== 'case') {
         // For consumables with intake/outtake, ask for quantity first.
         // Also, regular (non-consumable) device outtake requires a job to be selected.
@@ -394,6 +399,8 @@ export function ScanPage() {
       setScannedCase(null);
       setCaseDeviceIds([]);
       setCaseActionMessage(null);
+    } else if (newAction === 'outtake') {
+      setStep('job');
     } else {
       setStep('device');
     }
@@ -486,7 +493,11 @@ export function ScanPage() {
                   ? t('scan.case.title')
                   : step === 'device-for-case'
                     ? t('scan.case.addDevicesTitle')
-                    : t('scan.scannerTitle')}
+                    : step === 'job'
+                      ? t('scan.outtake.title')
+                      : action === 'outtake'
+                        ? t('scan.outtake.addDevicesTitle')
+                        : t('scan.scannerTitle')}
             </h1>
             <p className="text-sm sm:text-base text-gray-400">
               {step === 'zone'
@@ -495,7 +506,11 @@ export function ScanPage() {
                   ? t('scan.case.subtitle')
                   : step === 'device-for-case'
                     ? t('scan.case.addDevicesSubtitle')
-                    : t('scan.scannerSubtitle')}
+                    : step === 'job'
+                      ? t('scan.outtake.subtitle')
+                      : action === 'outtake'
+                        ? t('scan.outtake.addDevicesSubtitle')
+                        : t('scan.scannerSubtitle')}
             </p>
           </div>
 
@@ -541,6 +556,29 @@ export function ScanPage() {
                   2
                 </div>
                 <span className="text-sm sm:text-base font-semibold">{t('scan.case.steps.devices')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Step Indicator for Outtake */}
+          {action === 'outtake' && (
+            <div className="mb-4 sm:mb-6 flex items-center justify-center gap-2 sm:gap-4">
+              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'job' ? 'text-accent-red' : 'text-green-500'}`}>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base ${
+                  step === 'job' ? 'bg-accent-red' : 'bg-green-500'
+                }`}>
+                  {step !== 'job' ? '✓' : '1'}
+                </div>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.outtake.steps.job')}</span>
+              </div>
+              <div className="w-8 sm:w-12 h-0.5 bg-white/20"></div>
+              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'device' ? 'text-accent-red' : 'text-gray-500'}`}>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base ${
+                  step === 'device' ? 'bg-accent-red' : 'bg-gray-700'
+                }`}>
+                  2
+                </div>
+                <span className="text-sm sm:text-base font-semibold">{t('scan.outtake.steps.device')}</span>
               </div>
             </div>
           )}
@@ -621,7 +659,7 @@ export function ScanPage() {
                 <button
                   type="button"
                   disabled={loading}
-                  onClick={() => setScannedJobId(null)}
+                  onClick={() => { setScannedJobId(null); setStep('job'); }}
                   className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/20 text-gray-300 transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <X className="w-3 h-3" />
@@ -752,7 +790,9 @@ export function ScanPage() {
                         ? t('scan.case.placeholderCase')
                         : step === 'device-for-case'
                           ? t('scan.case.placeholderDevice')
-                          : t('scan.placeholders.device')
+                          : step === 'job'
+                            ? t('scan.outtake.placeholderJob')
+                            : t('scan.placeholders.device')
                     : t('scan.placeholders.manualFallback')
                 }
                 autoFocus={inputMethod === 'keyboard'}
@@ -761,7 +801,7 @@ export function ScanPage() {
             </div>
 
             {/* Action Selection - only show in step 1 */}
-            {(step === 'device' || step === 'case') && (
+            {(step === 'case' || step === 'job' || (step === 'device' && action !== 'outtake')) && (
               <div className="grid grid-cols-4 gap-2 sm:gap-3">
                 {([
                   { value: 'check', label: t('scan.actions.check') },
@@ -799,7 +839,11 @@ export function ScanPage() {
                     ? t('scan.case.scanCase')
                     : step === 'device-for-case'
                       ? t('scan.case.scanDeviceForCase')
-                      : t('scan.scanDevice')}
+                      : step === 'job'
+                        ? t('scan.outtake.scanJobButton')
+                        : action === 'outtake'
+                          ? t('scan.outtake.scanDeviceForJob')
+                          : t('scan.scanDevice')}
             </button>
           </form>
         </div>

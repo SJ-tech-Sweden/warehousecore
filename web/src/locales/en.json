@@ -1182,9 +1182,20 @@
       "status": "Status:"
     },
     "outtake": {
-      "jobSelected": "Job #{{id}} selected – now scan the device to check out.",
+      "title": "Scan Job",
+      "subtitle": "Scan the job barcode to begin outtake",
+      "addDevicesTitle": "Check Out Device",
+      "addDevicesSubtitle": "Scan a device to check it out for this job",
+      "steps": {
+        "job": "Job",
+        "device": "Device"
+      },
+      "placeholderJob": "Job barcode (JOB######)",
+      "scanJobButton": "Scan Job",
+      "scanDeviceForJob": "Check Out Device",
+      "jobSelected": "Job #{{id}} selected – scan the device to check out.",
       "noJobSelected": "Scan a job barcode (JOB######) first, then scan the device.",
-      "clearJob": "Clear Job"
+      "clearJob": "Change Job"
     },
     "ledModal": {
       "title": "Enable LED light?",
