@@ -13,7 +13,6 @@ const (
 	StatusOnJob     DeviceStatus = "on_job"
 	StatusDefective DeviceStatus = "defective"
 	StatusRepair    DeviceStatus = "repair"
-	StatusFree      DeviceStatus = "free"
 	StatusRented    DeviceStatus = "rented"
 )
 

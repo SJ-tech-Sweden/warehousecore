@@ -65,7 +65,7 @@ interface DeviceFormData {
 
 const initialFormData: DeviceFormData = {
   new_device_id: '',
-  status: 'free',
+  status: 'in_storage',
   serial_number: '',
   rfid: '',
   barcode: '',
@@ -221,7 +221,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
     setFormData({
       new_device_id: device.device_id,
       product_id: device.product_id,
-      status: device.status || 'free',
+      status: device.status || 'in_storage',
       serial_number: device.serial_number || '',
       rfid: device.rfid || '',
       barcode: device.barcode || '',
@@ -416,7 +416,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
             title={t('devices.status')}
           >
             <option value="">{t('admin.devices.filters.allStatuses')}</option>
-            <option value="free">{t('admin.devices.statuses.free')}</option>
+            <option value="in_storage">{t('admin.devices.statuses.in_storage')}</option>
             <option value="on_job">{t('admin.devices.statuses.on_job')}</option>
             <option value="defective">{t('admin.devices.statuses.defective')}</option>
             <option value="maintenance">{t('admin.devices.statuses.maintenance')}</option>
@@ -540,7 +540,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          device.status === 'free'
+                          device.status === 'in_storage'
                             ? 'bg-green-500/20 text-green-400'
                             : device.status === 'on_job'
                             ? 'bg-blue-500/20 text-blue-400'
@@ -617,7 +617,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
               </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    device.status === 'free'
+                    device.status === 'in_storage'
                       ? 'bg-green-500/20 text-green-400'
                       : device.status === 'on_job'
                       ? 'bg-blue-500/20 text-blue-400'
@@ -820,7 +820,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                     required
                     title={t('devices.status')}
                   >
-                    <option value="free">{t('admin.devices.statuses.free')}</option>
+                    <option value="in_storage">{t('admin.devices.statuses.in_storage')}</option>
                     <option value="on_job">{t('admin.devices.statuses.on_job')}</option>
                     <option value="defective">{t('admin.devices.statuses.defective')}</option>
                     <option value="maintenance">{t('admin.devices.statuses.maintenance')}</option>

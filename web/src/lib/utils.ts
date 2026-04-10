@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 export function getStatusColor(status: string): string {
   switch (status.toLowerCase()) {
     case 'in_storage':
-      return 'text-gray-400';
+      return 'text-green-500';
     case 'on_job':
     case 'rented':
       return 'text-accent-red';
@@ -16,8 +16,6 @@ export function getStatusColor(status: string): string {
       return 'text-yellow-500';
     case 'repair':
       return 'text-blue-400';
-    case 'free':
-      return 'text-green-500';
     default:
       return 'text-gray-500';
   }

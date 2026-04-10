@@ -820,11 +820,11 @@
         "allZones": "All zones"
       },
       "statuses": {
-        "free": "Free",
         "on_job": "On job",
         "defective": "Defective",
         "maintenance": "Maintenance",
-        "retired": "Retired"
+        "retired": "Retired",
+        "in_storage": "In Storage"
       },
       "retireDate": "Retire date",
       "warrantyEndDate": "Warranty end date",
