@@ -269,16 +269,6 @@ export function ScanPage() {
         setStep('device');
       }
       // All other actions (outtake, check) - single step
-      else if (action === 'outtake' && step === 'job') {
-        // A non-job code was scanned before selecting a job – guide the user
-        setResult({
-          success: false,
-          message: t('scan.outtake.noJobSelected'),
-          action,
-          duplicate: false,
-        });
-        setScanCode('');
-      }
       else if (action !== 'case') {
         // For consumables with intake/outtake, ask for quantity first.
         // Also, regular (non-consumable) device outtake requires a job to be selected.
@@ -319,8 +309,9 @@ export function ScanPage() {
               return;
             }
             quantity = quantityNum;
-          } else if (action === 'outtake' && checkResponse.data.device && !scannedJobId) {
-            // Regular device outtake requires a job to be selected first
+          } else if (action === 'outtake' && !scannedJobId) {
+            // Regular device outtake requires a job to be selected first.
+            // In the job step, guide the user to scan a job barcode.
             setResult({
               success: false,
               message: t('scan.outtake.noJobSelected'),
