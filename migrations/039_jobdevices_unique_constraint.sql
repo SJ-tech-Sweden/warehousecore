@@ -1,6 +1,6 @@
--- Add a unique constraint on (jobid, deviceid) to the job_devices table.
+-- Add a unique constraint on (jobid, deviceid) to the jobdevices table.
 -- This is required so that the INSERT ... ON CONFLICT (jobid, deviceid) DO UPDATE
--- query used by the jobdevices view's INSTEAD OF trigger works correctly in PostgreSQL.
+-- query used by the outtake scan correctly handles re-scans after intake.
 --
 -- Both steps run inside a single transaction with an explicit table lock so
 -- that no concurrent INSERT/UPDATE can create a new duplicate row between the
@@ -8,19 +8,20 @@
 -- small table this is negligible. If the table is large and write availability
 -- is critical, run during a maintenance window.
 --
--- The underlying table is `job_devices` (RentalCore canonical table). This
--- migration operates on that table and is idempotent.
+-- The underlying table is `jobdevices` (consistent with all Go service code and
+-- other migrations in this repo). This migration operates on that table and is
+-- idempotent.
 BEGIN;
 
 -- Lock the table for the duration of this migration to prevent concurrent
 -- writes from inserting a new duplicate row between the DELETE and the
 -- constraint addition.
-LOCK TABLE job_devices IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE jobdevices IN SHARE ROW EXCLUSIVE MODE;
 
 -- Step 1: Remove any duplicate (jobid, deviceid) pairs that would violate the
 -- constraint, keeping the row with the newest pack_ts and using ctid only as a
 -- deterministic tie-breaker when pack_ts values are equal or NULL.
-DELETE FROM job_devices
+DELETE FROM jobdevices
 WHERE ctid IN (
   SELECT ctid
   FROM (
@@ -29,13 +30,13 @@ WHERE ctid IN (
              PARTITION BY jobid, deviceid
              ORDER BY (pack_ts IS NULL), pack_ts DESC, ctid DESC
            ) AS rn
-    FROM job_devices
+    FROM jobdevices
   ) ranked
   WHERE rn > 1
 );
 
 -- Step 2: Add the unique constraint (idempotent: skip if any unique constraint
--- OR unique index already covers exactly (jobid, deviceid) on job_devices,
+-- OR unique index already covers exactly (jobid, deviceid) on jobdevices,
 -- regardless of name — covers both ADD CONSTRAINT and CREATE UNIQUE INDEX paths).
 -- NOTE: The idempotency checks use `array_agg(... ORDER BY a.attname)` which
 -- returns column names in alphabetical order, so the comparisons use
@@ -48,7 +49,7 @@ BEGIN
     SELECT 1
     FROM   pg_constraint c
     WHERE  c.contype  = 'u'
-      AND  c.conrelid = 'job_devices'::regclass
+      AND  c.conrelid = 'jobdevices'::regclass
       AND  (
           SELECT array_agg(a.attname::text ORDER BY a.attname)
           FROM   pg_attribute a
@@ -59,7 +60,7 @@ BEGIN
     -- Check for a standalone UNIQUE index on exactly (jobid, deviceid)
     SELECT 1
     FROM   pg_index i
-    WHERE  i.indrelid  = 'job_devices'::regclass
+    WHERE  i.indrelid  = 'jobdevices'::regclass
       AND  i.indisunique = true
       AND  (
         SELECT array_agg(a.attname::text ORDER BY a.attname)
@@ -69,8 +70,8 @@ BEGIN
           AND  a.attnum   > 0
       ) = ARRAY['deviceid', 'jobid']
   ) THEN
-    ALTER TABLE job_devices
-      ADD CONSTRAINT uq_job_devices_jobid_deviceid UNIQUE (jobid, deviceid);
+    ALTER TABLE jobdevices
+      ADD CONSTRAINT uq_jobdevices_jobid_deviceid UNIQUE (jobid, deviceid);
   END IF;
 END;
 $$;

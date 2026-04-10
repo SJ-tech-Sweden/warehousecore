@@ -12,6 +12,17 @@ import (
 	"warehousecore/internal/repository"
 )
 
+// upsertJobDeviceSQL inserts (or re-activates on conflict) a row in jobdevices.
+// When a device has previously been returned via intake its pack_status is reset
+// to 'pending'; scanning it out again must restore it to 'issued'. Using an
+// explicit constant lets tests verify the SQL without running a real database.
+const upsertJobDeviceSQL = `
+	INSERT INTO jobdevices (jobID, deviceID, pack_status, pack_ts)
+	VALUES ($1, $2, 'issued', NOW())
+	ON CONFLICT (jobID, deviceID) DO UPDATE
+		SET pack_status = 'issued', pack_ts = NOW()
+`
+
 // ScanService handles all scan-related business logic
 type ScanService struct {
 	db *sql.DB
@@ -195,11 +206,11 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 		return nil, nil, err
 	}
 
-	// Assign to job and update pack_status to issued
-	_, err = tx.Exec(`
-		INSERT INTO jobdevices (jobID, deviceID, pack_status)
-		VALUES ($1, $2, 'issued')
-	`, *jobID, device.DeviceID)
+	// Assign to job and update pack_status to issued. Uses ON CONFLICT so that
+	// re-scanning after an intake (which resets pack_status to 'pending')
+	// correctly marks the device as issued again without failing on the
+	// unique constraint.
+	_, err = tx.Exec(upsertJobDeviceSQL, *jobID, device.DeviceID)
 	if err != nil {
 		return nil, nil, err
 	}
