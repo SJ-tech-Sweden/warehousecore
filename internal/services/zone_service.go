@@ -127,10 +127,10 @@ func (s *ZoneService) GenerateShelfName(parentZoneID *int64) (string, error) {
 // getTypePrefix returns the type prefix for zone codes
 func getTypePrefix(zoneType string) string {
 	prefixes := map[string]string{
-		"warehouse": "WH", // Warehouse
-		"rack":      "RK", // Rack (Shelving Unit)
-		"gitterbox": "GB", // Grid Box
-		"shelf":     "SH", // Shelf/Compartment
+		"warehouse": "LGR", // Warehouse
+		"rack":      "RG",  // Rack (Shelving Unit)
+		"gitterbox": "GB",  // Grid Box
+		"shelf":     "F",   // Shelf/Compartment
 	}
 
 	if prefix, ok := prefixes[zoneType]; ok {

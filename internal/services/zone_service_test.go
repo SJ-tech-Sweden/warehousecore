@@ -59,10 +59,10 @@ func TestGetTypePrefixKnown(t *testing.T) {
 		zoneType string
 		expected string
 	}{
-		{"warehouse", "WH"},
-		{"rack", "RK"},
+		{"warehouse", "LGR"},
+		{"rack", "RG"},
 		{"gitterbox", "GB"},
-		{"shelf", "SH"},
+		{"shelf", "F"},
 	}
 	for _, c := range cases {
 		got := getTypePrefix(c.zoneType)
