@@ -472,6 +472,25 @@ export function ScanPage() {
     (step === 'device' && action !== 'outtake') ||
     (step === 'device' && action === 'outtake' && !scannedJobId);
 
+  const getTitleKey = (): string => {
+    switch (step) {
+      case 'zone': return 'scan.zoneTitle';
+      case 'case': return 'scan.case.title';
+      case 'device-for-case': return 'scan.case.addDevicesTitle';
+      case 'job': return 'scan.outtake.title';
+      default: return action === 'outtake' ? 'scan.outtake.addDevicesTitle' : 'scan.scannerTitle';
+    }
+  };
+  const getSubtitleKey = (): string => {
+    switch (step) {
+      case 'zone': return 'scan.zoneSubtitle';
+      case 'case': return 'scan.case.subtitle';
+      case 'device-for-case': return 'scan.case.addDevicesSubtitle';
+      case 'job': return 'scan.outtake.subtitle';
+      default: return action === 'outtake' ? 'scan.outtake.addDevicesSubtitle' : 'scan.scannerSubtitle';
+    }
+  };
+
   return (
     <div className="flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-2xl my-auto">
@@ -488,30 +507,10 @@ export function ScanPage() {
               )}
             </div>
             <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1 sm:mb-2">
-              {step === 'zone'
-                ? t('scan.zoneTitle')
-                : step === 'case'
-                  ? t('scan.case.title')
-                  : step === 'device-for-case'
-                    ? t('scan.case.addDevicesTitle')
-                    : step === 'job'
-                      ? t('scan.outtake.title')
-                      : action === 'outtake'
-                        ? t('scan.outtake.addDevicesTitle')
-                        : t('scan.scannerTitle')}
+              {t(getTitleKey())}
             </h1>
             <p className="text-sm sm:text-base text-gray-400">
-              {step === 'zone'
-                ? t('scan.zoneSubtitle')
-                : step === 'case'
-                  ? t('scan.case.subtitle')
-                  : step === 'device-for-case'
-                    ? t('scan.case.addDevicesSubtitle')
-                    : step === 'job'
-                      ? t('scan.outtake.subtitle')
-                      : action === 'outtake'
-                        ? t('scan.outtake.addDevicesSubtitle')
-                        : t('scan.scannerSubtitle')}
+              {t(getSubtitleKey())}
             </p>
           </div>
 
