@@ -490,7 +490,7 @@ export function JobsPage() {
   };
 
   const stats = getRequirementStats(selectedJob.product_requirements, selectedJob.devices);
-  const progress = stats.total > 0 ? (stats.scanned / stats.total) * 100 : 0;
+  const progress = stats.total > 0 ? Math.min((stats.scanned / stats.total) * 100, 100) : 0;
 
   return (
     <div className="min-h-screen p-6">

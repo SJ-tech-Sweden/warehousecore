@@ -1,4 +1,4 @@
--- Add a unique constraint on (deviceid, jobid) to the job_devices table.
+-- Add a unique constraint on (jobid, deviceid) to the job_devices table.
 -- This is required so that the INSERT ... ON CONFLICT (jobid, deviceid) DO UPDATE
 -- query used by the jobdevices view's INSTEAD OF trigger works correctly in PostgreSQL.
 --
@@ -37,6 +37,10 @@ WHERE ctid IN (
 -- Step 2: Add the unique constraint (idempotent: skip if any unique constraint
 -- OR unique index already covers exactly (jobid, deviceid) on job_devices,
 -- regardless of name — covers both ADD CONSTRAINT and CREATE UNIQUE INDEX paths).
+-- NOTE: The idempotency checks use `array_agg(... ORDER BY a.attname)` which
+-- returns column names in alphabetical order, so the comparisons use
+-- ARRAY['deviceid', 'jobid'] (alphabetical). The actual constraint is on
+-- (jobid, deviceid) as shown in the ALTER TABLE statement below.
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -50,7 +54,7 @@ BEGIN
           FROM   pg_attribute a
           WHERE  a.attrelid = c.conrelid
             AND  a.attnum   = ANY(c.conkey)
-        ) = ARRAY['jobid', 'deviceid']
+        ) = ARRAY['deviceid', 'jobid']
     UNION ALL
     -- Check for a standalone UNIQUE index on exactly (jobid, deviceid)
     SELECT 1
@@ -63,7 +67,7 @@ BEGIN
         WHERE  a.attrelid = i.indrelid
           AND  a.attnum   = ANY(i.indkey)
           AND  a.attnum   > 0
-      ) = ARRAY['jobid', 'deviceid']
+      ) = ARRAY['deviceid', 'jobid']
   ) THEN
     ALTER TABLE job_devices
       ADD CONSTRAINT uq_job_devices_jobid_deviceid UNIQUE (jobid, deviceid);
