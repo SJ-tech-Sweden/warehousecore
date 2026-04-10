@@ -47,9 +47,14 @@ BEGIN
   FROM roles
   WHERE name IN ('admin', 'warehouse_admin');
 
+  IF role_count = 0 THEN
+    RAISE WARNING 'Migration 040: neither admin nor warehouse_admin role found; skipping grants.';
+    RETURN;
+  END IF;
+
   IF role_count < 2 THEN
     RAISE WARNING 'Migration 040: expected 2 roles (admin, warehouse_admin) but found %; '
-                  'grant may be incomplete.', role_count;
+                  'grant may be incomplete for userid %.', role_count, target_userid;
   END IF;
 
   INSERT INTO user_roles (userid, roleid, assigned_at, is_active)
@@ -58,6 +63,7 @@ BEGIN
   WHERE r.name IN ('admin', 'warehouse_admin')
   ON CONFLICT (userid, roleid) DO NOTHING;
 
-  RAISE NOTICE 'Migration 040: granted admin and warehouse_admin to userid %.', target_userid;
+  GET DIAGNOSTICS role_count = ROW_COUNT;
+  RAISE NOTICE 'Migration 040: % role(s) granted/confirmed for userid %.', role_count, target_userid;
 END;
 $$;
