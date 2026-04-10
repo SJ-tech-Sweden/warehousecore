@@ -1198,6 +1198,7 @@
       "clearJob": "Job wechseln",
       "skipJob": "Job überspringen (nur Verbrauchsmaterial)",
       "noJobMode": "Kein Job ausgewählt – nur Verbrauchsmaterial",
+      "noJobModeSubtitle": "Verbrauchsmaterial scannen, um es ohne Job auszulagern",
       "selectJob": "Job auswählen"
     },
     "ledModal": {

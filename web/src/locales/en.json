@@ -1198,6 +1198,7 @@
       "clearJob": "Change Job",
       "skipJob": "Skip Job (consumables only)",
       "noJobMode": "No job selected – consumables only",
+      "noJobModeSubtitle": "Scan a consumable to check it out without a job",
       "selectJob": "Select Job"
     },
     "ledModal": {
