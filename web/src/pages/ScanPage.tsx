@@ -554,11 +554,11 @@ export function ScanPage() {
           {/* Step Indicator for Outtake */}
           {action === 'outtake' && (
             <div className="mb-4 sm:mb-6 flex items-center justify-center gap-2 sm:gap-4">
-              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'job' ? 'text-accent-red' : 'text-green-500'}`}>
+              <div className={`flex items-center gap-1.5 sm:gap-2 ${step === 'job' ? 'text-accent-red' : scannedJobId ? 'text-green-500' : 'text-gray-500'}`}>
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-sm sm:text-base ${
-                  step === 'job' ? 'bg-accent-red' : 'bg-green-500'
+                  step === 'job' ? 'bg-accent-red' : scannedJobId ? 'bg-green-500' : 'bg-gray-600'
                 }`}>
-                  {step !== 'job' ? '✓' : '1'}
+                  {step !== 'job' ? (scannedJobId ? '✓' : '—') : '1'}
                 </div>
                 <span className="text-sm sm:text-base font-semibold">{t('scan.outtake.steps.job')}</span>
               </div>
@@ -655,6 +655,26 @@ export function ScanPage() {
                 >
                   <X className="w-3 h-3" />
                   {t('scan.outtake.clearJob')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* No-Job Info Panel (outtake device step, no job selected) */}
+          {action === 'outtake' && step === 'device' && !scannedJobId && (
+            <div className="mb-4 p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Info className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="text-sm text-gray-400">{t('scan.outtake.noJobMode')}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setStep('job')}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold bg-accent-red/20 hover:bg-accent-red/30 text-red-300 transition-colors flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {t('scan.outtake.selectJob')}
                 </button>
               </div>
             </div>
@@ -792,7 +812,7 @@ export function ScanPage() {
             </div>
 
             {/* Action Selection - only show in step 1 */}
-            {(step === 'case' || step === 'job' || (step === 'device' && action !== 'outtake')) && (
+            {(step === 'case' || step === 'job' || (step === 'device' && action !== 'outtake') || (step === 'device' && action === 'outtake' && !scannedJobId)) && (
               <div className="grid grid-cols-4 gap-2 sm:gap-3">
                 {([
                   { value: 'check', label: t('scan.actions.check') },
@@ -813,6 +833,19 @@ export function ScanPage() {
                     {btn.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Skip Job button – visible in outtake step 1 so users can go straight to consumable scanning */}
+            {action === 'outtake' && step === 'job' && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => { setStep('device'); setResult(null); }}
+                  className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline"
+                >
+                  {t('scan.outtake.skipJob')}
+                </button>
               </div>
             )}
 

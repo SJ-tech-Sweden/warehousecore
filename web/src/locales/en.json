@@ -1195,7 +1195,10 @@
       "scanDeviceForJob": "Check Out Device",
       "jobSelected": "Job #{{id}} selected – scan the device to check out.",
       "noJobSelected": "Scan a job barcode (JOB######) first, then scan the device.",
-      "clearJob": "Change Job"
+      "clearJob": "Change Job",
+      "skipJob": "Skip Job (consumables only)",
+      "noJobMode": "No job selected – consumables only",
+      "selectJob": "Select Job"
     },
     "ledModal": {
       "title": "Enable LED light?",

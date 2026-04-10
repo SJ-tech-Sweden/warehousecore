@@ -1195,7 +1195,10 @@
       "scanDeviceForJob": "Gerät auslagern",
       "jobSelected": "Job #{{id}} ausgewählt – Gerät scannen zum Ausgeben.",
       "noJobSelected": "Zuerst einen Job-Barcode (JOB######) scannen, dann das Gerät.",
-      "clearJob": "Job wechseln"
+      "clearJob": "Job wechseln",
+      "skipJob": "Job überspringen (nur Verbrauchsmaterial)",
+      "noJobMode": "Kein Job ausgewählt – nur Verbrauchsmaterial",
+      "selectJob": "Job auswählen"
     },
     "ledModal": {
       "title": "LED-Licht aktivieren?",
