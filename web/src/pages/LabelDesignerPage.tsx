@@ -38,13 +38,10 @@ export default function LabelDesignerPage() {
   const isDraggingRef = useRef(false);
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
-  // Cancel any in-flight drag/resize when the component unmounts or the
-  // window loses focus (e.g. mid-drag Alt+Tab).
+  // Cancel any in-flight drag/resize when the component unmounts.
+  // Blur cleanup is handled by the active drag/resize interaction itself.
   useEffect(() => {
-    const cancelDrag = () => dragCleanupRef.current?.();
-    window.addEventListener('blur', cancelDrag);
     return () => {
-      window.removeEventListener('blur', cancelDrag);
       dragCleanupRef.current?.();
     };
   }, []);
@@ -837,7 +834,10 @@ export default function LabelDesignerPage() {
       if (me.relatedTarget === null) cleanup();
     };
 
+    let cleanedUp = false;
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       isDraggingRef.current = false;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', cleanup);
@@ -933,7 +933,10 @@ export default function LabelDesignerPage() {
       if (me.relatedTarget === null) cleanup();
     };
 
+    let cleanedUp = false;
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       isDraggingRef.current = false;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', cleanup);
@@ -1342,6 +1345,9 @@ export default function LabelDesignerPage() {
                   <div
                     key={elem.id}
                     className={`element-overlay${selectedElement === elem.id ? ' selected' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${elem.type}: ${elem.content || ''} (x: ${elem.x}mm, y: ${elem.y}mm)`}
                     style={{
                       left: `${(elem.x / labelWidth) * 100}%`,
                       top: `${(elem.y / labelHeight) * 100}%`,
@@ -1354,6 +1360,12 @@ export default function LabelDesignerPage() {
                       e.stopPropagation();
                       setSelectedElement(elem.id);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedElement(elem.id);
+                      }
+                    }}
                   >
                     <div className="element-overlay-label">
                       {elem.type === 'qrcode' && <QrCode size={10} />}
@@ -1363,10 +1375,38 @@ export default function LabelDesignerPage() {
                     </div>
                     {selectedElement === elem.id && (
                       <>
-                        <div className="resize-handle resize-nw" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'nw')} />
-                        <div className="resize-handle resize-ne" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'ne')} />
-                        <div className="resize-handle resize-sw" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'sw')} />
-                        <div className="resize-handle resize-se" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'se')} />
+                        <div
+                          className="resize-handle resize-nw"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t('labels.resizeHandleNW')}
+                          onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'nw')}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                        />
+                        <div
+                          className="resize-handle resize-ne"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t('labels.resizeHandleNE')}
+                          onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'ne')}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                        />
+                        <div
+                          className="resize-handle resize-sw"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t('labels.resizeHandleSW')}
+                          onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'sw')}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                        />
+                        <div
+                          className="resize-handle resize-se"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t('labels.resizeHandleSE')}
+                          onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'se')}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
+                        />
                       </>
                     )}
                   </div>

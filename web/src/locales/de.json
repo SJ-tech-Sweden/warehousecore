@@ -286,7 +286,11 @@
       "case": "Casefelder",
       "zone": "Zonenfelder"
     },
-    "dragHint": "Klicken zum Auswählen · Ziehen zum Verschieben · Eckpunkte zum Skalieren"
+    "dragHint": "Klicken zum Auswählen · Ziehen zum Verschieben · Eckpunkte zum Skalieren",
+    "resizeHandleNW": "Größe oben links ändern",
+    "resizeHandleNE": "Größe oben rechts ändern",
+    "resizeHandleSW": "Größe unten links ändern",
+    "resizeHandleSE": "Größe unten rechts ändern"
   },
   "maintenance": {
     "title": "Wartung",
