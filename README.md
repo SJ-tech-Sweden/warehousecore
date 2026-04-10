@@ -390,8 +390,8 @@ Defines which LED indices belong to which storage bins.
     {
       "shelf_id": "Regal-01",
       "bins": [
-        { "bin_id": "WDL-RG-01-F-01", "pixels": [0, 1, 2, 3] },
-        { "bin_id": "WDL-RG-01-F-02", "pixels": [4, 5, 6] }
+        { "bin_id": "WDL-RK-01-SH-01", "pixels": [0, 1, 2, 3] },
+        { "bin_id": "WDL-RK-01-SH-02", "pixels": [4, 5, 6] }
       ]
     }
   ],
@@ -411,7 +411,7 @@ Defines which LED indices belong to which storage bins.
 **How it works:**
 1. Job is selected with devices
 2. WarehouseCore looks up each device's `zone_id` in the database
-3. Gets the zone's `code` (e.g., "WDL-RG-01-F-01")
+3. Gets the zone's `code` (e.g., "WDL-RK-01-SH-01")
 4. Matches this code with `bin_id` in the mapping file
 5. Sends the corresponding `pixels` to the ESP32 to light up
 
@@ -617,8 +617,8 @@ Edit `internal/led/config/led_mapping.json`:
 **IMPORTANT:** The `bin_id` must match the `code` from your `storage_zones` table in the database!
 
 Example:
-- Database has zone with `code = "WDL-RG-01-F-01"` (Weidelbach, Rack 01, Bin 01)
-- LED Mapping has `"bin_id": "WDL-RG-01-F-01"`
+- Database has zone with `code = "WDL-RK-01-SH-01"` (Weidelbach, Rack 01, Bin 01)
+- LED Mapping has `"bin_id": "WDL-RK-01-SH-01"`
 - When a device in that zone is part of a job, the LEDs will light up
 
 1. Set `warehouse_id` to your main warehouse zone code (e.g., `"WDL"`)
@@ -2366,7 +2366,7 @@ For issues or questions:
 ### Version 1.32 (2025-10-18)
 - **Bug Fix: LED Zone Code Mapping and MQTT Configuration** 🔧
   - Fixed LED mapping zone codes to include complete hierarchical format
-  - Updated bin_id values from `WDL-RG-02-F-XX` to `WDL-06-RG-02-F-XX` format
+  - Updated bin_id values from `WDL-RK-02-SH-XX` to `WDL-06-RK-02-SH-XX` format
   - Ensures exact match with storage_zones.code column in database
   - Both shelf_id and bin_id now use proper hierarchical zone codes
 - **Port Configuration Fix:**
@@ -2387,7 +2387,7 @@ For issues or questions:
   - ✅ MQTT connection successful: `tcp://mosquitto:1883`
   - ✅ LED mapping loaded: 1 shelf, 5 bins
   - ✅ LED highlight command published successfully for Job 1024
-  - ✅ Device MIX2001 correctly mapped to zone WDL-06-RG-02-F-01
+  - ✅ Device MIX2001 correctly mapped to zone WDL-06-RK-02-SH-01
   - ✅ MQTT message published to topic: `weidelbach/WDL/cmd`
 - **Environment Variables:**
   - PORT changed from 8081 to 8082
@@ -2403,23 +2403,23 @@ For issues or questions:
 ### Version 1.29 (2025-10-17)
 - **LED Mapping Now Uses Zone Codes from Database** 🔗
   - `bin_id` in LED mapping file must now match `code` from `storage_zones` table
-  - Example: `"bin_id": "WDL-RG-01-F-01"` matches zone code in database
+  - Example: `"bin_id": "WDL-RK-01-SH-01"` matches zone code in database
   - `WAREHOUSE_ID` environment variable is now the main warehouse zone code (e.g., "WDL")
   - System automatically looks up device zones by code, not name
 - **Improved Database Integration:**
   - Changed query from `z.name` to `z.code` in `getJobDeviceZones()`
-  - Zone codes are unique and hierarchical (e.g., WDL-RG-01-F-01)
+  - Zone codes are unique and hierarchical (e.g., WDL-RK-01-SH-01)
   - Direct mapping between database zones and LED pixels
   - No manual zone name matching required
 - **Updated Configuration Examples:**
-  - LED mapping file now shows real zone codes: "WDL-RG-01-F-01", "WDL-RG-02-F-01"
+  - LED mapping file now shows real zone codes: "WDL-RK-01-SH-01", "WDL-RK-02-SH-01"
   - `WAREHOUSE_ID=WDL` instead of "weidelbach" in .env files
   - ESP32 secrets.h.template updated with zone code examples
   - Clear documentation on how bin_id must match database codes
 - **How It Works:**
   1. Job is selected with devices
   2. WarehouseCore queries device's `zone_id` from database
-  3. Gets the zone's `code` field (e.g., "WDL-RG-01-F-01")
+  3. Gets the zone's `code` field (e.g., "WDL-RK-01-SH-01")
   4. Matches code with `bin_id` in LED mapping configuration
   5. Sends corresponding pixel indices to ESP32
   6. LEDs light up for the correct bins
@@ -2634,7 +2634,7 @@ For issues or questions:
   - `LED_MQTT_PASS` - MQTT password
   - `LED_TOPIC_PREFIX` - Topic namespace
   - `WAREHOUSE_ID` - Warehouse identifier
-  - `LED_PREVIEW_BIN_ID` - Optional bin code for admin preview (e.g. `WDL-06-RG-02-F-01`)
+  - `LED_PREVIEW_BIN_ID` - Optional bin code for admin preview (e.g. `WDL-06-RK-02-SH-01`)
 - **Testing:**
   - Dry-run mode logs commands without sending
   - Status endpoint shows connection state
@@ -2978,7 +2978,7 @@ For issues or questions:
   - Ensures every device is assigned to a specific storage location
   - Prevents devices from being stored without location information
 - **Example Workflow:**
-  1. Select "Einlagern" action
+  1. Select "Intake" action
   2. Scan device barcode → Device verified ✓
   3. Scan zone barcode (e.g., SHELF-00000014) → Device stored at specific location
   4. Process complete with full audit trail
@@ -3036,9 +3036,9 @@ For issues or questions:
   - Barcode generation logic after zone insertion
 - **Example Usage:**
   - Create storage zone Weidelbach (WDB)
-  - Create Rack A (WDB-RG-01)
+  - Create Rack A (WDB-RK-01)
   - Click "Create Bins" → Enter "5" → Creates Bin 01 through Bin 05 automatically
-  - Each bin gets codes like WDB-RG-01-F-01 and barcodes like SHELF-00000014
+  - Each bin gets codes like WDB-RK-01-SH-01 and barcodes like SHELF-00000014
 
 ### Version 1.7 (2025-10-14)
 - **Simplified Zone Types:** Reduced to 3 types only
@@ -3051,11 +3051,11 @@ For issues or questions:
   - Safety checks: prevents deletion if zone contains devices or subzones
   - Confirmation dialog before deletion
 - **Updated Code Generation:**
-  - Warehouse prefix: LGR
-  - Rack prefix: RG
+  - Warehouse prefix: WH
+  - Rack prefix: RK
   - Gitterbox prefix: GB
 - **Example Hierarchy:**
-  - Weidelbach (WDL) → Rack A (WDL-RG-01) → Gitterbox 01 (WDL-RG-01-GB-01)
+  - Weidelbach (WDL) → Rack A (WDL-RK-01) → Gitterbox 01 (WDL-RK-01-GB-01)
 - **Database Migration:** Updated ENUM type to support gitterbox
 
 ### Version 1.6 (2025-10-14)
