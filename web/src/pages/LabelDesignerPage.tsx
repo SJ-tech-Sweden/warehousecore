@@ -37,11 +37,16 @@ export default function LabelDesignerPage() {
   // Use a ref instead of state so toggling drag doesn't re-trigger the renderPreview effect.
   const isDraggingRef = useRef(false);
   const dragCleanupRef = useRef<(() => void) | null>(null);
+  // Always points to the latest renderPreview to avoid stale closures in drag/resize cleanup.
+  const renderPreviewRef = useRef<() => void>(() => {});
+  // Track mount state so cleanup never fires API calls after the component unmounts.
+  const isMountedRef = useRef(true);
 
   // Cancel any in-flight drag/resize when the component unmounts.
   // Blur cleanup is handled by the active drag/resize interaction itself.
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       dragCleanupRef.current?.();
     };
   }, []);
@@ -407,6 +412,10 @@ export default function LabelDesignerPage() {
       }
     }
   };
+
+  // Keep the ref pointing at the latest renderPreview so drag/resize cleanup
+  // always calls the version that reads the most-recent elements state.
+  renderPreviewRef.current = renderPreview;
 
   useEffect(() => {
     if (previewDevice && !isDraggingRef.current) {
@@ -845,8 +854,8 @@ export default function LabelDesignerPage() {
       window.removeEventListener('blur', cleanup);
       window.removeEventListener('mouseout', handleWindowMouseOut);
       dragCleanupRef.current = null;
-      // Trigger a final preview render now that the drag is done.
-      renderPreview();
+      // Trigger a final preview render (via ref to avoid stale closure).
+      if (isMountedRef.current) renderPreviewRef.current();
     };
 
     dragCleanupRef.current = cleanup;
@@ -875,41 +884,47 @@ export default function LabelDesignerPage() {
     isDraggingRef.current = true;
 
     const handleMouseMove = (me: MouseEvent) => {
+      if (labelWidth <= 0 || labelHeight <= 0) return;
+
       const rect = canvas.getBoundingClientRect();
       const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
       const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
 
+      // Use label-aware minimums so the min never exceeds the label itself.
+      const minW = Math.min(3, labelWidth);
+      const minH = Math.min(2, labelHeight);
+
       let newX = origX, newY = origY, newW = origW, newH = origH;
 
-      if (direction.includes('e')) newW = Math.max(3, origW + deltaXMm);
-      if (direction.includes('s')) newH = Math.max(2, origH + deltaYMm);
+      if (direction.includes('e')) newW = Math.max(minW, origW + deltaXMm);
+      if (direction.includes('s')) newH = Math.max(minH, origH + deltaYMm);
       if (direction.includes('w')) {
-        newW = Math.max(3, origW - deltaXMm);
+        newW = Math.max(minW, origW - deltaXMm);
         newX = origX + origW - newW;
       }
       if (direction.includes('n')) {
-        newH = Math.max(2, origH - deltaYMm);
+        newH = Math.max(minH, origH - deltaYMm);
         newY = origY + origH - newH;
       }
 
-      newX = Math.max(0, Math.min(labelWidth - newW, newX));
-      newY = Math.max(0, Math.min(labelHeight - newH, newY));
+      newX = Math.max(0, Math.min(Math.max(0, labelWidth - newW), newX));
+      newY = Math.max(0, Math.min(Math.max(0, labelHeight - newH), newY));
       // Clamp width/height to remaining label space from the (possibly adjusted) origin
       newW = Math.min(newW, labelWidth - newX);
       newH = Math.min(newH, labelHeight - newY);
 
       const roundToTenthMm = (value: number) => Math.round(value * 10) / 10;
 
-      let roundedW = Math.max(3, Math.min(roundToTenthMm(newW), labelWidth));
-      let roundedH = Math.max(2, Math.min(roundToTenthMm(newH), labelHeight));
-      let roundedX = Math.max(0, Math.min(roundToTenthMm(newX), labelWidth - roundedW));
-      let roundedY = Math.max(0, Math.min(roundToTenthMm(newY), labelHeight - roundedH));
+      let roundedW = Math.max(minW, Math.min(roundToTenthMm(newW), labelWidth));
+      let roundedH = Math.max(minH, Math.min(roundToTenthMm(newH), labelHeight));
+      let roundedX = Math.max(0, Math.min(roundToTenthMm(newX), Math.max(0, labelWidth - roundedW)));
+      let roundedY = Math.max(0, Math.min(roundToTenthMm(newY), Math.max(0, labelHeight - roundedH)));
 
       // Re-clamp after rounding so the final persisted geometry still fits the label.
-      roundedW = Math.max(3, Math.min(roundedW, labelWidth - roundedX));
-      roundedH = Math.max(2, Math.min(roundedH, labelHeight - roundedY));
-      roundedX = Math.max(0, Math.min(roundedX, labelWidth - roundedW));
-      roundedY = Math.max(0, Math.min(roundedY, labelHeight - roundedH));
+      roundedW = Math.max(minW, Math.min(roundedW, labelWidth - roundedX));
+      roundedH = Math.max(minH, Math.min(roundedH, labelHeight - roundedY));
+      roundedX = Math.max(0, Math.min(roundedX, Math.max(0, labelWidth - roundedW)));
+      roundedY = Math.max(0, Math.min(roundedY, Math.max(0, labelHeight - roundedH)));
 
       setElements((prev) =>
         prev.map((el) =>
@@ -944,8 +959,8 @@ export default function LabelDesignerPage() {
       window.removeEventListener('blur', cleanup);
       window.removeEventListener('mouseout', handleWindowMouseOut);
       dragCleanupRef.current = null;
-      // Trigger a final preview render now that the drag is done.
-      renderPreview();
+      // Trigger a final preview render (via ref to avoid stale closure).
+      if (isMountedRef.current) renderPreviewRef.current();
     };
 
     dragCleanupRef.current = cleanup;
@@ -1377,35 +1392,23 @@ export default function LabelDesignerPage() {
                       <>
                         <div
                           className="resize-handle resize-nw"
-                          role="button"
-                          tabIndex={0}
                           aria-label={t('labels.resizeHandleNW')}
                           onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'nw')}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                         />
                         <div
                           className="resize-handle resize-ne"
-                          role="button"
-                          tabIndex={0}
                           aria-label={t('labels.resizeHandleNE')}
                           onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'ne')}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                         />
                         <div
                           className="resize-handle resize-sw"
-                          role="button"
-                          tabIndex={0}
                           aria-label={t('labels.resizeHandleSW')}
                           onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'sw')}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                         />
                         <div
                           className="resize-handle resize-se"
-                          role="button"
-                          tabIndex={0}
                           aria-label={t('labels.resizeHandleSE')}
                           onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'se')}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.preventDefault(); }}
                         />
                       </>
                     )}
