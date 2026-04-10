@@ -87,7 +87,7 @@ func createCSV(headers []string, rows [][]string) ([]byte, error) {
 	buf.Write(utf8BOM)
 
 	writer := csv.NewWriter(&buf)
-	writer.Comma = ';' // Use semicolon for German CSV format
+	writer.Comma = ';' // Use semicolon as CSV separator
 
 	// Write headers
 	if err := writer.Write(headers); err != nil {
@@ -109,12 +109,12 @@ func createCSV(headers []string, rows [][]string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// formatBool converts boolean to German Ja/Nein
+// formatBool converts boolean to Yes/No
 func formatBool(b bool) string {
 	if b {
-		return "Ja"
+		return "Yes"
 	}
-	return "Nein"
+	return "No"
 }
 
 // formatNullString handles NULL string values
@@ -133,16 +133,15 @@ func formatNullInt(i *int) string {
 	return strconv.Itoa(*i)
 }
 
-// formatNullFloat handles NULL float values with German decimal separator
+// formatNullFloat handles NULL float values
 func formatNullFloat(f *float64) string {
 	if f == nil {
 		return ""
 	}
-	// Use comma as decimal separator for German format
 	return fmt.Sprintf("%.2f", *f)
 }
 
-// formatDate formats time to German date format (DD.MM.YYYY HH:MM)
+// formatDate formats time to date format (DD.MM.YYYY HH:MM)
 func formatDate(t *time.Time) string {
 	if t == nil {
 		return ""
@@ -187,9 +186,9 @@ func exportProducts() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Produkt-ID", "Name", "Beschreibung", "Kategorie", "Unterkategorie",
-		"Zubehör", "Verbrauchsmaterial", "Kosten/Tag", "Gewicht (kg)", "Höhe (cm)",
-		"Breite (cm)", "Tiefe (cm)", "Stromverbrauch (W)", "Barcode",
+		"Product-ID", "Name", "Description", "Category", "Subcategory",
+		"Accessory", "Consumable", "Cost/Day", "Weight (kg)", "Height (cm)",
+		"Width (cm)", "Depth (cm)", "Power Consumption (W)", "Barcode",
 	}
 
 	var csvRows [][]string
@@ -258,8 +257,8 @@ func exportProductsWithDeviceCount() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Produkt-ID", "Name", "Kategorie", "Gesamt Geräte",
-		"Verfügbar", "Im Einsatz", "Defekt",
+		"Product-ID", "Name", "Category", "Total Devices",
+		"Available", "In Use", "Defective",
 	}
 
 	var csvRows [][]string
@@ -319,8 +318,8 @@ func exportProductsWithBrandManufacturer() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Produkt-ID", "Name", "Kategorie", "Hersteller", "Marke",
-		"Beschreibung", "Kosten/Tag",
+		"Product-ID", "Name", "Category", "Manufacturer", "Brand",
+		"Description", "Cost/Day",
 	}
 
 	var csvRows [][]string
@@ -383,8 +382,8 @@ func exportAllDevices() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Geräte-ID", "Produkt", "Seriennummer", "Status", "Kaufdatum",
-		"Kaufpreis", "Letzte Wartung", "Notizen", "Lagerbereich", "Case",
+		"Device-ID", "Product", "Serial Number", "Status", "Purchase Date",
+		"Purchase Price", "Last Maintenance", "Notes", "Storage Area", "Case",
 	}
 
 	var csvRows [][]string
@@ -441,7 +440,7 @@ func exportManufacturers() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Name", "Webseite",
+		"ID", "Name", "Website",
 	}
 
 	var csvRows [][]string
@@ -488,7 +487,7 @@ func exportManufacturersWithBrands() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Hersteller", "Marken",
+		"ID", "Manufacturer", "Brands",
 	}
 
 	var csvRows [][]string
@@ -534,7 +533,7 @@ func exportBrands() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Markenname", "Hersteller",
+		"ID", "Brand Name", "Manufacturer",
 	}
 
 	var csvRows [][]string

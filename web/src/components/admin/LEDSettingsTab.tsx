@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 const ZONE_KEYWORDS = ['bin', 'fach', 'slot', 'compartment', 'shelf', 'gitterbox'];
 
 const zoneLabelForOption = (zone: Zone): string => {
-  const zoneName = zone.name || zone.code || 'Unbenanntes Fach';
+  const zoneName = zone.name || zone.code || 'Unnamed Shelf';
   const code = zone.code || '';
   return code ? `${zoneName} (${code})` : zoneName;
 };

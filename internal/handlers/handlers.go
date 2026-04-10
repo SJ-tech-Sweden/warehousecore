@@ -456,25 +456,25 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 	switch scanReq.Action {
 	case "intake":
 		newStock = product.StockQuantity + quantity
-		message = fmt.Sprintf("✅ %s eingelagert: %.1f %s (Neuer Bestand: %.1f)",
+		message = fmt.Sprintf("✅ %s stored: %.1f %s (New stock: %.1f)",
 			product.Name, quantity, product.CountTypeAbbr, newStock)
 	case "outtake":
 		if product.StockQuantity < quantity {
 			respondJSON(w, http.StatusBadRequest, map[string]interface{}{
 				"success": false,
-				"message": fmt.Sprintf("❌ Nicht genug Bestand! Verfügbar: %.1f %s", product.StockQuantity, product.CountTypeAbbr),
+				"message": fmt.Sprintf("❌ Not enough stock! Available: %.1f %s", product.StockQuantity, product.CountTypeAbbr),
 				"action":  scanReq.Action,
 			})
 			return
 		}
 		newStock = product.StockQuantity - quantity
-		message = fmt.Sprintf("✅ %s ausgelagert: %.1f %s (Verbleibender Bestand: %.1f)",
+		message = fmt.Sprintf("✅ %s retrieved: %.1f %s (Remaining stock: %.1f)",
 			product.Name, quantity, product.CountTypeAbbr, newStock)
 	case "check":
-		message = fmt.Sprintf("📊 %s - Aktueller Bestand: %.1f %s",
+		message = fmt.Sprintf("📊 %s - Current stock: %.1f %s",
 			product.Name, product.StockQuantity, product.CountTypeAbbr)
 		if product.StockQuantity <= product.MinStockLevel {
-			message += fmt.Sprintf(" ⚠️ Unter Mindestbestand (%.1f)", product.MinStockLevel)
+			message += fmt.Sprintf(" ⚠️ Below minimum stock (%.1f)", product.MinStockLevel)
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
 			"success": true,
@@ -492,7 +492,7 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 	default:
 		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
 			"success": false,
-			"message": "Ungültige Aktion",
+			"message": "Invalid action",
 			"action":  scanReq.Action,
 		})
 		return
@@ -507,7 +507,7 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 		log.Printf("Failed to update stock: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]interface{}{
 			"success": false,
-			"message": "Fehler beim Aktualisieren des Bestands",
+			"message": "Error updating stock",
 			"action":  scanReq.Action,
 		})
 		return
@@ -1139,7 +1139,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 	if input.Name != nil && *input.Name != "" {
 		zoneName = *input.Name
 	} else if input.Type == "shelf" {
-		// Generate automatic name for shelves (Fächer)
+		// Generate automatic name for shelves
 		generatedName, err := zoneService.GenerateShelfName(input.ParentZoneID)
 		if err != nil {
 			log.Printf("Shelf name generation error: %v", err)
@@ -1210,7 +1210,7 @@ func CreateZone(w http.ResponseWriter, r *http.Request) {
 	// Generate and update barcode for shelves
 	var generatedBarcode *string
 	if input.Type == "shelf" {
-		barcodeStr := fmt.Sprintf("FACH-%08d", id)
+		barcodeStr := fmt.Sprintf("SHELF-%08d", id)
 		_, err := db.Exec(`UPDATE storage_zones SET barcode = $1 WHERE zone_id = $2`, barcodeStr, id)
 		if err != nil {
 			log.Printf("Failed to update barcode: %v", err)
