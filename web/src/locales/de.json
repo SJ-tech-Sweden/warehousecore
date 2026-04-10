@@ -1184,9 +1184,24 @@
       "status": "Status:"
     },
     "outtake": {
-      "jobSelected": "Job #{{id}} ausgewählt – jetzt das Gerät scannen zum Ausgeben.",
+      "title": "Job scannen",
+      "subtitle": "Scanne den Job-Barcode, um mit dem Auslagern zu beginnen",
+      "addDevicesTitle": "Gerät auslagern",
+      "addDevicesSubtitle": "Scanne ein Gerät, um es für diesen Job auszugeben",
+      "steps": {
+        "job": "Job",
+        "device": "Gerät"
+      },
+      "placeholderJob": "Job-Barcode (JOB######)",
+      "scanJobButton": "Job scannen",
+      "scanDeviceForJob": "Gerät auslagern",
+      "jobSelected": "Job #{{id}} ausgewählt – Gerät scannen zum Ausgeben.",
       "noJobSelected": "Zuerst einen Job-Barcode (JOB######) scannen, dann das Gerät.",
-      "clearJob": "Job abwählen"
+      "clearJob": "Job wechseln",
+      "skipJob": "Job überspringen (nur Verbrauchsmaterial)",
+      "noJobMode": "Kein Job ausgewählt – nur Verbrauchsmaterial",
+      "noJobModeSubtitle": "Verbrauchsmaterial scannen, um es ohne Job auszulagern",
+      "selectJob": "Job auswählen"
     },
     "ledModal": {
       "title": "LED-Licht aktivieren?",
