@@ -102,8 +102,8 @@ func generatePrefix(name string) string {
 	return cleaned[:3]
 }
 
-// GenerateShelfName generates an automatic name for a shelf (Fach)
-// Returns "Fach 01", "Fach 02", etc based on existing shelves in parent zone
+// GenerateShelfName generates an automatic name for a shelf
+// Returns "Shelf 01", "Shelf 02", etc based on existing shelves in parent zone
 func (s *ZoneService) GenerateShelfName(parentZoneID *int64) (string, error) {
 	if parentZoneID == nil || *parentZoneID == 0 {
 		return "", fmt.Errorf("parent zone ID required for shelf creation")
@@ -120,17 +120,17 @@ func (s *ZoneService) GenerateShelfName(parentZoneID *int64) (string, error) {
 		return "", err
 	}
 
-	// Generate name: Fach 01, Fach 02, etc.
-	return fmt.Sprintf("Fach %02d", count+1), nil
+	// Generate name: Shelf 01, Shelf 02, etc.
+	return fmt.Sprintf("Shelf %02d", count+1), nil
 }
 
 // getTypePrefix returns the type prefix for zone codes
 func getTypePrefix(zoneType string) string {
 	prefixes := map[string]string{
-		"warehouse": "LGR", // Lager
-		"rack":      "RG",  // Regal (Shelving Unit)
-		"gitterbox": "GB",  // Gitterbox
-		"shelf":     "F",   // Fach (Shelf/Compartment)
+		"warehouse": "LGR", // Warehouse
+		"rack":      "RG",  // Rack (Shelving Unit)
+		"gitterbox": "GB",  // Grid Box
+		"shelf":     "F",   // Shelf/Compartment
 	}
 
 	if prefix, ok := prefixes[zoneType]; ok {

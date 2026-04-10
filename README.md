@@ -388,7 +388,7 @@ Defines which LED indices belong to which storage bins.
   "warehouse_id": "WDL",
   "shelves": [
     {
-      "shelf_id": "Regal-01",
+      "shelf_id": "Rack-01",
       "bins": [
         { "bin_id": "WDL-RG-01-F-01", "pixels": [0, 1, 2, 3] },
         { "bin_id": "WDL-RG-01-F-02", "pixels": [4, 5, 6] }
@@ -2131,7 +2131,7 @@ For issues or questions:
   - Flashing instructions with troubleshooting
   - Admin panel management workflow
   - Zone type assignment and multi-controller routing explanation
-  - Testing procedures (Identify, Fach-Test, Job-Highlight)
+  - Testing procedures (Identify, Shelf-Test, Job-Highlight)
   - Comprehensive troubleshooting section with error codes
   - Added reference link in main README for easy access
 
@@ -2978,9 +2978,9 @@ For issues or questions:
   - Ensures every device is assigned to a specific storage location
   - Prevents devices from being stored without location information
 - **Example Workflow:**
-  1. Select "Einlagern" action
+  1. Select "Intake" action
   2. Scan device barcode → Device verified ✓
-  3. Scan zone barcode (e.g., FACH-00000014) → Device stored at specific location
+  3. Scan zone barcode (e.g., SHELF-00000014) → Device stored at specific location
   4. Process complete with full audit trail
 
 ### Version 1.11 (2025-10-14)
@@ -3015,10 +3015,10 @@ For issues or questions:
   - Consistent shelf numbering without gaps
 
 ### Version 1.8 (2025-10-14)
-- **Automatic Bin (Fach) Creation:**
-  - Added 📚 **Bin** (Fach) as a 4th zone type for racks
-  - Automatic name generation (Bin 01, Bin 02, etc.) based on existing bins in parent rack
-  - Automatic barcode generation (FACH-%08d format) after creation
+- **Automatic Bin (Shelf) Creation:**
+  - Added 📚 **Bin** (Shelf) as a 4th zone type for racks
+  - Automatic name generation (Shelf 01, Shelf 02, etc.) based on existing bins in parent rack
+  - Automatic barcode generation (SHELF-%08d format) after creation
   - No manual name input required for bin creation
 - **Bulk Bin Creation:**
   - "Create Bins" button in rack detail view
@@ -3038,7 +3038,7 @@ For issues or questions:
   - Create storage zone Weidelbach (WDB)
   - Create Rack A (WDB-RG-01)
   - Click "Create Bins" → Enter "5" → Creates Bin 01 through Bin 05 automatically
-  - Each bin gets codes like WDB-RG-01-F-01 and barcodes like FACH-00000014
+  - Each bin gets codes like WDB-RG-01-F-01 and barcodes like SHELF-00000014
 
 ### Version 1.7 (2025-10-14)
 - **Simplified Zone Types:** Reduced to 3 types only

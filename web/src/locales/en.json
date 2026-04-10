@@ -738,8 +738,10 @@
         "previewStartedFor": "✓ Preview for {{target}} started - \"Stop preview\" ends lighting.",
         "previewError": "Preview failed: ",
         "previewStopped": "✓ Preview stopped.",
-        "stopError": "Stop failed: "
-      }
+        "stopError": "Stop failed: ",
+        "settingsSaved": "✓ Settings saved"
+      },
+      "unnamedZone": "Unnamed Zone"
     },
     "apiKeys": {
       "title": "API Keys",

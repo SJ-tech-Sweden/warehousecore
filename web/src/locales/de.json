@@ -738,8 +738,10 @@
         "previewStartedFor": "✓ Vorschau für {{target}} gestartet - \"Vorschau stoppen\" beendet das Leuchten.",
         "previewError": "Fehler bei der Vorschau: ",
         "previewStopped": "✓ Vorschau gestoppt.",
-        "stopError": "Fehler beim Stoppen: "
-      }
+        "stopError": "Fehler beim Stoppen: ",
+        "settingsSaved": "✓ Einstellungen gespeichert"
+      },
+      "unnamedZone": "Unbenannte Zone"
     },
     "apiKeys": {
       "title": "API-Keys",

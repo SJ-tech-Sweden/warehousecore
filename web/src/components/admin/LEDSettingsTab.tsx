@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 
 const ZONE_KEYWORDS = ['bin', 'fach', 'slot', 'compartment', 'shelf', 'gitterbox'];
 
-const zoneLabelForOption = (zone: Zone): string => {
-  const zoneName = zone.name || zone.code || 'Unbenanntes Fach';
+const zoneLabelForOption = (zone: Zone, t: (key: string) => string): string => {
+  const zoneName = zone.name || zone.code || t('admin.ledSettings.unnamedZone');
   const code = zone.code || '';
   return code ? `${zoneName} (${code})` : zoneName;
 };
@@ -76,9 +76,9 @@ export function LEDSettingsTab() {
     });
     const list = filtered.length > 0 ? filtered : zones;
     return [...list].sort((a, b) =>
-      zoneLabelForOption(a).localeCompare(zoneLabelForOption(b), 'de', { sensitivity: 'base' })
+      zoneLabelForOption(a, t).localeCompare(zoneLabelForOption(b, t), 'de', { sensitivity: 'base' })
     );
-  }, [zones]);
+  }, [zones, t]);
   const previewBinOptions = useMemo(() => {
     if (!mapping) return [];
     const seen = new Set<string>();
@@ -193,7 +193,7 @@ export function LEDSettingsTab() {
 
     try {
       await api.put('/admin/led/single-bin-default', defaults);
-      setMessage('✓ Einstellungen gespeichert');
+      setMessage(t('admin.ledSettings.messages.settingsSaved'));
       setTimeout(() => setMessage(''), 3000);
     } catch (error: any) {
       setMessage(`${t('common.error')}: ` + (error.response?.data?.error || error.message));
@@ -1061,7 +1061,7 @@ export function LEDSettingsTab() {
                                   <option value="">{t('admin.ledSettings.selectAreaPlaceholder')}</option>
                                   {zoneOptions.map((zone) => (
                                     <option key={zone.zone_id} value={zone.code ?? ''} className="bg-dark">
-                                      {zoneLabelForOption(zone)}
+                                      {zoneLabelForOption(zone, t)}
                                     </option>
                                   ))}
                                 </select>
