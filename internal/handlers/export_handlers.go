@@ -31,31 +31,31 @@ func ExportCSV(w http.ResponseWriter, r *http.Request) {
 	switch exportType {
 	case "products":
 		csvData, err = exportProducts()
-		filename = fmt.Sprintf("produkte_%s.csv", timestamp)
+		filename = fmt.Sprintf("products_%s.csv", timestamp)
 	case "products-with-count":
 		csvData, err = exportProductsWithDeviceCount()
-		filename = fmt.Sprintf("produkte_mit_anzahl_%s.csv", timestamp)
+		filename = fmt.Sprintf("products_with_count_%s.csv", timestamp)
 	case "products-with-brand":
 		csvData, err = exportProductsWithBrandManufacturer()
-		filename = fmt.Sprintf("produkte_mit_marke_%s.csv", timestamp)
+		filename = fmt.Sprintf("products_with_brand_%s.csv", timestamp)
 	case "devices":
 		csvData, err = exportAllDevices()
-		filename = fmt.Sprintf("geraete_%s.csv", timestamp)
+		filename = fmt.Sprintf("devices_%s.csv", timestamp)
 	case "manufacturers":
 		csvData, err = exportManufacturers()
-		filename = fmt.Sprintf("hersteller_%s.csv", timestamp)
+		filename = fmt.Sprintf("manufacturers_%s.csv", timestamp)
 	case "manufacturers-with-brands":
 		csvData, err = exportManufacturersWithBrands()
-		filename = fmt.Sprintf("hersteller_mit_marken_%s.csv", timestamp)
+		filename = fmt.Sprintf("manufacturers_with_brands_%s.csv", timestamp)
 	case "brands":
 		csvData, err = exportBrands()
-		filename = fmt.Sprintf("marken_%s.csv", timestamp)
+		filename = fmt.Sprintf("brands_%s.csv", timestamp)
 	case "zones":
 		csvData, err = exportStorageZones()
-		filename = fmt.Sprintf("lagerbereiche_%s.csv", timestamp)
+		filename = fmt.Sprintf("storage_zones_%s.csv", timestamp)
 	case "cables":
 		csvData, err = exportCables()
-		filename = fmt.Sprintf("kabel_%s.csv", timestamp)
+		filename = fmt.Sprintf("cables_%s.csv", timestamp)
 	case "jobs":
 		csvData, err = exportJobs()
 		filename = fmt.Sprintf("jobs_%s.csv", timestamp)
@@ -586,8 +586,8 @@ func exportStorageZones() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Zonen-ID", "Name", "Typ", "Barcode", "Kapazität",
-		"Standort", "Notizen", "Anzahl Geräte",
+		"Zone-ID", "Name", "Type", "Barcode", "Capacity",
+		"Location", "Notes", "Device Count",
 	}
 
 	var csvRows [][]string
@@ -651,8 +651,8 @@ func exportCables() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"ID", "Name", "Kabeltyp", "Stecker A", "Stecker B",
-		"Länge (m)", "Farbe", "Notizen", "Menge",
+		"ID", "Name", "Cable Type", "Connector A", "Connector B",
+		"Length (m)", "Color", "Notes", "Quantity",
 	}
 
 	var csvRows [][]string
@@ -718,8 +718,8 @@ func exportJobs() ([]byte, error) {
 	defer rows.Close()
 
 	headers := []string{
-		"Job-ID", "Job-Nummer", "Titel", "Kunde", "Startdatum",
-		"Enddatum", "Status", "Standort", "Notizen", "Anzahl Gerätetypen", "Gesamtmenge",
+		"Job-ID", "Job-Number", "Title", "Customer", "Start Date",
+		"End Date", "Status", "Location", "Notes", "Device Type Count", "Total Quantity",
 	}
 
 	var csvRows [][]string

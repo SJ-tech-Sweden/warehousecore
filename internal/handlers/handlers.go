@@ -437,7 +437,7 @@ func handleAccessoryConsumableScan(w http.ResponseWriter, scanReq *models.ScanRe
 		log.Printf("Failed to get product details: %v", err)
 		respondJSON(w, http.StatusNotFound, map[string]interface{}{
 			"success": false,
-			"message": "Produkt nicht gefunden",
+			"message": "Product not found",
 			"action":  scanReq.Action,
 		})
 		return
