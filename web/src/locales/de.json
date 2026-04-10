@@ -399,6 +399,8 @@
       "supplierNameDesc": "Der Lieferantenname für importierte Produkte. Standard: 'Eventory'.",
       "syncInterval": "Automatisches Synchronisierungsintervall",
       "syncIntervalDesc": "Wie oft Produkte automatisch im Hintergrund synchronisiert werden sollen.",
+      "priceMargin": "Kundenpreis-Marge",
+      "priceMarginDesc": "Optionaler prozentualer Aufschlag auf den Eventory-Preis zur Berechnung des Kundenpreises beim Sync. 0 deaktiviert die automatische Kundenpreisberechnung.",
       "syncIntervalDisabled": "Deaktiviert (nur manuell)",
       "syncInterval15m": "Alle 15 Minuten",
       "syncInterval30m": "Alle 30 Minuten",

@@ -114,6 +114,10 @@ type EventoryConfig struct {
 	// SyncIntervalMinutes controls automatic background syncing.
 	// 0 means disabled; positive values trigger a sync every N minutes.
 	SyncIntervalMinutes int `json:"sync_interval_minutes"`
+	// PriceMarginPercent is applied to the Eventory rental_price to derive the
+	// customer_price on import: customer_price = rental_price * (1 + margin/100).
+	// 0 means automatic customer price calculation is disabled.
+	PriceMarginPercent float64 `json:"price_margin_percent"`
 }
 
 // EffectiveSupplierName returns SupplierName or the default "Eventory".
@@ -432,10 +436,11 @@ func GetEventoryConfig() (*EventoryConfig, error) {
 }
 
 // GetEventoryPublicConfig loads the non-secret Eventory configuration fields
-// (APIURL, Username, TokenEndpoint, SupplierName, SyncIntervalMinutes) from
-// the database without attempting to decrypt stored credentials. Use this when
-// you need to preserve non-secret settings even when EVENTORY_CREDENTIAL_KEY
-// is missing or incorrect and decryption would fail.
+// (APIURL, Username, TokenEndpoint, SupplierName, SyncIntervalMinutes,
+// PriceMarginPercent) from the database without attempting to decrypt stored
+// credentials. Use this when you need to preserve non-secret settings even
+// when EVENTORY_CREDENTIAL_KEY is missing or incorrect and decryption would
+// fail.
 func GetEventoryPublicConfig() (*EventoryConfig, error) {
 	adminSvc := NewAdminService()
 	setting, err := adminSvc.GetSetting(eventorySettingScope, eventorySettingKey)
@@ -499,6 +504,7 @@ func SaveEventoryConfig(cfg *EventoryConfig) error {
 		"token_endpoint":        cfg.TokenEndpoint,
 		"supplier_name":         cfg.SupplierName,
 		"sync_interval_minutes": cfg.SyncIntervalMinutes,
+		"price_margin_percent":  cfg.PriceMarginPercent,
 	}
 
 	return adminSvc.SetSetting(eventorySettingScope, eventorySettingKey, value)

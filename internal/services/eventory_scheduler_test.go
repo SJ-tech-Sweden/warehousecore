@@ -289,3 +289,54 @@ func TestTryAcquireSync_StopBlocksNewAcquire(t *testing.T) {
 		s.ReleaseSync()
 	}
 }
+
+// ===========================
+// Customer price margin computation
+// ===========================
+
+func TestApplyMarginPrice_ZeroMargin(t *testing.T) {
+	// Zero margin should leave the price unchanged.
+	if got := applyMarginPrice(100.0, 0); got != 100.0 {
+		t.Errorf("expected 100.00, got %v", got)
+	}
+}
+
+func TestApplyMarginPrice_RoundNumbers(t *testing.T) {
+	cases := []struct {
+		price    float64
+		margin   float64
+		expected float64
+	}{
+		{100.0, 10, 110.0},
+		{200.0, 25, 250.0},
+		{50.0, 100, 100.0},
+		{0.0, 50, 0.0},
+	}
+	for _, tc := range cases {
+		if got := applyMarginPrice(tc.price, tc.margin); got != tc.expected {
+			t.Errorf("price=%.2f margin=%.2f: expected %.2f, got %.2f", tc.price, tc.margin, tc.expected, got)
+		}
+	}
+}
+
+func TestApplyMarginPrice_Rounding(t *testing.T) {
+	// 29.99 * 1.10 = 32.989 → rounds to 32.99
+	got := applyMarginPrice(29.99, 10)
+	if got != 32.99 {
+		t.Errorf("expected 32.99, got %v", got)
+	}
+
+	// 9.95 * 1.15 = 11.4425 → rounds to 11.44
+	got = applyMarginPrice(9.95, 15)
+	if got != 11.44 {
+		t.Errorf("expected 11.44, got %v", got)
+	}
+}
+
+func TestApplyMarginPrice_FractionalMargin(t *testing.T) {
+	// 100.0 * 1.075 = 107.5 → no rounding needed
+	got := applyMarginPrice(100.0, 7.5)
+	if got != 107.5 {
+		t.Errorf("expected 107.50, got %v", got)
+	}
+}
