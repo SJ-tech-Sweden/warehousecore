@@ -285,7 +285,8 @@
       "location": "Standortfelder",
       "case": "Casefelder",
       "zone": "Zonenfelder"
-    }
+    },
+    "dragHint": "Klicken zum Auswählen · Ziehen zum Verschieben · Eckpunkte zum Skalieren"
   },
   "maintenance": {
     "title": "Wartung",

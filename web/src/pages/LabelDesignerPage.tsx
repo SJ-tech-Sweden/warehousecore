@@ -33,6 +33,8 @@ export default function LabelDesignerPage() {
   const [templates, setTemplates] = useState<LabelTemplate[]>([]);
   const [currentTemplateId, setCurrentTemplateId] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     loadDevices();
@@ -397,10 +399,10 @@ export default function LabelDesignerPage() {
   };
 
   useEffect(() => {
-    if (previewDevice) {
+    if (previewDevice && !isDragging) {
       renderPreview();
     }
-  }, [elements, labelWidth, labelHeight, previewDevice]);
+  }, [elements, labelWidth, labelHeight, previewDevice, isDragging]);
 
   const generateAllLabels = async () => {
     const totalItems = devices.length + cases.length + zones.length;
@@ -777,6 +779,112 @@ export default function LabelDesignerPage() {
       `);
       printWindow.document.close();
     }
+  };
+
+  const handleElementMouseDown = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedElement(id);
+
+    const elem = elements.find((el) => el.id === id);
+    if (!elem || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = elem.x;
+    const origY = elem.y;
+    const elemWidth = elem.width;
+    const elemHeight = elem.height;
+
+    setIsDragging(true);
+
+    const handleMouseMove = (me: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
+      const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
+      const newX = Math.max(0, Math.min(labelWidth - elemWidth, origX + deltaXMm));
+      const newY = Math.max(0, Math.min(labelHeight - elemHeight, origY + deltaYMm));
+      setElements((prev) =>
+        prev.map((el) =>
+          el.id === id
+            ? { ...el, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 }
+            : el
+        )
+      );
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent, id: string, direction: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const elem = elements.find((el) => el.id === id);
+    if (!elem || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = elem.x;
+    const origY = elem.y;
+    const origW = elem.width;
+    const origH = elem.height;
+
+    setIsDragging(true);
+
+    const handleMouseMove = (me: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
+      const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
+
+      let newX = origX, newY = origY, newW = origW, newH = origH;
+
+      if (direction.includes('e')) newW = Math.max(3, origW + deltaXMm);
+      if (direction.includes('s')) newH = Math.max(2, origH + deltaYMm);
+      if (direction.includes('w')) {
+        newW = Math.max(3, origW - deltaXMm);
+        newX = origX + origW - newW;
+      }
+      if (direction.includes('n')) {
+        newH = Math.max(2, origH - deltaYMm);
+        newY = origY + origH - newH;
+      }
+
+      newX = Math.max(0, Math.min(labelWidth - newW, newX));
+      newY = Math.max(0, Math.min(labelHeight - newH, newY));
+
+      setElements((prev) =>
+        prev.map((el) =>
+          el.id === id
+            ? {
+                ...el,
+                x: Math.round(newX * 10) / 10,
+                y: Math.round(newY * 10) / 10,
+                width: Math.round(newW * 10) / 10,
+                height: Math.round(newH * 10) / 10,
+              }
+            : el
+        )
+      );
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   const selectedElem = elements.find((e) => e.id === selectedElement);
@@ -1156,8 +1264,49 @@ export default function LabelDesignerPage() {
               </optgroup>
             </select>
           </div>
+          <div className="canvas-drag-hint">{t('labels.dragHint')}</div>
           <div className="canvas-wrapper">
-            <canvas ref={canvasRef} className="label-canvas" />
+            <div className="canvas-interactive-container" ref={canvasContainerRef}>
+              <canvas ref={canvasRef} className="label-canvas" style={{ display: 'block' }} />
+              <div
+                className="canvas-overlay"
+                onClick={() => setSelectedElement(null)}
+              >
+                {elements.map((elem) => (
+                  <div
+                    key={elem.id}
+                    className={`element-overlay${selectedElement === elem.id ? ' selected' : ''}`}
+                    style={{
+                      left: `${(elem.x / labelWidth) * 100}%`,
+                      top: `${(elem.y / labelHeight) * 100}%`,
+                      width: `${(elem.width / labelWidth) * 100}%`,
+                      height: `${(elem.height / labelHeight) * 100}%`,
+                    }}
+                    title={`${elem.type}: ${elem.content || ''} (x: ${elem.x}mm, y: ${elem.y}mm)`}
+                    onMouseDown={(e) => handleElementMouseDown(e, elem.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedElement(elem.id);
+                    }}
+                  >
+                    <div className="element-overlay-label">
+                      {elem.type === 'qrcode' && <QrCode size={10} />}
+                      {elem.type === 'barcode' && <Barcode size={10} />}
+                      {elem.type === 'text' && <Type size={10} />}
+                      {elem.type === 'image' && <ImageIcon size={10} />}
+                    </div>
+                    {selectedElement === elem.id && (
+                      <>
+                        <div className="resize-handle resize-nw" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'nw')} />
+                        <div className="resize-handle resize-ne" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'ne')} />
+                        <div className="resize-handle resize-sw" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'sw')} />
+                        <div className="resize-handle resize-se" onMouseDown={(e) => handleResizeMouseDown(e, elem.id, 'se')} />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
