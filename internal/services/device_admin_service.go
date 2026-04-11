@@ -47,7 +47,7 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		return nil, errors.New("quantity cannot exceed 100")
 	}
 
-	status := strings.TrimSpace(input.Status)
+	status := strings.ToLower(strings.TrimSpace(input.Status))
 	if status == "" || status == "free" {
 		status = string(models.StatusInStorage)
 	}

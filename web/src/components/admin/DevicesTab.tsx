@@ -205,9 +205,12 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
     return matchesSearch && matchesStatus && matchesProduct && matchesZone;
   });
 
+  const normalizeDeviceStatus = (status: string) =>
+    status === 'free' ? 'in_storage' : status;
+
   const statusLabel = (status?: string) => {
     if (!status) return '-';
-    return t(`admin.devices.statuses.${status}`, status);
+    return t(`admin.devices.statuses.${normalizeDeviceStatus(status)}`, status);
   };
 
   const openCreateModal = () => {
@@ -540,11 +543,11 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          device.status === 'in_storage'
+                          normalizeDeviceStatus(device.status) === 'in_storage'
                             ? 'bg-green-500/20 text-green-400'
-                            : device.status === 'on_job'
+                            : normalizeDeviceStatus(device.status) === 'on_job'
                             ? 'bg-blue-500/20 text-blue-400'
-                            : device.status === 'defective'
+                            : normalizeDeviceStatus(device.status) === 'defective'
                             ? 'bg-red-500/20 text-red-400'
                             : 'bg-yellow-500/20 text-yellow-400'
                         }`}
@@ -617,11 +620,11 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
               </div>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    device.status === 'in_storage'
+                    normalizeDeviceStatus(device.status) === 'in_storage'
                       ? 'bg-green-500/20 text-green-400'
-                      : device.status === 'on_job'
+                      : normalizeDeviceStatus(device.status) === 'on_job'
                       ? 'bg-blue-500/20 text-blue-400'
-                      : device.status === 'defective'
+                      : normalizeDeviceStatus(device.status) === 'defective'
                       ? 'bg-red-500/20 text-red-400'
                       : 'bg-yellow-500/20 text-yellow-400'
                   }`}
