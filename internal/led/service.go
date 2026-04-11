@@ -253,7 +253,7 @@ func (s *Service) HighlightJobBins(jobID string) error {
 		return fmt.Errorf("failed to resolve job zone counts: %w", err)
 	}
 	if len(zoneCounts) == 0 {
-		return fmt.Errorf("no devices found for job %s", jobID)
+		return fmt.Errorf("no matching in-storage devices or zones found for highlighting for job %s", jobID)
 	}
 
 	s.mu.RLock()
@@ -763,7 +763,7 @@ func (s *Service) getProductRequirementZonesWithCounts(jobID string) (zoneCounts
 	}
 
 	if !hasRequirements {
-		return nil, false, nil
+		return zoneCounts, false, nil
 	}
 	return zoneCounts, true, nil
 }
