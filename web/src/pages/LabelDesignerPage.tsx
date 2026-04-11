@@ -46,7 +46,7 @@ function startDragInteraction(
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('blur', cleanup);
     window.removeEventListener('mouseout', handleWindowMouseOut);
-    window.removeEventListener('scroll', refreshRect, { capture: true, passive: true } as AddEventListenerOptions);
+    window.removeEventListener('scroll', refreshRect, true);
     window.removeEventListener('resize', refreshRect);
     onDone();
   };
