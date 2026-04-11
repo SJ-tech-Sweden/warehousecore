@@ -819,8 +819,12 @@ export default function LabelDesignerPage() {
     isDraggingRef.current = true;
     let geometryChanged = false;
 
+    // Cache the rect at drag start; refresh on scroll/resize to avoid per-event reflow.
+    let cachedRect = canvas.getBoundingClientRect();
+    const refreshRect = () => { cachedRect = canvas.getBoundingClientRect(); };
+
     const handleMouseMove = (me: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = cachedRect;
       if (rect.width === 0 || rect.height === 0) return;
       const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
       const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
@@ -854,6 +858,8 @@ export default function LabelDesignerPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', cleanup);
       window.removeEventListener('mouseout', handleWindowMouseOut);
+      window.removeEventListener('scroll', refreshRect, true);
+      window.removeEventListener('resize', refreshRect);
       dragCleanupRef.current = null;
       // Only re-render when the element was actually moved (not on a simple click).
       if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
@@ -865,6 +871,8 @@ export default function LabelDesignerPage() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', cleanup);
     window.addEventListener('mouseout', handleWindowMouseOut);
+    window.addEventListener('scroll', refreshRect, true);
+    window.addEventListener('resize', refreshRect);
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, id: string, direction: 'nw' | 'ne' | 'sw' | 'se') => {
@@ -886,10 +894,14 @@ export default function LabelDesignerPage() {
     isDraggingRef.current = true;
     let geometryChanged = false;
 
+    // Cache the rect at drag start; refresh on scroll/resize to avoid per-event reflow.
+    let cachedRect = canvas.getBoundingClientRect();
+    const refreshRect = () => { cachedRect = canvas.getBoundingClientRect(); };
+
     const handleMouseMove = (me: MouseEvent) => {
       if (labelWidth <= 0 || labelHeight <= 0) return;
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = cachedRect;
       if (rect.width === 0 || rect.height === 0) return;
       const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
       const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
@@ -967,6 +979,8 @@ export default function LabelDesignerPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', cleanup);
       window.removeEventListener('mouseout', handleWindowMouseOut);
+      window.removeEventListener('scroll', refreshRect, true);
+      window.removeEventListener('resize', refreshRect);
       dragCleanupRef.current = null;
       // Only re-render when geometry actually changed (not on a simple mousedown).
       if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
@@ -978,6 +992,8 @@ export default function LabelDesignerPage() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', cleanup);
     window.addEventListener('mouseout', handleWindowMouseOut);
+    window.addEventListener('scroll', refreshRect, true);
+    window.addEventListener('resize', refreshRect);
   };
 
   const selectedElem = elements.find((e) => e.id === selectedElement);
