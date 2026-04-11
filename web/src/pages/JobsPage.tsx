@@ -482,8 +482,14 @@ export function JobsPage() {
   const getRequirementStats = (reqs: ProductRequirement[] | undefined, devices: JobDevice[]) => {
     if (reqs && reqs.length > 0) {
       const total = reqs.reduce((acc, r) => acc + (r.required || 0), 0);
-      const scanned = reqs.reduce((acc, r) => acc + (r.assigned || 0), 0);
-      const remaining = Math.max(0, total - scanned);
+      const scanned = reqs.reduce(
+        (acc, r) => acc + Math.min(r.assigned || 0, r.required || 0),
+        0
+      );
+      const remaining = reqs.reduce(
+        (acc, r) => acc + Math.max(0, (r.required || 0) - (r.assigned || 0)),
+        0
+      );
       return { total, scanned, remaining };
     }
     return getDeviceStats(devices);

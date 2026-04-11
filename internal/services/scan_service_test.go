@@ -22,9 +22,9 @@ func TestUpsertJobDeviceSQL_HasOnConflict(t *testing.T) {
 }
 
 // TestUpsertJobDeviceSQL_ConflictOnJobIDAndDeviceID verifies that the conflict
-// target in the ON CONFLICT clause covers both jobID and deviceID (matching the
-// unique constraint enforced by migration 039), rather than just checking that
-// those column names appear somewhere in the SQL.
+// target in the ON CONFLICT clause covers both deviceID and jobID (matching the
+// unique constraint uq_jobdevices_device_job enforced by migration 039), rather
+// than just checking that those column names appear somewhere in the SQL.
 func TestUpsertJobDeviceSQL_ConflictOnJobIDAndDeviceID(t *testing.T) {
 	lower := strings.ToLower(upsertJobDeviceSQL)
 

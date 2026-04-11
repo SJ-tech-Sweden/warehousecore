@@ -17,9 +17,9 @@ import (
 // to 'pending'; scanning it out again must restore it to 'issued'. Using an
 // explicit constant lets tests verify the SQL without running a real database.
 const upsertJobDeviceSQL = `
-	INSERT INTO jobdevices (jobID, deviceID, pack_status, pack_ts)
+	INSERT INTO jobdevices (deviceID, jobID, pack_status, pack_ts)
 	VALUES ($1, $2, 'issued', NOW())
-	ON CONFLICT (jobID, deviceID) DO UPDATE
+	ON CONFLICT (deviceID, jobID) DO UPDATE
 		SET pack_status = 'issued', pack_ts = NOW()
 `
 
@@ -210,7 +210,7 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	// re-scanning after an intake (which resets pack_status to 'pending')
 	// correctly marks the device as issued again without failing on the
 	// unique constraint.
-	_, err = tx.Exec(upsertJobDeviceSQL, *jobID, device.DeviceID)
+	_, err = tx.Exec(upsertJobDeviceSQL, device.DeviceID, *jobID)
 	if err != nil {
 		return nil, nil, err
 	}

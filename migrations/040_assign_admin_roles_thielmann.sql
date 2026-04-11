@@ -5,42 +5,48 @@
 -- by edits to that file.
 --
 -- Improvements over 008:
---   1. A single PL/pgSQL block selects exactly one matching user (ORDER BY
---      userid LIMIT 1), so both role grants always apply to the same userid.
---      (008 used two independent queries that could resolve to different users.)
---   2. Raises a NOTICE if neither role is found, so the operator knows the
---      grant was a no-op.
---   3. Idempotent: ON CONFLICT (userid, roleid) DO NOTHING.
+--   1. A single PL/pgSQL block counts matching users first and aborts with
+--      RAISE EXCEPTION if more than one matches, so roles are never granted to
+--      the wrong account.
+--   2. Raises a NOTICE when no user is found (safe no-op).
+--   3. Returns early with a WARNING when neither required role exists.
+--   4. Reports the actual number of inserted rows (GET DIAGNOSTICS ROW_COUNT).
+--   5. Idempotent: ON CONFLICT (userid, roleid) DO NOTHING.
 --
--- The ILIKE '%thielmann%' pattern is intentionally broad to match variations
--- (first/last name split, email domain, etc.).  If the target environment has
--- multiple users matching the pattern, ops should verify the granted userid
--- in the Postgres log (RAISE NOTICE output).
---
--- Safe to re-run on any environment.
+-- Safe to re-run on any environment where the target user is unique.
 
 DO $$
 DECLARE
   target_userid BIGINT;
+  user_count     INT;
   role_count     INT;
 BEGIN
-  -- Pick exactly one user whose full name, username, or email contains
-  -- 'thielmann' (case-insensitive).  ORDER BY userid gives deterministic
-  -- selection when multiple rows match.
+  -- Count how many users match the pattern to guard against ambiguity.
+  SELECT COUNT(*) INTO user_count
+  FROM users u
+  WHERE (
+    (COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) ILIKE '%thielmann%'
+    OR u.username ILIKE '%thielmann%'
+    OR u.email    ILIKE '%thielmann%'
+  );
+
+  IF user_count = 0 THEN
+    RAISE NOTICE 'Migration 040: no user matching thielmann found; skipping role grants.';
+    RETURN;
+  END IF;
+
+  IF user_count <> 1 THEN
+    RAISE EXCEPTION 'Migration 040: expected exactly 1 user matching thielmann, found %; '
+                    'aborting to avoid granting roles to the wrong account.', user_count;
+  END IF;
+
   SELECT u.userid INTO target_userid
   FROM users u
   WHERE (
     (COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, '')) ILIKE '%thielmann%'
     OR u.username ILIKE '%thielmann%'
     OR u.email    ILIKE '%thielmann%'
-  )
-  ORDER BY u.userid
-  LIMIT 1;
-
-  IF target_userid IS NULL THEN
-    RAISE NOTICE 'Migration 040: no user matching thielmann found; skipping role grants.';
-    RETURN;
-  END IF;
+  );
 
   -- Verify that both required roles exist before inserting.
   SELECT COUNT(*) INTO role_count
