@@ -1372,6 +1372,7 @@ export default function LabelDesignerPage() {
                     role="button"
                     tabIndex={0}
                     aria-label={`${elem.type}: ${elem.content || ''} (x: ${elem.x}mm, y: ${elem.y}mm)`}
+                    aria-pressed={selectedElement === elem.id}
                     style={{
                       left: `${(elem.x / labelWidth) * 100}%`,
                       top: `${(elem.y / labelHeight) * 100}%`,

@@ -449,6 +449,7 @@
   position: absolute;
   inset: 0;
   pointer-events: auto;
+  user-select: none;
 }
 
 .element-overlay {
@@ -458,6 +459,7 @@
   pointer-events: auto;
   box-sizing: border-box;
   transition: border-color 0.15s, background-color 0.15s;
+  user-select: none;
 }
 
 .element-overlay:hover {
