@@ -11,6 +11,54 @@ interface DesignElement extends LabelElement {
   image_data?: string; // Base64 encoded image data
 }
 
+/**
+ * Registers the shared event listeners for a drag or resize interaction
+ * and returns an idempotent cleanup function.
+ *
+ * - Caches the canvas bounding rect once at call time; refreshes on scroll/resize.
+ * - Calls `onMouseMove(event, rect)` on each mousemove.
+ * - Calls `onDone()` when the interaction ends (mouseup, blur, visibility change, etc.).
+ */
+function startDragInteraction(
+  canvas: HTMLCanvasElement,
+  onMouseMove: (me: MouseEvent, rect: DOMRect) => void,
+  onDone: () => void
+): () => void {
+  let cachedRect = canvas.getBoundingClientRect();
+  const refreshRect = () => { cachedRect = canvas.getBoundingClientRect(); };
+  const wrappedMouseMove = (me: MouseEvent) => onMouseMove(me, cachedRect);
+  const handleVisibilityChange = () => {
+    if (document.visibilityState !== 'visible') cleanup();
+  };
+  const handleWindowMouseOut = (me: MouseEvent) => {
+    if (me.relatedTarget === null) cleanup();
+  };
+
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    document.removeEventListener('mousemove', wrappedMouseMove);
+    document.removeEventListener('mouseup', cleanup);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('blur', cleanup);
+    window.removeEventListener('mouseout', handleWindowMouseOut);
+    window.removeEventListener('scroll', refreshRect, true);
+    window.removeEventListener('resize', refreshRect);
+    onDone();
+  };
+
+  document.addEventListener('mousemove', wrappedMouseMove);
+  document.addEventListener('mouseup', cleanup);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('blur', cleanup);
+  window.addEventListener('mouseout', handleWindowMouseOut);
+  window.addEventListener('scroll', refreshRect, true);
+  window.addEventListener('resize', refreshRect);
+
+  return cleanup;
+}
+
 export default function LabelDesignerPage() {
   const { t } = useTranslation();
   const presetSizes = [
@@ -808,7 +856,9 @@ export default function LabelDesignerPage() {
     const elem = elements.find((el) => el.id === id);
     if (!elem || !canvasRef.current) return;
 
-    const canvas = canvasRef.current;
+    // Terminate any previous interaction before starting a new one.
+    dragCleanupRef.current?.();
+
     const startX = e.clientX;
     const startY = e.clientY;
     const origX = elem.x;
@@ -819,60 +869,33 @@ export default function LabelDesignerPage() {
     isDraggingRef.current = true;
     let geometryChanged = false;
 
-    // Cache the rect at drag start; refresh on scroll/resize to avoid per-event reflow.
-    let cachedRect = canvas.getBoundingClientRect();
-    const refreshRect = () => { cachedRect = canvas.getBoundingClientRect(); };
-
-    const handleMouseMove = (me: MouseEvent) => {
-      const rect = cachedRect;
-      if (rect.width === 0 || rect.height === 0) return;
-      const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
-      const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
-      const rawX = Math.max(0, Math.min(labelWidth - elemWidth, origX + deltaXMm));
-      const rawY = Math.max(0, Math.min(labelHeight - elemHeight, origY + deltaYMm));
-      // Round then re-clamp so rounding never pushes x/y outside the label.
-      const newX = Math.max(0, Math.min(Math.round(rawX * 10) / 10, labelWidth - elemWidth));
-      const newY = Math.max(0, Math.min(Math.round(rawY * 10) / 10, labelHeight - elemHeight));
-      setElements((prev) => {
-        const current = prev.find((el) => el.id === id);
-        if (current && current.x === newX && current.y === newY) return prev;
-        geometryChanged = true;
-        return prev.map((el) => (el.id === id ? { ...el, x: newX, y: newY } : el));
-      });
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') cleanup();
-    };
-    const handleWindowMouseOut = (me: MouseEvent) => {
-      if (me.relatedTarget === null) cleanup();
-    };
-
-    let cleanedUp = false;
-    const cleanup = () => {
-      if (cleanedUp) return;
-      cleanedUp = true;
-      isDraggingRef.current = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', cleanup);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', cleanup);
-      window.removeEventListener('mouseout', handleWindowMouseOut);
-      window.removeEventListener('scroll', refreshRect, true);
-      window.removeEventListener('resize', refreshRect);
-      dragCleanupRef.current = null;
-      // Only re-render when the element was actually moved (not on a simple click).
-      if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
-    };
+    const cleanup = startDragInteraction(
+      canvasRef.current,
+      (me, rect) => {
+        if (rect.width === 0 || rect.height === 0) return;
+        const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
+        const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
+        const rawX = Math.max(0, Math.min(labelWidth - elemWidth, origX + deltaXMm));
+        const rawY = Math.max(0, Math.min(labelHeight - elemHeight, origY + deltaYMm));
+        // Round then re-clamp so rounding never pushes x/y outside the label.
+        const newX = Math.max(0, Math.min(Math.round(rawX * 10) / 10, labelWidth - elemWidth));
+        const newY = Math.max(0, Math.min(Math.round(rawY * 10) / 10, labelHeight - elemHeight));
+        setElements((prev) => {
+          const current = prev.find((el) => el.id === id);
+          if (current && current.x === newX && current.y === newY) return prev;
+          geometryChanged = true;
+          return prev.map((el) => (el.id === id ? { ...el, x: newX, y: newY } : el));
+        });
+      },
+      () => {
+        isDraggingRef.current = false;
+        dragCleanupRef.current = null;
+        // Only re-render when the element was actually moved (not on a simple click).
+        if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
+      }
+    );
 
     dragCleanupRef.current = cleanup;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', cleanup);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', cleanup);
-    window.addEventListener('mouseout', handleWindowMouseOut);
-    window.addEventListener('scroll', refreshRect, true);
-    window.addEventListener('resize', refreshRect);
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, id: string, direction: 'nw' | 'ne' | 'sw' | 'se') => {
@@ -883,7 +906,9 @@ export default function LabelDesignerPage() {
     const elem = elements.find((el) => el.id === id);
     if (!elem || !canvasRef.current) return;
 
-    const canvas = canvasRef.current;
+    // Terminate any previous interaction before starting a new one.
+    dragCleanupRef.current?.();
+
     const startX = e.clientX;
     const startY = e.clientY;
     const origX = elem.x;
@@ -894,106 +919,78 @@ export default function LabelDesignerPage() {
     isDraggingRef.current = true;
     let geometryChanged = false;
 
-    // Cache the rect at drag start; refresh on scroll/resize to avoid per-event reflow.
-    let cachedRect = canvas.getBoundingClientRect();
-    const refreshRect = () => { cachedRect = canvas.getBoundingClientRect(); };
+    const cleanup = startDragInteraction(
+      canvasRef.current,
+      (me, rect) => {
+        if (labelWidth <= 0 || labelHeight <= 0) return;
+        if (rect.width === 0 || rect.height === 0) return;
+        const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
+        const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
 
-    const handleMouseMove = (me: MouseEvent) => {
-      if (labelWidth <= 0 || labelHeight <= 0) return;
+        // Use label-aware minimums so the min never exceeds the label itself.
+        const minW = Math.min(3, labelWidth);
+        const minH = Math.min(2, labelHeight);
 
-      const rect = cachedRect;
-      if (rect.width === 0 || rect.height === 0) return;
-      const deltaXMm = ((me.clientX - startX) / rect.width) * labelWidth;
-      const deltaYMm = ((me.clientY - startY) / rect.height) * labelHeight;
+        let newX = origX, newY = origY, newW = origW, newH = origH;
 
-      // Use label-aware minimums so the min never exceeds the label itself.
-      const minW = Math.min(3, labelWidth);
-      const minH = Math.min(2, labelHeight);
-
-      let newX = origX, newY = origY, newW = origW, newH = origH;
-
-      if (direction.includes('e')) newW = Math.max(minW, origW + deltaXMm);
-      if (direction.includes('s')) newH = Math.max(minH, origH + deltaYMm);
-      if (direction.includes('w')) {
-        newW = Math.max(minW, origW - deltaXMm);
-        newX = origX + origW - newW;
-      }
-      if (direction.includes('n')) {
-        newH = Math.max(minH, origH - deltaYMm);
-        newY = origY + origH - newH;
-      }
-
-      newX = Math.max(0, Math.min(Math.max(0, labelWidth - newW), newX));
-      newY = Math.max(0, Math.min(Math.max(0, labelHeight - newH), newY));
-      // Clamp width/height to remaining label space from the (possibly adjusted) origin
-      newW = Math.min(newW, labelWidth - newX);
-      newH = Math.min(newH, labelHeight - newY);
-
-      const roundToTenthMm = (value: number) => Math.round(value * 10) / 10;
-
-      let roundedW = Math.max(minW, Math.min(roundToTenthMm(newW), labelWidth));
-      let roundedH = Math.max(minH, Math.min(roundToTenthMm(newH), labelHeight));
-      let roundedX = Math.max(0, Math.min(roundToTenthMm(newX), Math.max(0, labelWidth - roundedW)));
-      let roundedY = Math.max(0, Math.min(roundToTenthMm(newY), Math.max(0, labelHeight - roundedH)));
-
-      // Re-clamp after rounding so the final persisted geometry still fits the label.
-      roundedW = Math.max(minW, Math.min(roundedW, labelWidth - roundedX));
-      roundedH = Math.max(minH, Math.min(roundedH, labelHeight - roundedY));
-      roundedX = Math.max(0, Math.min(roundedX, Math.max(0, labelWidth - roundedW)));
-      roundedY = Math.max(0, Math.min(roundedY, Math.max(0, labelHeight - roundedH)));
-
-      setElements((prev) => {
-        const current = prev.find((el) => el.id === id);
-        if (
-          current &&
-          current.x === roundedX &&
-          current.y === roundedY &&
-          current.width === roundedW &&
-          current.height === roundedH
-        ) {
-          return prev;
+        if (direction.includes('e')) newW = Math.max(minW, origW + deltaXMm);
+        if (direction.includes('s')) newH = Math.max(minH, origH + deltaYMm);
+        if (direction.includes('w')) {
+          newW = Math.max(minW, origW - deltaXMm);
+          newX = origX + origW - newW;
         }
-        geometryChanged = true;
-        return prev.map((el) =>
-          el.id === id
-            ? { ...el, x: roundedX, y: roundedY, width: roundedW, height: roundedH }
-            : el
-        );
-      });
-    };
+        if (direction.includes('n')) {
+          newH = Math.max(minH, origH - deltaYMm);
+          newY = origY + origH - newH;
+        }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') cleanup();
-    };
-    const handleWindowMouseOut = (me: MouseEvent) => {
-      if (me.relatedTarget === null) cleanup();
-    };
+        newX = Math.max(0, Math.min(Math.max(0, labelWidth - newW), newX));
+        newY = Math.max(0, Math.min(Math.max(0, labelHeight - newH), newY));
+        // Clamp width/height to remaining label space from the (possibly adjusted) origin
+        newW = Math.min(newW, labelWidth - newX);
+        newH = Math.min(newH, labelHeight - newY);
 
-    let cleanedUp = false;
-    const cleanup = () => {
-      if (cleanedUp) return;
-      cleanedUp = true;
-      isDraggingRef.current = false;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', cleanup);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', cleanup);
-      window.removeEventListener('mouseout', handleWindowMouseOut);
-      window.removeEventListener('scroll', refreshRect, true);
-      window.removeEventListener('resize', refreshRect);
-      dragCleanupRef.current = null;
-      // Only re-render when geometry actually changed (not on a simple mousedown).
-      if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
-    };
+        const roundToTenthMm = (value: number) => Math.round(value * 10) / 10;
+
+        let roundedW = Math.max(minW, Math.min(roundToTenthMm(newW), labelWidth));
+        let roundedH = Math.max(minH, Math.min(roundToTenthMm(newH), labelHeight));
+        let roundedX = Math.max(0, Math.min(roundToTenthMm(newX), Math.max(0, labelWidth - roundedW)));
+        let roundedY = Math.max(0, Math.min(roundToTenthMm(newY), Math.max(0, labelHeight - roundedH)));
+
+        // Re-clamp after rounding so the final persisted geometry still fits the label.
+        roundedW = Math.max(minW, Math.min(roundedW, labelWidth - roundedX));
+        roundedH = Math.max(minH, Math.min(roundedH, labelHeight - roundedY));
+        roundedX = Math.max(0, Math.min(roundedX, Math.max(0, labelWidth - roundedW)));
+        roundedY = Math.max(0, Math.min(roundedY, Math.max(0, labelHeight - roundedH)));
+
+        setElements((prev) => {
+          const current = prev.find((el) => el.id === id);
+          if (
+            current &&
+            current.x === roundedX &&
+            current.y === roundedY &&
+            current.width === roundedW &&
+            current.height === roundedH
+          ) {
+            return prev;
+          }
+          geometryChanged = true;
+          return prev.map((el) =>
+            el.id === id
+              ? { ...el, x: roundedX, y: roundedY, width: roundedW, height: roundedH }
+              : el
+          );
+        });
+      },
+      () => {
+        isDraggingRef.current = false;
+        dragCleanupRef.current = null;
+        // Only re-render when geometry actually changed (not on a simple mousedown).
+        if (geometryChanged && isMountedRef.current) renderPreviewRef.current();
+      }
+    );
 
     dragCleanupRef.current = cleanup;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', cleanup);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', cleanup);
-    window.addEventListener('mouseout', handleWindowMouseOut);
-    window.addEventListener('scroll', refreshRect, true);
-    window.addEventListener('resize', refreshRect);
   };
 
   const selectedElem = elements.find((e) => e.id === selectedElement);
