@@ -716,47 +716,55 @@ func (s *Service) getJobDeviceZonesWithCounts(jobID string) (map[string]int, err
 func (s *Service) getProductRequirementZonesWithCounts(jobID string) (zoneCounts map[string]int, hasRequirements bool, err error) {
 	db := repository.GetSQLDB()
 
-	// First check whether any requirements are configured for this job.
-	if scanErr := db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM job_product_requirements WHERE job_id = $1)`,
-		jobID,
-	).Scan(&hasRequirements); scanErr != nil {
-		return nil, false, fmt.Errorf("checking product requirements for job %s: %w", jobID, scanErr)
-	}
-	if !hasRequirements {
-		return nil, false, nil
-	}
-
 	query := `
-		SELECT z.code, COUNT(*) as device_count
-		FROM devices d
-		JOIN storage_zones z ON d.zone_id = z.zone_id
-		JOIN job_product_requirements jpr ON jpr.product_id = d.productID AND jpr.job_id = $1
-		WHERE d.status = 'in_storage'
-		  AND z.code IS NOT NULL
-		GROUP BY z.code
+		WITH requirement_state AS (
+			SELECT EXISTS(
+				SELECT 1
+				FROM job_product_requirements
+				WHERE job_id = $1
+			) AS has_requirements
+		)
+		SELECT rs.has_requirements, z.code, COUNT(z.code) AS device_count
+		FROM requirement_state rs
+		LEFT JOIN job_product_requirements jpr
+			ON rs.has_requirements AND jpr.job_id = $1
+		LEFT JOIN devices d
+			ON jpr.product_id = d.productID
+		   AND d.status = 'in_storage'
+		LEFT JOIN storage_zones z
+			ON d.zone_id = z.zone_id
+		   AND z.code IS NOT NULL
+		GROUP BY rs.has_requirements, z.code
 	`
 
 	rows, queryErr := db.Query(query, jobID)
 	if queryErr != nil {
-		return nil, true, fmt.Errorf("querying product requirement zones for job %s: %w", jobID, queryErr)
+		return nil, false, fmt.Errorf("querying product requirement zones for job %s: %w", jobID, queryErr)
 	}
 	defer rows.Close()
 
 	zoneCounts = make(map[string]int)
 	for rows.Next() {
-		var zoneCode string
+		var zoneCode sql.NullString
 		var count int
-		if scanErr := rows.Scan(&zoneCode, &count); scanErr != nil {
-			return nil, true, fmt.Errorf("scanning product requirement zone for job %s: %w", jobID, scanErr)
+		if scanErr := rows.Scan(&hasRequirements, &zoneCode, &count); scanErr != nil {
+			return nil, false, fmt.Errorf("scanning product requirement zone for job %s: %w", jobID, scanErr)
 		}
-		zoneCounts[zoneCode] = count
-		log.Printf("[LED] Zone %s has %d matching product devices for job %s", zoneCode, count, jobID)
+		if !hasRequirements {
+			continue
+		}
+		if zoneCode.Valid && count > 0 {
+			zoneCounts[zoneCode.String] = count
+			log.Printf("[LED] Zone %s has %d matching product devices for job %s", zoneCode.String, count, jobID)
+		}
 	}
 	if rowsErr := rows.Err(); rowsErr != nil {
-		return nil, true, fmt.Errorf("iterating product requirement zones for job %s: %w", jobID, rowsErr)
+		return nil, false, fmt.Errorf("iterating product requirement zones for job %s: %w", jobID, rowsErr)
 	}
 
+	if !hasRequirements {
+		return nil, false, nil
+	}
 	return zoneCounts, true, nil
 }
 
