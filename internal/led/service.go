@@ -733,12 +733,14 @@ func (s *Service) getProductRequirementZonesWithCounts(jobID string) (zoneCounts
 	db := repository.GetSQLDB()
 
 	// First check whether any requirements are configured for this job.
-	var reqCount int
-	if scanErr := db.QueryRow(`SELECT COUNT(*) FROM job_product_requirements WHERE job_id = $1`, jobID).Scan(&reqCount); scanErr != nil {
+	if scanErr := db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM job_product_requirements WHERE job_id = $1)`,
+		jobID,
+	).Scan(&hasRequirements); scanErr != nil {
 		return nil, false, fmt.Errorf("checking product requirements for job %s: %w", jobID, scanErr)
 	}
-	if reqCount == 0 {
-		return make(map[string]int), false, nil
+	if !hasRequirements {
+		return nil, false, nil
 	}
 
 	query := `
