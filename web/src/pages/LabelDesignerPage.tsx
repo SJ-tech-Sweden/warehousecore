@@ -14,6 +14,9 @@ interface DesignElement extends LabelElement {
 /** Rounds a mm value to one decimal place (0.1 mm precision). */
 const roundToTenthMm = (value: number) => Math.round(value * 10) / 10;
 
+/** Maximum number of characters shown from element content in accessible labels/tooltips. */
+const MAX_OVERLAY_LABEL_CONTENT_LENGTH = 50;
+
 /**
  * Registers the shared event listeners for a drag or resize interaction
  * and returns an idempotent cleanup function.
@@ -885,7 +888,7 @@ export default function LabelDesignerPage() {
         const newX = Math.max(0, Math.min(Math.round(rawX * 10) / 10, labelWidth - elemWidth));
         const newY = Math.max(0, Math.min(Math.round(rawY * 10) / 10, labelHeight - elemHeight));
         setElements((prev) => {
-          // Use the cached index; validate id in case the array was mutated.
+          // Use the cached index with a bounds + id guard in case the array was mutated.
           const current = prev[elemIndex];
           if (!current || current.id !== id) return prev;
           if (current.x === newX && current.y === newY) return prev;
@@ -972,7 +975,7 @@ export default function LabelDesignerPage() {
         roundedY = Math.max(0, Math.min(roundedY, Math.max(0, labelHeight - roundedH)));
 
         setElements((prev) => {
-          // Use the cached index; validate id in case the array was mutated.
+          // Use the cached index with a bounds + id guard in case the array was mutated.
           const current = prev[elemIndex];
           if (!current || current.id !== id) return prev;
           if (
@@ -1390,7 +1393,7 @@ export default function LabelDesignerPage() {
                     elem.type === 'text' ? t('labels.text') :
                     elem.type === 'image' ? t('labels.image') :
                     elem.type;
-                  const shortContent = (elem.content || '').slice(0, 50);
+                  const shortContent = (elem.content || '').slice(0, MAX_OVERLAY_LABEL_CONTENT_LENGTH);
                   const overlayLabel = t('labels.elementOverlayLabel', {
                     type: typeLabel,
                     content: shortContent,
