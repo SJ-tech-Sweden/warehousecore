@@ -286,7 +286,8 @@
       "case": "Casefelder",
       "zone": "Zonenfelder"
     },
-    "dragHint": "Klicken zum Auswählen · Ziehen zum Verschieben · Eckpunkte zum Skalieren"
+    "dragHint": "Klicken zum Auswählen · Ziehen zum Verschieben · Eckpunkte zum Skalieren",
+    "elementOverlayLabel": "{{type}}: {{content}} (x: {{x}}mm, y: {{y}}mm)"
   },
   "maintenance": {
     "title": "Wartung",

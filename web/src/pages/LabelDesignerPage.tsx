@@ -856,8 +856,9 @@ export default function LabelDesignerPage() {
     (e.currentTarget as HTMLElement).focus();
     setSelectedElement(id);
 
-    const elem = elements.find((el) => el.id === id);
-    if (!elem || !canvasRef.current) return;
+    const elemIndex = elements.findIndex((el) => el.id === id);
+    if (elemIndex === -1 || !canvasRef.current) return;
+    const elem = elements[elemIndex];
 
     // Terminate any previous interaction before starting a new one.
     dragCleanupRef.current?.();
@@ -884,16 +885,13 @@ export default function LabelDesignerPage() {
         const newX = Math.max(0, Math.min(Math.round(rawX * 10) / 10, labelWidth - elemWidth));
         const newY = Math.max(0, Math.min(Math.round(rawY * 10) / 10, labelHeight - elemHeight));
         setElements((prev) => {
-          let index = -1;
-          for (let i = 0; i < prev.length; i++) {
-            if (prev[i].id === id) { index = i; break; }
-          }
-          if (index === -1) return prev;
-          const current = prev[index];
+          // Use the cached index; validate id in case the array was mutated.
+          const current = prev[elemIndex];
+          if (!current || current.id !== id) return prev;
           if (current.x === newX && current.y === newY) return prev;
           geometryChanged = true;
           const next = [...prev];
-          next[index] = { ...current, x: newX, y: newY };
+          next[elemIndex] = { ...current, x: newX, y: newY };
           return next;
         });
       },
@@ -913,8 +911,9 @@ export default function LabelDesignerPage() {
     e.preventDefault();
     e.stopPropagation();
 
-    const elem = elements.find((el) => el.id === id);
-    if (!elem || !canvasRef.current) return;
+    const elemIndex = elements.findIndex((el) => el.id === id);
+    if (elemIndex === -1 || !canvasRef.current) return;
+    const elem = elements[elemIndex];
 
     // Terminate any previous interaction before starting a new one.
     dragCleanupRef.current?.();
@@ -973,12 +972,9 @@ export default function LabelDesignerPage() {
         roundedY = Math.max(0, Math.min(roundedY, Math.max(0, labelHeight - roundedH)));
 
         setElements((prev) => {
-          let index = -1;
-          for (let i = 0; i < prev.length; i++) {
-            if (prev[i].id === id) { index = i; break; }
-          }
-          if (index === -1) return prev;
-          const current = prev[index];
+          // Use the cached index; validate id in case the array was mutated.
+          const current = prev[elemIndex];
+          if (!current || current.id !== id) return prev;
           if (
             current.x === roundedX &&
             current.y === roundedY &&
@@ -987,7 +983,7 @@ export default function LabelDesignerPage() {
           ) return prev;
           geometryChanged = true;
           const next = [...prev];
-          next[index] = { ...current, x: roundedX, y: roundedY, width: roundedW, height: roundedH };
+          next[elemIndex] = { ...current, x: roundedX, y: roundedY, width: roundedW, height: roundedH };
           return next;
         });
       },
@@ -1387,13 +1383,27 @@ export default function LabelDesignerPage() {
                 className="canvas-overlay"
                 onClick={() => setSelectedElement(null)}
               >
-                {labelWidth > 0 && labelHeight > 0 && elements.map((elem) => (
+                {labelWidth > 0 && labelHeight > 0 && elements.map((elem) => {
+                  const typeLabel =
+                    elem.type === 'qrcode' ? t('labels.qrCode') :
+                    elem.type === 'barcode' ? t('labels.barcode') :
+                    elem.type === 'text' ? t('labels.text') :
+                    elem.type === 'image' ? t('labels.image') :
+                    elem.type;
+                  const shortContent = (elem.content || '').slice(0, 50);
+                  const overlayLabel = t('labels.elementOverlayLabel', {
+                    type: typeLabel,
+                    content: shortContent,
+                    x: elem.x,
+                    y: elem.y,
+                  });
+                  return (
                   <div
                     key={elem.id}
                     className={`element-overlay${selectedElement === elem.id ? ' selected' : ''}`}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${elem.type}: ${elem.content || ''} (x: ${elem.x}mm, y: ${elem.y}mm)`}
+                    aria-label={overlayLabel}
                     aria-pressed={selectedElement === elem.id}
                     style={{
                       left: `${(elem.x / labelWidth) * 100}%`,
@@ -1401,7 +1411,7 @@ export default function LabelDesignerPage() {
                       width: `${(elem.width / labelWidth) * 100}%`,
                       height: `${(elem.height / labelHeight) * 100}%`,
                     }}
-                    title={`${elem.type}: ${elem.content || ''} (x: ${elem.x}mm, y: ${elem.y}mm)`}
+                    title={overlayLabel}
                     onMouseDown={(e) => handleElementMouseDown(e, elem.id)}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1411,6 +1421,9 @@ export default function LabelDesignerPage() {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         setSelectedElement(elem.id);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setSelectedElement(null);
                       }
                     }}
                   >
@@ -1449,7 +1462,8 @@ export default function LabelDesignerPage() {
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
