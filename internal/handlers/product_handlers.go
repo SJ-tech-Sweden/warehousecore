@@ -1069,7 +1069,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				if _, err := db.Exec("INSERT INTO devices (deviceID, productID, status) VALUES ($1, $2, 'free')", candidateID, req.ProductID); err != nil {
+				if _, err := db.Exec("INSERT INTO devices (deviceID, productID, status) VALUES ($1, $2, 'in_storage')", candidateID, req.ProductID); err != nil {
 					if strings.Contains(strings.ToLower(err.Error()), "duplicate key") {
 						usedIDs[candidateID] = struct{}{}
 						continue
@@ -1090,7 +1090,7 @@ func CreateDevicesForProduct(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES ($1, 'free')", req.ProductID); err != nil {
+		if _, err := db.Exec("INSERT INTO devices (productID, status) VALUES ($1, 'in_storage')", req.ProductID); err != nil {
 			log.Printf("[DEVICE CREATE ERROR] Failed to create device %d/%d for product %d: %v", i+1, req.Quantity, req.ProductID, err)
 			failedCount++
 		}

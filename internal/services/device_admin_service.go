@@ -47,9 +47,9 @@ func (s *DeviceAdminService) CreateDevices(ctx context.Context, input *models.De
 		return nil, errors.New("quantity cannot exceed 100")
 	}
 
-	status := strings.TrimSpace(input.Status)
-	if status == "" {
-		status = "free"
+	status := strings.ToLower(strings.TrimSpace(input.Status))
+	if status == "" || status == "free" {
+		status = string(models.StatusInStorage)
 	}
 
 	autoGenerateLabel := true
@@ -202,7 +202,11 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 
 	if input.Status.Set {
 		if input.Status.Valid {
-			addArg("status = $%d", strings.TrimSpace(input.Status.Value))
+			normalizedStatus := strings.ToLower(strings.TrimSpace(input.Status.Value))
+			if normalizedStatus == "free" {
+				normalizedStatus = string(models.StatusInStorage)
+			}
+			addArg("status = $%d", normalizedStatus)
 		} else {
 			addArg("status = $%d", nil)
 		}

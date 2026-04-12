@@ -2719,7 +2719,7 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If status is repaired or closed, update device status to free
+	// If status is repaired or closed, update device status to in_storage
 	if input.Status != nil && (*input.Status == "repaired" || *input.Status == "closed") {
 		var deviceID string
 		if err := tx.QueryRow(`SELECT device_id FROM defect_reports WHERE defect_id = $1`, defectID).Scan(&deviceID); err != nil {
@@ -2728,7 +2728,7 @@ func UpdateDefect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if deviceID != "" {
-			if _, err := tx.Exec(`UPDATE devices SET status = 'free' WHERE deviceID = $1`, deviceID); err != nil {
+			if _, err := tx.Exec(`UPDATE devices SET status = 'in_storage' WHERE deviceID = $1`, deviceID); err != nil {
 				log.Printf("Error updating device status for device %s: %v", deviceID, err)
 				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update device status"})
 				return
