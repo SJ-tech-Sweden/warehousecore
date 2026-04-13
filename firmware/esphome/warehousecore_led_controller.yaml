@@ -6,7 +6,7 @@
 #
 # Usage:
 #   1. Copy secrets.yaml.template to secrets.yaml and fill in credentials
-#   2. Adjust substitutions below (led_count, led_pin, chipset)
+#   2. Adjust substitutions below (led_count, led_pin)
 #   3. Install: esphome run warehousecore_led_controller.yaml
 #
 # Supports: ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6
@@ -26,7 +26,6 @@ substitutions:
   # LED strip configuration
   led_count: "600"
   led_pin: "GPIO5"
-  chipset: "SK6812_GRBW"
 
   # Heartbeat interval in seconds
   heartbeat_interval: "15"
@@ -37,36 +36,35 @@ substitutions:
 esphome:
   name: warehousecore-led
   friendly_name: "WarehouseCore LED Controller"
+  includes:
+    - ArduinoJson.h
   on_boot:
     priority: -100
     then:
       - lambda: |-
           // Build controller_id from MAC suffix
-          std::string mac = get_mac_address();
-          // Remove colons
-          std::string clean;
-          for (char c : mac) {
-            if (c != ':') clean += tolower(c);
-          }
-          // Take last 6 hex characters
-          if (clean.length() >= 6) {
-            id(controller_id) = "${controller_id_prefix}-" + clean.substr(clean.length() - 6);
-          } else {
-            id(controller_id) = "${controller_id_prefix}-" + clean;
-          }
+          uint8_t mac[6];
+          esp_read_mac(mac, ESP_MAC_WIFI_STA);
+          char suffix[7];
+          snprintf(suffix, sizeof(suffix), "%02x%02x%02x", mac[3], mac[4], mac[5]);
+          id(controller_id) = std::string("${controller_id_prefix}-") + suffix;
           id(topic_suffix) = id(controller_id);
+          // Build MAC address string (no colons, lowercase)
+          char mac_str[13];
+          snprintf(mac_str, sizeof(mac_str), "%02x%02x%02x%02x%02x%02x",
+                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+          id(mac_address) = std::string(mac_str);
           ESP_LOGI("boot", "Controller ID: %s", id(controller_id).c_str());
+          ESP_LOGI("boot", "MAC: %s", id(mac_address).c_str());
 
 esp32:
   board: esp32dev
   framework:
     type: arduino
 
-# Enable logging
 logger:
   level: INFO
 
-# Enable OTA updates (for Home Assistant / ESPHome dashboard)
 ota:
   - platform: esphome
     password: !secret ota_password
@@ -80,7 +78,6 @@ wifi:
 
 captive_portal:
 
-# Global variables
 globals:
   - id: controller_id
     type: std::string
@@ -90,18 +87,27 @@ globals:
     type: std::string
     restore_value: false
     initial_value: '"esp-000000"'
+  - id: mac_address
+    type: std::string
+    restore_value: false
+    initial_value: '""'
   - id: active_led_count
     type: int
     restore_value: false
     initial_value: "0"
-  - id: leds_are_active
+  - id: pending_command
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+  - id: command_updated
     type: bool
     restore_value: false
     initial_value: "false"
 
-# MQTT configuration — communicates with WarehouseCore using the same
-# topic structure as the Arduino firmware
+# MQTT — communicates with WarehouseCore using the same topic structure
+# as the Arduino firmware
 mqtt:
+  id: mqtt_client
   broker: !secret mqtt_host
   port: !secret mqtt_port
   username: !secret mqtt_user
@@ -111,17 +117,16 @@ mqtt:
   will_message:
   on_connect:
     - lambda: |-
-        ESP_LOGI("mqtt", "Connected - subscribing to command topic");
+        ESP_LOGI("mqtt", "Connected, subscribing to command topic");
     - mqtt.subscribe:
         topic: !lambda |-
           return "${topic_prefix}/" + id(topic_suffix) + "/cmd";
         then:
           - lambda: |-
-              // Parse incoming WarehouseCore JSON command
               std::string payload_str(x.c_str());
-              ESP_LOGI("mqtt", "Command received: %s", payload_str.c_str());
+              ESP_LOGI("mqtt", "Command received (%d bytes)", payload_str.size());
 
-              // Parse JSON
+              // Parse JSON using ArduinoJson (included via Arduino framework)
               DynamicJsonDocument doc(4096);
               DeserializationError error = deserializeJson(doc, payload_str);
               if (error) {
@@ -136,77 +141,62 @@ mqtt:
               }
 
               if (strcmp(op, "highlight") == 0) {
-                // Clear existing state
+                // Store the command JSON for the LED effect to read
+                id(pending_command) = payload_str;
+                id(command_updated) = true;
+
+                // Turn on the light with the warehousecore effect
                 auto call = id(led_strip).turn_on();
                 call.set_effect("warehousecore");
                 call.perform();
 
-                // Store the command JSON for the custom effect to use
-                id(pending_command) = payload_str;
-                id(command_updated) = true;
-                id(leds_are_active) = true;
-
-                // Count active LEDs
+                // Count active pixels
                 int pixel_count = 0;
                 JsonArray shelves = doc["shelves"];
                 for (JsonObject shelf : shelves) {
                   JsonArray bins = shelf["bins"];
-                  for (JsonObject bin : bins) {
-                    JsonArray pixels = bin["pixels"];
-                    pixel_count += pixels.size();
+                  for (JsonObject bin_obj : bins) {
+                    pixel_count += bin_obj["pixels"].size();
                   }
                 }
                 id(active_led_count) = pixel_count;
-                ESP_LOGI("cmd", "Highlight: %d pixels active", pixel_count);
+                ESP_LOGI("cmd", "Highlight: %d pixels", pixel_count);
 
               } else if (strcmp(op, "clear") == 0) {
                 auto call = id(led_strip).turn_off();
                 call.perform();
                 id(active_led_count) = 0;
-                id(leds_are_active) = false;
                 ESP_LOGI("cmd", "Clear: all LEDs off");
 
               } else if (strcmp(op, "identify") == 0) {
-                // Flash all LEDs white 3 times
                 auto call = id(led_strip).turn_on();
                 call.set_effect("identify");
                 call.perform();
                 ESP_LOGI("cmd", "Identify: flashing all LEDs");
 
               } else if (strcmp(op, "config") == 0) {
-                // Config commands are handled differently in ESPHome
-                // LED count and pin are set at compile time
-                ESP_LOGI("cmd", "Config command received (compile-time in ESPHome)");
+                // In ESPHome, LED count and pin are set at compile time.
+                // Log the request but no runtime change is possible.
+                ESP_LOGI("cmd", "Config received (compile-time in ESPHome)");
 
               } else if (strcmp(op, "restart") == 0) {
-                ESP_LOGI("cmd", "Restart command received");
+                ESP_LOGI("cmd", "Restart in 2 seconds...");
                 delay(2000);
                 App.safe_reboot();
 
               } else {
-                ESP_LOGW("cmd", "Unknown operation: %s", op);
+                ESP_LOGW("cmd", "Unknown op: %s", op);
               }
     - lambda: |-
-        // Send initial heartbeat after subscribing
+        // Send initial heartbeat
         id(send_heartbeat).execute();
 
-# Additional globals for command passing
-globals:
-  - id: pending_command
-    type: std::string
-    restore_value: false
-    initial_value: '""'
-  - id: command_updated
-    type: bool
-    restore_value: false
-    initial_value: "false"
-
-# LED strip — uses ESPHome's neopixelbus platform
+# LED strip using NeoPixelBus (SK6812 GRBW)
 light:
   - platform: neopixelbus
     id: led_strip
     name: "Warehouse LEDs"
-    type: ${chipset}
+    type: GRBW
     variant: SK6812
     pin: ${led_pin}
     num_leds: ${led_count}
@@ -216,82 +206,66 @@ light:
           name: "warehousecore"
           update_interval: 16ms
           lambda: |-
-            // This effect reads the pending_command global and applies pixel colors
-            static std::string current_command;
-            static std::vector<std::tuple<int, Color, std::string, uint8_t>> pixel_config;
-            static unsigned long effect_start = 0;
+            static std::string current_cmd;
+            static std::vector<std::tuple<int, uint8_t, uint8_t, uint8_t, std::string, uint8_t>> pixels;
 
             if (id(command_updated)) {
               id(command_updated) = false;
-              current_command = id(pending_command);
-              pixel_config.clear();
-              effect_start = millis();
+              current_cmd = id(pending_command);
+              pixels.clear();
 
-              // Parse the command
               DynamicJsonDocument doc(4096);
-              if (deserializeJson(doc, current_command) != DeserializationError::Ok) return;
+              if (deserializeJson(doc, current_cmd) != DeserializationError::Ok) return;
 
               JsonArray shelves = doc["shelves"];
               for (JsonObject shelf : shelves) {
                 JsonArray bins = shelf["bins"];
-                for (JsonObject bin : bins) {
-                  JsonArray pixels = bin["pixels"];
-                  const char* color_hex = bin["color"] | "#FF2A2A";
-                  const char* pattern = bin["pattern"] | "breathe";
-                  uint8_t intensity = bin["intensity"] | 180;
+                for (JsonObject bin_obj : bins) {
+                  const char* hex = bin_obj["color"] | "#FF2A2A";
+                  const char* pat = bin_obj["pattern"] | "breathe";
+                  uint8_t inten = bin_obj["intensity"] | 180;
 
-                  // Parse hex color
-                  long color_val = strtol(color_hex + 1, nullptr, 16);
-                  uint8_t r = (color_val >> 16) & 0xFF;
-                  uint8_t g = (color_val >> 8) & 0xFF;
-                  uint8_t b = color_val & 0xFF;
+                  long cv = strtol(hex + 1, nullptr, 16);
+                  uint8_t r = (cv >> 16) & 0xFF;
+                  uint8_t g = (cv >> 8) & 0xFF;
+                  uint8_t b = cv & 0xFF;
 
-                  Color c(r, g, b);
-
-                  for (JsonVariant px : pixels) {
+                  JsonArray px_arr = bin_obj["pixels"];
+                  for (JsonVariant px : px_arr) {
                     int idx = px.as<int>();
                     if (idx >= 0 && idx < it.size()) {
-                      pixel_config.push_back(std::make_tuple(idx, c, std::string(pattern), intensity));
+                      pixels.push_back(std::make_tuple(idx, r, g, b, std::string(pat), inten));
                     }
                   }
                 }
               }
-
-              // Clear all pixels first
               it.all() = Color::BLACK;
             }
 
             unsigned long now = millis();
-            for (auto& [idx, color, pattern, intensity] : pixel_config) {
-              uint8_t r = color.r;
-              uint8_t g = color.g;
-              uint8_t b = color.b;
-
+            for (auto& [idx, r, g, b, pattern, intensity] : pixels) {
+              uint8_t pr = r, pg = g, pb = b;
               if (pattern == "solid") {
-                r = (r * intensity) / 255;
-                g = (g * intensity) / 255;
-                b = (b * intensity) / 255;
-                it[idx] = Color(r, g, b);
-
+                pr = (r * intensity) / 255;
+                pg = (g * intensity) / 255;
+                pb = (b * intensity) / 255;
               } else if (pattern == "blink") {
                 if ((now / 500) % 2 == 0) {
-                  r = (r * intensity) / 255;
-                  g = (g * intensity) / 255;
-                  b = (b * intensity) / 255;
-                  it[idx] = Color(r, g, b);
+                  pr = (r * intensity) / 255;
+                  pg = (g * intensity) / 255;
+                  pb = (b * intensity) / 255;
                 } else {
-                  it[idx] = Color::BLACK;
+                  pr = pg = pb = 0;
                 }
-
               } else if (pattern == "breathe") {
                 float phase = (now / 2000.0f) * 2.0f * 3.14159265f;
                 float breath = (sin(phase) + 1.0f) / 2.0f;
                 uint8_t bi = (uint8_t)(breath * intensity);
-                r = (r * bi) / 255;
-                g = (g * bi) / 255;
-                b = (b * bi) / 255;
-                it[idx] = Color(r, g, b);
+                pr = (r * bi) / 255;
+                pg = (g * bi) / 255;
+                pb = (b * bi) / 255;
               }
+              it[idx] = Color(pr, pg, pb);
             }
 
       - addressable_lambda:
@@ -300,20 +274,16 @@ light:
           lambda: |-
             static int blink_count = 0;
             static bool is_on = false;
-
             if (initial_run) {
               blink_count = 0;
               is_on = false;
             }
-
             if (blink_count >= 6) {
-              // Done — turn off effect after 3 blink cycles
               auto call = id(led_strip).turn_off();
               call.perform();
               blink_count = 0;
               return;
             }
-
             if (is_on) {
               it.all() = Color::BLACK;
             } else {
@@ -322,55 +292,48 @@ light:
             is_on = !is_on;
             blink_count++;
 
-# Periodic heartbeat — sends telemetry to WarehouseCore
+# Periodic heartbeat
 interval:
   - interval: ${heartbeat_interval}s
     then:
-      - lambda: |-
-          id(send_heartbeat).execute();
+      - script.execute: send_heartbeat
 
-# Script to send heartbeat (reusable)
+# Heartbeat script — publishes telemetry in the same JSON format as the
+# Arduino firmware, with an additional "firmware_type":"esphome" field.
 script:
   - id: send_heartbeat
     then:
-      - lambda: |-
-          if (!mqtt::global_mqtt_client->is_connected()) return;
-
-          DynamicJsonDocument doc(512);
-          doc["status"] = "online";
-          doc["controller_id"] = id(controller_id);
-          doc["topic_suffix"] = id(topic_suffix);
-          doc["warehouse_id"] = "${warehouse_id}";
-          doc["active_leds"] = id(active_led_count);
-          doc["wifi_rssi"] = WiFi.RSSI();
-          doc["uptime_seconds"] = (unsigned long)(millis() / 1000);
-          doc["ip_address"] = WiFi.localIP().toString().c_str();
-
-          const char* hostname = App.get_name().c_str();
-          if (hostname) {
-            doc["hostname"] = hostname;
-          }
-
-          doc["firmware_version"] = "${firmware_version}";
-          doc["firmware_type"] = "esphome";
-
-          // Get MAC address
-          std::string mac = get_mac_address();
-          std::string clean_mac;
-          for (char c : mac) {
-            if (c != ':') clean_mac += tolower(c);
-          }
-          doc["mac_address"] = clean_mac;
-
-          doc["led_count"] = ${led_count};
-          doc["chipset"] = "${chipset}";
-
-          std::string payload;
-          serializeJson(doc, payload);
-
-          std::string status_topic = "${topic_prefix}/" + id(topic_suffix) + "/status";
-          mqtt::global_mqtt_client->publish(status_topic.c_str(), payload.c_str());
-          ESP_LOGD("heartbeat", "Sent to %s", status_topic.c_str());
+      - mqtt.publish:
+          topic: !lambda |-
+            return "${topic_prefix}/" + id(topic_suffix) + "/status";
+          payload: !lambda |-
+            char buf[512];
+            snprintf(buf, sizeof(buf),
+              "{\"status\":\"online\""
+              ",\"controller_id\":\"%s\""
+              ",\"topic_suffix\":\"%s\""
+              ",\"warehouse_id\":\"${warehouse_id}\""
+              ",\"active_leds\":%d"
+              ",\"wifi_rssi\":%d"
+              ",\"uptime_seconds\":%lu"
+              ",\"ip_address\":\"%s\""
+              ",\"hostname\":\"%s\""
+              ",\"firmware_version\":\"${firmware_version}\""
+              ",\"firmware_type\":\"esphome\""
+              ",\"mac_address\":\"%s\""
+              ",\"led_count\":${led_count}"
+              ",\"chipset\":\"SK6812_GRBW\""
+              "}",
+              id(controller_id).c_str(),
+              id(topic_suffix).c_str(),
+              id(active_led_count),
+              WiFi.RSSI(),
+              (unsigned long)(millis() / 1000),
+              WiFi.localIP().toString().c_str(),
+              App.get_name().c_str(),
+              id(mac_address).c_str()
+            );
+            return std::string(buf);
 
 # Sensors exposed to Home Assistant
 sensor:
