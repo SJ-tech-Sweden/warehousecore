@@ -126,7 +126,7 @@ mqtt:
         then:
           - lambda: |-
               std::string payload_str(x.c_str());
-              ESP_LOGI("mqtt", "Command received (%d bytes)", payload_str.size());
+              ESP_LOGI("mqtt", "Command received (%zu bytes)", payload_str.size());
 
               // Parse JSON using ArduinoJson (included via Arduino framework)
               DynamicJsonDocument doc(4096);

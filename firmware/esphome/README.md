@@ -42,7 +42,7 @@ Fill in your WiFi, MQTT, and OTA credentials:
 wifi_ssid: "YourWiFiNetwork"
 wifi_password: "YourWiFiPassword"
 mqtt_host: "mqtt.example.com"
-mqtt_port: "1883"
+mqtt_port: 1883
 mqtt_user: "leduser"
 mqtt_password: "ledpassword123"
 ota_password: "a_secure_password"
