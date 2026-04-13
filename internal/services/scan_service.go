@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"warehousecore/internal/led"
@@ -17,15 +18,10 @@ import (
 // to 'pending'; scanning it out again must restore it to 'issued'. Using an
 // explicit constant lets tests verify the SQL without running a real database.
 const upsertJobDeviceSQL = `
-	WITH u AS (
-		UPDATE job_devices
-		SET pack_status = 'issued', pack_ts = NOW()
-		WHERE jobid = $2 AND deviceid = $1
-		RETURNING 1
-	)
-	INSERT INTO job_devices (jobid, deviceid, pack_status, pack_ts)
-	SELECT $2, $1, 'issued', NOW()
-	WHERE NOT EXISTS (SELECT 1 FROM u)
+INSERT INTO jobdevices (deviceid, jobid, pack_status, pack_ts)
+VALUES ($1, $2, 'issued', NOW())
+ON CONFLICT (deviceid, jobid) DO UPDATE
+SET pack_status = 'issued', pack_ts = NOW();
 `
 
 // ScanService handles all scan-related business logic
@@ -204,11 +200,40 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 		fromZoneID = &device.ZoneID.Int64
 	}
 
-	// Update device status to on_job
-	var err error
-	_, err = tx.Exec(upsertJobDeviceSQL, device.DeviceID, *jobID)
+	// Persist device status change inside the transaction so the device row
+	// reflects the outtake immediately.
+	_, err := tx.Exec(`
+		UPDATE devices
+		SET status = 'on_job', zone_id = NULL, current_location = 'job'
+		WHERE deviceID = $1
+	`, device.DeviceID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Upsert into jobdevices. Run this outside the caller transaction so a
+	// missing UNIQUE constraint (which triggers a Postgres error) doesn't
+	// abort the main transaction — instead we detect the condition and fall
+	// back to an UPDATE/INSERT using the DB handle directly.
+	if _, err := s.db.Exec(upsertJobDeviceSQL, device.DeviceID, *jobID); err != nil {
+		if strings.Contains(err.Error(), "no unique or exclusion constraint matching the ON CONFLICT specification") {
+			// Fallback: try UPDATE first; if no rows updated, INSERT.
+			updRes, updErr := s.db.Exec(`
+				UPDATE jobdevices
+				SET pack_status = 'issued', pack_ts = NOW()
+				WHERE deviceid = $1 AND jobid = $2
+			`, device.DeviceID, *jobID)
+			if updErr != nil {
+				return nil, nil, updErr
+			}
+			if n, _ := updRes.RowsAffected(); n == 0 {
+				if _, insErr := s.db.Exec(`INSERT INTO jobdevices (deviceid, jobid, pack_status, pack_ts) VALUES ($1, $2, 'issued', NOW())`, device.DeviceID, *jobID); insErr != nil {
+					return nil, nil, insErr
+				}
+			}
+		} else {
+			return nil, nil, err
+		}
 	}
 
 	// Create movement record
