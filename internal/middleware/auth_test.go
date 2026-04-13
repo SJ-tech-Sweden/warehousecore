@@ -184,3 +184,46 @@ func TestAuthMiddleware_SessionCookie_NoDB(t *testing.T) {
 		t.Errorf("expected 500 when DB is nil with session cookie, got %d", rr.Code)
 	}
 }
+
+// TestAuthMiddleware_APIKey_NonAdminPath verifies that an API key on a
+// non-admin path (e.g. /auth/me) is ignored and the request gets 401,
+// not authenticated via API key.
+func TestAuthMiddleware_APIKey_NonAdminPath(t *testing.T) {
+	withNilDB(t)
+
+	handler := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("handler should not be called on non-admin path with API key")
+	}))
+
+	req := httptest.NewRequest("GET", "/api/v1/auth/me", nil)
+	req.Header.Set("X-API-Key", "some-admin-key")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	// API key ignored on non-admin path → 401 "No session"
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 on non-admin path with API key, got %d", rr.Code)
+	}
+}
+
+// TestIsAdminPath verifies the admin-path detection helper.
+func TestIsAdminPath(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"/api/v1/admin/zone-types", true},
+		{"/api/v1/admin/api-keys", true},
+		{"/admin/users", true},
+		{"/api/v1/admin", true},
+		{"/api/v1/auth/me", false},
+		{"/api/v1/scans", false},
+		{"/api/v1/scans/history", false},
+		{"/api/v1/administrator/settings", false}, // not a real /admin/ segment
+	}
+	for _, tt := range tests {
+		if got := isAdminPath(tt.path); got != tt.want {
+			t.Errorf("isAdminPath(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
+}
