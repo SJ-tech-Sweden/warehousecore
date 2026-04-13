@@ -1009,7 +1009,11 @@ func BulkDeleteProducts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(deletableIDs) == 0 {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "All selected products are managed by packages and cannot be deleted directly"})
+		respondJSON(w, http.StatusOK, map[string]int{
+			"deleted_products": 0,
+			"deleted_devices":  0,
+			"skipped_packages": len(skippedPackages),
+		})
 		return
 	}
 

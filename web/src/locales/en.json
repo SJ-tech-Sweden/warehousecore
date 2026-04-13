@@ -847,7 +847,8 @@
       "bulkEditDescription": "Apply changes to {{count}} selected device(s). Only filled fields will be updated.",
       "bulkDeleteSuccess": "Deleted {{count}} device(s).",
       "bulkUpdateSuccess": "Updated {{count}} device(s).",
-      "bulkDeletePartial": "Deleted {{deleted}} device(s), {{failed}} failed."
+      "bulkDeletePartial": "Deleted {{deleted}} device(s), {{failed}} failed.",
+      "failedIds": "Failed IDs"
     },
     "cases": {
       "title": "Case Management",

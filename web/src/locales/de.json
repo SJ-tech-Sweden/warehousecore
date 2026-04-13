@@ -847,7 +847,8 @@
       "bulkEditDescription": "Änderungen auf {{count}} ausgewählte(s) Gerät(e) anwenden. Nur ausgefüllte Felder werden aktualisiert.",
       "bulkDeleteSuccess": "{{count}} Gerät(e) gelöscht.",
       "bulkUpdateSuccess": "{{count}} Gerät(e) aktualisiert.",
-      "bulkDeletePartial": "{{deleted}} Gerät(e) gelöscht, {{failed}} fehlgeschlagen."
+      "bulkDeletePartial": "{{deleted}} Gerät(e) gelöscht, {{failed}} fehlgeschlagen.",
+      "failedIds": "Fehlgeschlagene IDs"
     },
     "cases": {
       "title": "Cases-Verwaltung",

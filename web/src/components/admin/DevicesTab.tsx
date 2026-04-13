@@ -423,7 +423,10 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
     try {
       const { data } = await devicesAdminApi.bulkDelete(Array.from(selectedDevices));
       if (data.failed_devices > 0) {
-        alert(t('admin.devices.bulkDeletePartial', { deleted: data.deleted_devices, failed: data.failed_devices }));
+        const failedIds = data.failed_ids && data.failed_ids.length > 0
+          ? `\n${t('admin.devices.failedIds')}: ${data.failed_ids.join(', ')}`
+          : '';
+        alert(t('admin.devices.bulkDeletePartial', { deleted: data.deleted_devices, failed: data.failed_devices }) + failedIds);
       } else {
         alert(t('admin.devices.bulkDeleteSuccess', { count: data.deleted_devices }));
       }

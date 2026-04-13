@@ -422,11 +422,22 @@ func (s *DeviceAdminService) deleteDeviceInTx(ctx context.Context, tx *sql.Tx, d
 }
 
 // removeLabelFile removes a device label file from disk.
+// Paths are sanitized to prevent path traversal outside the web/dist directory.
 func removeLabelFile(labelPath string) {
 	if labelPath == "" {
 		return
 	}
-	fullPath := filepath.Join("web", "dist", strings.TrimPrefix(labelPath, "/"))
+	baseDir, err := filepath.Abs(filepath.Join("web", "dist"))
+	if err != nil {
+		log.Printf("[DEVICE] Failed to resolve base dir for label cleanup: %v", err)
+		return
+	}
+	cleaned := filepath.Clean(strings.TrimPrefix(labelPath, "/"))
+	fullPath := filepath.Join(baseDir, cleaned)
+	if !strings.HasPrefix(fullPath, baseDir+string(os.PathSeparator)) {
+		log.Printf("[DEVICE] Skipping label path outside base dir: %s", labelPath)
+		return
+	}
 	if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Printf("[DEVICE] Failed to remove label %s: %v", fullPath, err)
 	}
