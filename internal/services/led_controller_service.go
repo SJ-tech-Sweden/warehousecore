@@ -171,6 +171,9 @@ func (s *LEDControllerService) RecordHeartbeat(identifier string, payload *model
 		if payload.FirmwareVersion != "" {
 			updates["firmware_version"] = payload.FirmwareVersion
 		}
+		if payload.FirmwareType != "" {
+			updates["firmware_type"] = payload.FirmwareType
+		}
 		if payload.MacAddress != "" {
 			originalMac := strings.TrimSpace(payload.MacAddress)
 			normalizedMac = normalizeMACAddress(payload.MacAddress)
@@ -247,6 +250,7 @@ func (s *LEDControllerService) RecordHeartbeat(identifier string, payload *model
 			TopicSuffix:  identifier,
 			IsActive:     true,
 			LastSeen:     &now,
+			FirmwareType: "arduino",
 		}
 
 		if payload != nil {
@@ -264,6 +268,9 @@ func (s *LEDControllerService) RecordHeartbeat(identifier string, payload *model
 			if payload.FirmwareVersion != "" {
 				value := payload.FirmwareVersion
 				controller.FirmwareVersion = &value
+			}
+			if payload.FirmwareType != "" {
+				controller.FirmwareType = payload.FirmwareType
 			}
 			if payload.MacAddress != "" {
 				value := payload.MacAddress

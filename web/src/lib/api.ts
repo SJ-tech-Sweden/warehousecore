@@ -491,6 +491,7 @@ export interface LEDController {
   ip_address?: string | null;
   hostname?: string | null;
   firmware_version?: string | null;
+  firmware_type?: string;
   mac_address?: string | null;
   status_data?: Record<string, unknown> | null;
   zone_types?: ZoneTypeDefinition[];

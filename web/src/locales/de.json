@@ -1003,6 +1003,7 @@
       "ip": "IP",
       "mac": "MAC",
       "firmware": "Firmware",
+      "firmwareType": "Typ",
       "leds": "LEDs",
       "wifiRssi": "WiFi RSSI",
       "uptime": "Uptime",
