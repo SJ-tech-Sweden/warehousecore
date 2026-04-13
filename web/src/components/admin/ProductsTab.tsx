@@ -885,7 +885,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                         type="button"
                         onClick={() => toggleProductSelection(product.product_id)}
                         className="text-gray-400 hover:text-white"
-                        aria-label={selectedProducts.has(product.product_id) ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
+                        aria-label={selectedProducts.has(product.product_id) ? t('admin.products.deselectProduct', { name: product.name }) : t('admin.products.selectProduct', { name: product.name })}
                       >
                         {selectedProducts.has(product.product_id) ? <CheckSquare className="w-4 h-4 text-accent-red" /> : <Square className="w-4 h-4" />}
                       </button>

@@ -652,7 +652,7 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                         type="button"
                         onClick={() => toggleDeviceSelection(device.device_id)}
                         className="text-gray-400 hover:text-white"
-                        aria-label={selectedDevices.has(device.device_id) ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
+                        aria-label={selectedDevices.has(device.device_id) ? t('admin.devices.deselectDevice', { id: device.device_id }) : t('admin.devices.selectDevice', { id: device.device_id })}
                       >
                         {selectedDevices.has(device.device_id) ? <CheckSquare className="w-4 h-4 text-accent-red" /> : <Square className="w-4 h-4" />}
                       </button>

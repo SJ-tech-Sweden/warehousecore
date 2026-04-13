@@ -326,10 +326,10 @@ func BulkUpdateDevices(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDs     []string `json:"ids"`
 		Updates struct {
-			Status          *string `json:"status"`
-			ZoneID          *int    `json:"zone_id"`
-			CurrentLocation *string `json:"current_location"`
-			ConditionRating *int    `json:"condition_rating"`
+			Status          *string  `json:"status"`
+			ZoneID          *int     `json:"zone_id"`
+			CurrentLocation *string  `json:"current_location"`
+			ConditionRating *float64 `json:"condition_rating"`
 		} `json:"updates"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

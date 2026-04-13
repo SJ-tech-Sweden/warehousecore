@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -979,6 +981,31 @@ func BulkDeleteProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Collect label paths for devices about to be deleted
+	var labelPaths []string
+	if len(deletableIDs) > 0 {
+		placeholders := make([]string, len(deletableIDs))
+		args := make([]interface{}, len(deletableIDs))
+		for i, id := range deletableIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			args[i] = id
+		}
+		query := fmt.Sprintf("SELECT label_path FROM devices WHERE productID IN (%s) AND label_path IS NOT NULL AND label_path != ''", strings.Join(placeholders, ","))
+		rows, err := tx.Query(query, args...)
+		if err != nil {
+			log.Printf("[BULK PRODUCT DELETE] Failed to collect label paths: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to collect device label paths"})
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var lp string
+			if err := rows.Scan(&lp); err == nil && lp != "" {
+				labelPaths = append(labelPaths, lp)
+			}
+		}
+	}
+
 	// Delete devices for all products
 	totalDevicesDeleted := 0
 	for _, id := range deletableIDs {
@@ -1008,6 +1035,14 @@ func BulkDeleteProducts(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to commit transaction"})
 		return
+	}
+
+	// Clean up label files after successful commit
+	for _, lp := range labelPaths {
+		fullPath := filepath.Join("web", "dist", strings.TrimPrefix(lp, "/"))
+		if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("[BULK PRODUCT DELETE] Failed to remove label %s: %v", fullPath, err)
+		}
 	}
 
 	log.Printf("[BULK PRODUCT DELETE] Deleted %d products and %d devices", totalProductsDeleted, totalDevicesDeleted)
