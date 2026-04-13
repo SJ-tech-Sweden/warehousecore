@@ -391,28 +391,19 @@ func (s *DeviceAdminService) UpdateDevice(ctx context.Context, deviceID string, 
 
 // deleteDeviceInTx deletes a single device within the provided transaction.
 // It returns the device's label_path (if any) for post-commit cleanup.
+// Uses DELETE ... RETURNING to atomically delete and retrieve the label path.
 func (s *DeviceAdminService) deleteDeviceInTx(ctx context.Context, tx *sql.Tx, deviceID string) (string, error) {
 	var labelPath sql.NullString
-	err := tx.QueryRowContext(ctx, `SELECT label_path FROM devices WHERE deviceID = $1`, deviceID).Scan(&labelPath)
+	err := tx.QueryRowContext(ctx, `DELETE FROM devices WHERE deviceID = $1 RETURNING label_path`, deviceID).Scan(&labelPath)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", repository.ErrNotFound
 	}
-	if err != nil {
-		return "", fmt.Errorf("failed to load device: %w", err)
-	}
-
-	result, err := tx.ExecContext(ctx, `DELETE FROM devices WHERE deviceID = $1`, deviceID)
 	if err != nil {
 		var pqErr *pq.Error
 		if errors.As(err, &pqErr) && pqErr.Code == "23503" { // foreign_key_violation
 			return "", fmt.Errorf("device %s is still linked to cases, jobs, or history entries", deviceID)
 		}
 		return "", fmt.Errorf("failed to delete device: %w", err)
-	}
-
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		return "", repository.ErrNotFound
 	}
 
 	if labelPath.Valid {
@@ -489,8 +480,8 @@ func (s *DeviceAdminService) BulkDeleteDevices(ctx context.Context, ids []string
 		_ = tx.Rollback()
 	}()
 
-	var labelPaths []string
-	var failedIDs []string
+	labelPaths := make([]string, 0)
+	failedIDs := make([]string, 0)
 	deleted := 0
 
 	for i, id := range ids {

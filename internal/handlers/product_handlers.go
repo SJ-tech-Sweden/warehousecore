@@ -903,6 +903,9 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		// Get device IDs and label paths for logging and cleanup
 		var deviceIDs []string
 		rows, err := db.Query("SELECT deviceID, label_path FROM devices WHERE productID = $1", id)
+		if err != nil {
+			log.Printf("[PRODUCT DELETE] Failed to query device label paths for product %d: %v", id, err)
+		}
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {

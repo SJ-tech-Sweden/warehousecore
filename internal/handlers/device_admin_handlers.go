@@ -295,7 +295,7 @@ func BulkDeleteDevices(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[BULK DEVICE DELETE] Transaction error: %v", err)
 		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"message":         "Failed to process bulk delete: " + err.Error(),
+			"message":         "Failed to process bulk delete due to a server error",
 			"deleted_devices": 0,
 			"failed_devices":  len(req.IDs),
 			"failed_ids":      req.IDs,
@@ -347,6 +347,10 @@ func BulkUpdateDevices(w http.ResponseWriter, r *http.Request) {
 
 	if req.Updates.Status != nil {
 		status := strings.ToLower(strings.TrimSpace(*req.Updates.Status))
+		if status == "" {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Status cannot be empty"})
+			return
+		}
 		if status == "free" {
 			status = "in_storage"
 		}
