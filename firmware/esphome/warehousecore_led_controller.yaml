@@ -24,11 +24,11 @@ substitutions:
   warehouse_id: "WDL"
 
   # LED strip configuration
-  led_count: "600"
+  led_count: 600
   led_pin: "GPIO5"
 
   # Heartbeat interval in seconds
-  heartbeat_interval: "15"
+  heartbeat_interval: 15
 
   # Firmware version
   firmware_version: "1.0.0"
