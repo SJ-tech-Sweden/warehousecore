@@ -363,6 +363,8 @@ func main() {
 	admin.HandleFunc("/cables/{id}", handlers.GetCable).Methods("GET")
 	admin.HandleFunc("/cables/{id}", handlers.UpdateCable).Methods("PUT")
 	admin.HandleFunc("/cables/{id}", handlers.DeleteCable).Methods("DELETE")
+	admin.HandleFunc("/cables/{id}/devices", handlers.GetCableDevices).Methods("GET")
+	admin.HandleFunc("/cables/{id}/devices", handlers.CreateDevicesForCable).Methods("POST")
 	admin.HandleFunc("/cable-connectors", handlers.GetCableConnectors).Methods("GET")
 	admin.HandleFunc("/cable-types", handlers.GetCableTypes).Methods("GET")
 	admin.HandleFunc("/devices-list", handlers.GetAllDevicesAdmin).Methods("GET")

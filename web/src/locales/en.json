@@ -886,8 +886,20 @@
         "delete": "Failed to delete cable",
         "save": "Failed to save cable",
         "requiredFields": "Please fill in all required fields.",
-        "lengthPositive": "Length must be greater than 0."
-      }
+        "lengthPositive": "Length must be greater than 0.",
+        "createDevices": "Failed to create devices for cable.",
+        "loadDevices": "Failed to load cable devices."
+      },
+      "manageDevices": "Manage devices",
+      "devicesTitle": "Devices for Cable #{{id}}",
+      "noDevices": "No devices assigned to this cable.",
+      "addDevices": "Add devices",
+      "devicePrefix": "Device prefix",
+      "devicePrefixPlaceholder": "e.g. CBL",
+      "deviceQuantity": "Quantity",
+      "deviceQuantityPlaceholder": "e.g. 5",
+      "createDevices": "Create devices",
+      "devicesCreated": "{{count}} device(s) created successfully."
     },
     "deviceTree": {
       "title": "Device Management",

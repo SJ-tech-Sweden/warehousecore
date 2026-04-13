@@ -31,6 +31,8 @@ type DeviceAdminResponse struct {
 	ZoneCode        string  `json:"zone_code,omitempty"`
 	CaseID          *int    `json:"case_id,omitempty"`
 	CaseName        string  `json:"case_name,omitempty"`
+	CableID         *int    `json:"cable_id,omitempty"`
+	CableName       string  `json:"cable_name,omitempty"`
 	CurrentJobID    *int    `json:"current_job_id,omitempty"`
 	JobNumber       string  `json:"job_number,omitempty"`
 	ConditionRating float64 `json:"condition_rating"`
@@ -81,6 +83,8 @@ func toDeviceAdminResponse(device *models.DeviceWithDetails) DeviceAdminResponse
 		ZoneCode:        device.ZoneCode,
 		CaseID:          nullIntToPtr(device.CaseID),
 		CaseName:        device.CaseName,
+		CableID:         nullIntToPtr(device.CableID),
+		CableName:       device.CableName,
 		CurrentJobID:    nullIntToPtr(device.CurrentJobID),
 		JobNumber:       device.JobNumber,
 		ConditionRating: device.ConditionRating,

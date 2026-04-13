@@ -886,8 +886,20 @@
         "delete": "Fehler beim Löschen des Kabels",
         "save": "Fehler beim Speichern des Kabels",
         "requiredFields": "Bitte füllen Sie alle Pflichtfelder aus.",
-        "lengthPositive": "Die Länge muss größer als 0 sein."
-      }
+        "lengthPositive": "Die Länge muss größer als 0 sein.",
+        "createDevices": "Geräte für Kabel konnten nicht erstellt werden.",
+        "loadDevices": "Kabel-Geräte konnten nicht geladen werden."
+      },
+      "manageDevices": "Geräte verwalten",
+      "devicesTitle": "Geräte für Kabel #{{id}}",
+      "noDevices": "Keine Geräte diesem Kabel zugewiesen.",
+      "addDevices": "Geräte hinzufügen",
+      "devicePrefix": "Geräte-Präfix",
+      "devicePrefixPlaceholder": "z.B. CBL",
+      "deviceQuantity": "Anzahl",
+      "deviceQuantityPlaceholder": "z.B. 5",
+      "createDevices": "Geräte erstellen",
+      "devicesCreated": "{{count}} Gerät(e) erfolgreich erstellt."
     },
     "deviceTree": {
       "title": "Geräteverwaltung",

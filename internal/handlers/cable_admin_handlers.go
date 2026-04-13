@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
 )
 
@@ -482,4 +483,195 @@ func GetCableTypes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(types)
+}
+
+// GetCableDevices retrieves all devices associated with a cable
+func GetCableDevices(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	cableID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable ID"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	query := `
+		WITH latest_job AS (
+			SELECT jd.deviceID, MAX(jd.jobID) AS jobID
+			FROM jobdevices jd
+			GROUP BY jd.deviceID
+		)
+		SELECT d.deviceID, d.productID, d.serialnumber, d.barcode, d.qr_code, d.rfid, d.status,
+		       d.current_location, d.zone_id,
+		       COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.purchaseDate, d.retire_date, d.warranty_end_date,
+		       d.lastmaintenance, d.nextmaintenance,
+		       d.notes, d.label_path,
+		       COALESCE(p.name, '') AS product_name,
+		       COALESCE(cat.name, '') AS product_category,
+		       COALESCE(z.name, '') AS zone_name,
+		       COALESCE(z.code, '') AS zone_code,
+		       dc.caseID,
+		       COALESCE(cs.name, '') AS case_name,
+		       lj.jobID,
+		       COALESCE(CAST(lj.jobID AS TEXT), '') AS job_number
+		FROM devices d
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN categories cat ON p.categoryID = cat.categoryID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
+		LEFT JOIN cases cs ON dc.caseID = cs.caseID
+		LEFT JOIN latest_job lj ON lj.deviceID = d.deviceID
+		WHERE d.cable_id = $1
+		ORDER BY d.deviceID ASC
+	`
+
+	rows, err := db.Query(query, cableID)
+	if err != nil {
+		log.Printf("[CABLE DEVICES] Failed to query devices for cable %d: %v", cableID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cable devices"})
+		return
+	}
+	defer rows.Close()
+
+	var responses []DeviceAdminResponse
+	for rows.Next() {
+		var device models.DeviceWithDetails
+		err := rows.Scan(
+			&device.DeviceID,
+			&device.ProductID,
+			&device.SerialNumber,
+			&device.Barcode,
+			&device.QRCode,
+			&device.RFID,
+			&device.Status,
+			&device.CurrentLocation,
+			&device.ZoneID,
+			&device.ConditionRating,
+			&device.UsageHours,
+			&device.PurchaseDate,
+			&device.RetireDate,
+			&device.WarrantyEndDate,
+			&device.LastMaintenance,
+			&device.NextMaintenance,
+			&device.Notes,
+			&device.LabelPath,
+			&device.ProductName,
+			&device.ProductCategory,
+			&device.ZoneName,
+			&device.ZoneCode,
+			&device.CaseID,
+			&device.CaseName,
+			&device.CurrentJobID,
+			&device.JobNumber,
+		)
+		if err != nil {
+			log.Printf("[CABLE DEVICES] Failed to scan device: %v", err)
+			continue
+		}
+
+		responses = append(responses, toDeviceAdminResponse(&device))
+	}
+
+	respondJSON(w, http.StatusOK, responses)
+}
+
+// CreateDevicesForCable creates one or more devices linked to a cable.
+// The caller must supply a prefix; device IDs are generated as PREFIX001, PREFIX002, etc.
+func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	cableID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable ID"})
+		return
+	}
+
+	var req struct {
+		Quantity int    `json:"quantity"`
+		Prefix   string `json:"prefix"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Quantity <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Valid quantity is required"})
+		return
+	}
+	if req.Quantity > 100 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cannot create more than 100 devices at once"})
+		return
+	}
+
+	prefix := strings.ToUpper(strings.TrimSpace(req.Prefix))
+	if prefix == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix is required for cable devices"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	// Verify cable exists
+	var exists bool
+	if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM cables WHERE cableID = $1)", cableID).Scan(&exists); err != nil || !exists {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
+		return
+	}
+
+	// Find existing IDs with this prefix to avoid collisions
+	usedIDs := make(map[string]struct{})
+	existRows, err := db.Query("SELECT deviceID FROM devices WHERE deviceID LIKE $1", prefix+"%")
+	if err == nil {
+		defer existRows.Close()
+		for existRows.Next() {
+			var id string
+			if err := existRows.Scan(&id); err == nil {
+				usedIDs[id] = struct{}{}
+			}
+		}
+	}
+
+	var createdIDs []string
+	counter := 1
+	for i := 0; i < req.Quantity; i++ {
+		inserted := false
+		for attempt := 0; attempt < 1000; attempt++ {
+			candidateID := fmt.Sprintf("%s%03d", prefix, counter)
+			counter++
+			if _, exists := usedIDs[candidateID]; exists {
+				continue
+			}
+			_, err := db.Exec(
+				"INSERT INTO devices (deviceID, cable_id, status) VALUES ($1, $2, 'in_storage')",
+				candidateID, cableID,
+			)
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), "duplicate key") {
+					usedIDs[candidateID] = struct{}{}
+					continue
+				}
+				log.Printf("[CABLE DEVICE CREATE] Failed to insert device %s: %v", candidateID, err)
+				break
+			}
+			usedIDs[candidateID] = struct{}{}
+			createdIDs = append(createdIDs, candidateID)
+			inserted = true
+			break
+		}
+		if !inserted {
+			log.Printf("[CABLE DEVICE CREATE] Could not insert device %d/%d for cable %d", i+1, req.Quantity, cableID)
+		}
+	}
+
+	if len(createdIDs) == 0 {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create any devices"})
+		return
+	}
+
+	log.Printf("[CABLE DEVICE CREATE] Created %d devices for cable %d: %v", len(createdIDs), cableID, createdIDs)
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"created_count": len(createdIDs),
+		"device_ids":    createdIDs,
+	})
 }
