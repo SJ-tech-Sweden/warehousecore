@@ -1035,7 +1035,7 @@ export function CablesTab() {
                     {t('admin.cables.devicesTitle', { id: devicesModal.cableId })}
                   </h2>
                   <p className="text-sm text-gray-400 mt-1">
-                    {t('modals.caseDetail.deviceCount', { count: cableDevices.length })}
+                    {t('admin.cables.deviceCount', { count: cableDevices.length })}
                   </p>
                 </div>
                 <button
