@@ -611,14 +611,19 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rawPrefix := strings.ToUpper(strings.TrimSpace(req.Prefix))
+	if rawPrefix == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix is required for cable devices"})
+		return
+	}
 	prefix := strings.Map(func(r rune) rune {
 		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
 			return r
 		}
 		return -1
-	}, strings.ToUpper(strings.TrimSpace(req.Prefix)))
+	}, rawPrefix)
 	if prefix == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix is required for cable devices (alphanumeric only)"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix must contain only alphanumeric characters (A-Z, 0-9)"})
 		return
 	}
 	if len(prefix) > 20 {
