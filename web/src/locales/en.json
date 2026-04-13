@@ -814,7 +814,9 @@
       "confirmDelete": "Do you really want to delete this device?",
       "errors": {
         "delete": "Failed to delete device",
-        "save": "Failed to save device"
+        "save": "Failed to save device",
+        "bulkDelete": "Failed to delete selected devices.",
+        "bulkUpdate": "Failed to update selected devices."
       },
       "filters": {
         "allStatuses": "All statuses",
@@ -831,7 +833,19 @@
       },
       "retireDate": "Retire date",
       "warrantyEndDate": "Warranty end date",
-      "deviceIdHint": "Change the device ID to use an existing label. Be careful – this also updates all references."
+      "deviceIdHint": "Change the device ID to use an existing label. Be careful – this also updates all references.",
+      "bulkActions": "Bulk actions",
+      "bulkDelete": "Delete selected",
+      "bulkEdit": "Edit selected",
+      "selectedCount": "{{count}} selected",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "confirmBulkDelete": "Delete {{count}} selected device(s)?",
+      "bulkEditTitle": "Bulk Edit Devices",
+      "bulkEditDescription": "Apply changes to {{count}} selected device(s). Only filled fields will be updated.",
+      "bulkDeleteSuccess": "Deleted {{count}} device(s).",
+      "bulkUpdateSuccess": "Updated {{count}} device(s).",
+      "bulkDeletePartial": "Deleted {{deleted}} device(s), {{failed}} failed."
     },
     "cases": {
       "title": "Case Management",
@@ -1141,8 +1155,22 @@
         "invalidDeviceCount": "Please enter a valid quantity.",
         "partialDeviceDelete": "Product saved, but some devices could not be deleted.",
         "deviceCreate": "Product created, but devices could not be created.",
-        "save": "Failed to save product."
-      }
+        "save": "Failed to save product.",
+        "bulkDelete": "Failed to delete selected products.",
+        "bulkUpdate": "Failed to update selected products."
+      },
+      "bulkActions": "Bulk actions",
+      "bulkDelete": "Delete selected",
+      "bulkEdit": "Edit selected",
+      "selectedCount": "{{count}} selected",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "confirmBulkDelete": "Delete {{count}} selected product(s) and all their devices?",
+      "bulkEditTitle": "Bulk Edit Products",
+      "bulkEditDescription": "Apply changes to {{count}} selected product(s). Only filled fields will be updated.",
+      "bulkDeleteSuccess": "Deleted {{products}} product(s) and {{devices}} device(s).",
+      "bulkUpdateSuccess": "Updated {{count}} product(s).",
+      "skippedPackages": "{{count}} package product(s) were skipped."
     }
   },
   "scan": {
