@@ -635,7 +635,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       }
       window.alert(msg);
       setSelectedProducts(new Set());
-      await fetchProducts(searchTerm, categoryFilter);
+      await fetchProducts(debouncedSearch, categoryFilter);
     } catch (error) {
       console.error('Failed to bulk delete products:', error);
       const axiosErr = error as { response?: { data?: { error?: string; message?: string } } };
@@ -666,7 +666,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       setBulkEditOpen(false);
       setBulkEditData({});
       setSelectedProducts(new Set());
-      await fetchProducts(searchTerm, categoryFilter);
+      await fetchProducts(debouncedSearch, categoryFilter);
     } catch (error) {
       console.error('Failed to bulk update products:', error);
       window.alert(t('admin.products.errors.bulkUpdate'));

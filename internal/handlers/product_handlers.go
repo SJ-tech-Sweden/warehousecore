@@ -1145,6 +1145,24 @@ func BulkUpdateProducts(w http.ResponseWriter, r *http.Request) {
 		totalUpdated += int(affected)
 	}
 
+	// Sync product_packages.price for package-managed products when price is updated
+	if req.Updates.ItemCostPerDay != nil && len(req.IDs) > 0 {
+		placeholders := make([]string, len(req.IDs))
+		syncArgs := make([]interface{}, 0, len(req.IDs)+1)
+		syncArgs = append(syncArgs, *req.Updates.ItemCostPerDay)
+		for i, id := range req.IDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+2)
+			syncArgs = append(syncArgs, id)
+		}
+		syncQuery := fmt.Sprintf(`
+			UPDATE product_packages SET price = $1
+			WHERE product_id IN (%s)`, strings.Join(placeholders, ","))
+		if _, err := tx.Exec(syncQuery, syncArgs...); err != nil {
+			log.Printf("[BULK PRODUCT UPDATE] Failed to sync product_packages.price: %v", err)
+			// Non-fatal: log but don't fail the whole operation
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to commit transaction"})
 		return
