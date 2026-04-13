@@ -623,7 +623,13 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
               <thead className="bg-white/5">
                 <tr>
                   <th className="w-10 px-3 py-3">
-                    <button onClick={toggleSelectAll} className="text-gray-400 hover:text-white" title={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="text-gray-400 hover:text-white"
+                      aria-label={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
+                      title={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
+                    >
                       {allFilteredSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                     </button>
                   </th>
@@ -642,7 +648,12 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                   return (
                   <tr key={device.device_id} className={`hover:bg-white/5 transition-colors ${selectedDevices.has(device.device_id) ? 'bg-white/5' : ''}`}>
                     <td className="w-10 px-3 py-3">
-                      <button onClick={() => toggleDeviceSelection(device.device_id)} className="text-gray-400 hover:text-white">
+                      <button
+                        type="button"
+                        onClick={() => toggleDeviceSelection(device.device_id)}
+                        className="text-gray-400 hover:text-white"
+                        aria-label={selectedDevices.has(device.device_id) ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
+                      >
                         {selectedDevices.has(device.device_id) ? <CheckSquare className="w-4 h-4 text-accent-red" /> : <Square className="w-4 h-4" />}
                       </button>
                     </td>

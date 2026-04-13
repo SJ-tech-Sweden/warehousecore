@@ -965,8 +965,12 @@ func BulkDeleteProducts(w http.ResponseWriter, r *http.Request) {
 		err := tx.QueryRow("SELECT package_id FROM product_packages WHERE product_id = $1", id).Scan(&packageID)
 		if err == nil {
 			skippedPackages = append(skippedPackages, id)
-		} else {
+		} else if err == sql.ErrNoRows {
 			deletableIDs = append(deletableIDs, id)
+		} else {
+			log.Printf("[BULK PRODUCT DELETE] Failed to check package mapping for product %d: %v", id, err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to verify package mapping for product %d", id)})
+			return
 		}
 	}
 
@@ -1062,7 +1066,7 @@ func BulkUpdateProducts(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Updates.ItemCostPerDay != nil {
 		paramCount++
-		setClauses = append(setClauses, fmt.Sprintf("item_cost_per_day = $%d", paramCount))
+		setClauses = append(setClauses, fmt.Sprintf("itemcostperday = $%d", paramCount))
 		args = append(args, *req.Updates.ItemCostPerDay)
 	}
 

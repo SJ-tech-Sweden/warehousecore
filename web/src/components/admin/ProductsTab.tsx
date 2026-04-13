@@ -860,7 +860,13 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
               <thead className="bg-white/5 text-xs uppercase tracking-wide text-gray-400">
                 <tr>
                   <th className="w-10 px-3 py-3">
-                    <button onClick={toggleSelectAllProducts} className="text-gray-400 hover:text-white" title={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}>
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllProducts}
+                      className="text-gray-400 hover:text-white"
+                      aria-label={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
+                      title={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
+                    >
                       {allProductsSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                     </button>
                   </th>
@@ -875,7 +881,12 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                 {sortedProducts.map(product => (
                   <tr key={product.product_id} className={`hover:bg-white/5 ${selectedProducts.has(product.product_id) ? 'bg-white/5' : ''}`}>
                     <td className="w-10 px-3 py-3 align-top">
-                      <button onClick={() => toggleProductSelection(product.product_id)} className="text-gray-400 hover:text-white">
+                      <button
+                        type="button"
+                        onClick={() => toggleProductSelection(product.product_id)}
+                        className="text-gray-400 hover:text-white"
+                        aria-label={selectedProducts.has(product.product_id) ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
+                      >
                         {selectedProducts.has(product.product_id) ? <CheckSquare className="w-4 h-4 text-accent-red" /> : <Square className="w-4 h-4" />}
                       </button>
                     </td>
