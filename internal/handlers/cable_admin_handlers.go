@@ -611,9 +611,18 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefix := strings.ToUpper(strings.TrimSpace(req.Prefix))
+	prefix := strings.Map(func(r rune) rune {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return r
+		}
+		return -1
+	}, strings.ToUpper(strings.TrimSpace(req.Prefix)))
 	if prefix == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix is required for cable devices"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix is required for cable devices (alphanumeric only)"})
+		return
+	}
+	if len(prefix) > 20 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Prefix must be at most 20 characters"})
 		return
 	}
 
@@ -621,7 +630,12 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 
 	// Verify cable exists
 	var exists bool
-	if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM cables WHERE cableID = $1)", cableID).Scan(&exists); err != nil || !exists {
+	if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM cables WHERE cableID = $1)", cableID).Scan(&exists); err != nil {
+		log.Printf("[CABLE DEVICE CREATE] Failed to verify cable %d existence: %v", cableID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify cable"})
+		return
+	}
+	if !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
 		return
 	}
