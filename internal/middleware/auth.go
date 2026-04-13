@@ -2,6 +2,9 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -11,6 +14,8 @@ import (
 	"warehousecore/internal/models"
 	"warehousecore/internal/repository"
 	"warehousecore/internal/services"
+
+	"gorm.io/gorm"
 )
 
 type contextKey string
@@ -26,6 +31,10 @@ func authDebugLog(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
+// errDBUnavailable is returned by authenticate helpers when the database
+// connection is nil or unreachable so the middleware can map it to HTTP 500.
+var errDBUnavailable = errors.New("database unavailable")
+
 // AuthMiddleware validates session cookie or admin API key and loads user.
 // It first checks for a session_id cookie. If none is found, it falls back
 // to X-API-Key header or Authorization: Bearer <key> header. Only API keys
@@ -36,16 +45,21 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// Debug: Log all cookies
 		authDebugLog("DEBUG [WarehouseCore]: AuthMiddleware - Path: %s, Cookies: %+v", r.URL.Path, r.Cookies())
 
-		// Check database availability early so outages are reported as 500.
-		if repository.GetDB() == nil || repository.GetSQLDB() == nil {
-			http.Error(w, `{"error":"Database unavailable"}`, http.StatusInternalServerError)
-			return
-		}
-
 		// --- Try session cookie first ---
 		cookie, err := r.Cookie("session_id")
 		if err == nil && cookie.Value != "" {
-			if user := authenticateSession(cookie.Value); user != nil {
+			user, authErr := authenticateSession(cookie.Value)
+			if authErr != nil {
+				if errors.Is(authErr, errDBUnavailable) {
+					http.Error(w, `{"error":"Database unavailable"}`, http.StatusInternalServerError)
+					return
+				}
+				// DB query error (connection lost mid-request, etc.) → 500
+				log.Printf("[AUTH] session auth DB error: %v", authErr)
+				http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
+				return
+			}
+			if user != nil {
 				ctx := context.WithValue(r.Context(), UserContextKey, user)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -55,7 +69,17 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// --- Fallback: admin API key via X-API-Key or Authorization: Bearer ---
 		apiKey := extractAPIKey(r)
 		if apiKey != "" {
-			if user := authenticateAdminAPIKey(apiKey); user != nil {
+			user, authErr := authenticateAdminAPIKey(apiKey)
+			if authErr != nil {
+				if errors.Is(authErr, errDBUnavailable) {
+					http.Error(w, `{"error":"Database unavailable"}`, http.StatusInternalServerError)
+					return
+				}
+				log.Printf("[AUTH] API key auth DB error: %v", authErr)
+				http.Error(w, `{"error":"Internal server error"}`, http.StatusInternalServerError)
+				return
+			}
+			if user != nil {
 				ctx := context.WithValue(r.Context(), UserContextKey, user)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -72,32 +96,35 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 // extractAPIKey reads the raw API key from the request.
 // It checks the X-API-Key header first, then the Authorization: Bearer header.
+// The Bearer scheme check is case-insensitive per RFC 6750.
 func extractAPIKey(r *http.Request) string {
 	if key := strings.TrimSpace(r.Header.Get("X-API-Key")); key != "" {
 		return key
 	}
-	if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		if key := strings.TrimSpace(strings.TrimPrefix(auth, "Bearer ")); key != "" {
-			return key
+	if auth := strings.TrimSpace(r.Header.Get("Authorization")); auth != "" {
+		parts := strings.Fields(auth)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			return parts[1]
 		}
 	}
 	return ""
 }
 
 // authenticateSession validates a session cookie value and returns the user,
-// or nil if the session is invalid/expired.
-func authenticateSession(cookieValue string) *models.User {
+// or (nil, nil) if the session is invalid/expired, or (nil, error) on DB
+// failures so the caller can distinguish outages from credential mismatches.
+func authenticateSession(cookieValue string) (*models.User, error) {
 	sessionID, err := url.QueryUnescape(cookieValue)
 	if err != nil {
 		authDebugLog("DEBUG [WarehouseCore]: Failed to decode cookie: %v", err)
-		return nil
+		return nil, nil // bad cookie value – not a DB error
 	}
 
 	authDebugLog("DEBUG [WarehouseCore]: Found session_id cookie (decoded: %s)", sessionID)
 
 	db := repository.GetDB()
 	if db == nil {
-		return nil
+		return nil, errDBUnavailable
 	}
 
 	var session models.Session
@@ -105,14 +132,19 @@ func authenticateSession(cookieValue string) *models.User {
 		Where("session_id = ? AND expires_at > ?", sessionID, time.Now()).
 		First(&session).Error
 	if err != nil {
-		authDebugLog("DEBUG [WarehouseCore]: Session validation failed for %s: %v", sessionID, err)
-		return nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			authDebugLog("DEBUG [WarehouseCore]: Session not found for %s", sessionID)
+			return nil, nil // credential mismatch
+		}
+		// Actual DB error (connection lost, etc.)
+		authDebugLog("DEBUG [WarehouseCore]: Session query error for %s: %v", sessionID, err)
+		return nil, fmt.Errorf("session query: %w", err)
 	}
 
 	authDebugLog("DEBUG [WarehouseCore]: Session valid for user: %s (ID: %d)", session.User.Username, session.User.UserID)
 
 	if !session.User.IsActive {
-		return nil
+		return nil, nil
 	}
 
 	rbacService := services.NewRBACService()
@@ -122,18 +154,16 @@ func authenticateSession(cookieValue string) *models.User {
 		authDebugLog("DEBUG [WarehouseCore]: Failed to load roles for user %d: %v", session.User.UserID, err)
 	}
 
-	return &session.User
+	return &session.User, nil
 }
 
 // authenticateAdminAPIKey validates a raw API key against the api_keys table.
-// Only keys with is_admin=true are accepted. A synthetic admin user is
-// returned so that downstream RequireAdmin / RequireRole checks pass.
-// Non-admin keys are rejected (they are handled by APIKeyMiddleware on
-// public routes instead).
-func authenticateAdminAPIKey(raw string) *models.User {
+// Only keys with is_admin=true are accepted. Returns (nil, nil) when the key
+// is not found or is not admin, and (nil, error) on DB failures.
+func authenticateAdminAPIKey(raw string) (*models.User, error) {
 	db := repository.GetSQLDB()
 	if db == nil {
-		return nil
+		return nil, errDBUnavailable
 	}
 
 	hash := repository.HashAPIKey(raw)
@@ -146,13 +176,16 @@ func authenticateAdminAPIKey(raw string) *models.User {
 		hash,
 	).Scan(&id, &name, &isAdmin)
 	if err != nil {
-		return nil
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil // key not found – credential mismatch
+		}
+		return nil, fmt.Errorf("api_key query: %w", err)
 	}
 
 	// Only admin keys may authenticate via AuthMiddleware
 	if !isAdmin {
 		authDebugLog("DEBUG [WarehouseCore]: API key %q (id=%d) is not an admin key – rejecting", name, id)
-		return nil
+		return nil, nil
 	}
 
 	// Best-effort last_used_at update
@@ -172,7 +205,7 @@ func authenticateAdminAPIKey(raw string) *models.User {
 			{Name: "admin"},
 			{Name: "warehouse_admin"},
 		},
-	}
+	}, nil
 }
 
 // OptionalAuthMiddleware loads user if session exists, but doesn't require it

@@ -42,7 +42,9 @@ func ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var k APIKey
 		if err := rows.Scan(&k.ID, &k.Name, &k.IsActive, &k.IsAdmin, &k.CreatedAt, &k.LastUsedAt); err != nil {
-			continue
+			log.Printf("[APIKEY] failed to scan key row: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read API key"})
+			return
 		}
 		keys = append(keys, k)
 	}
