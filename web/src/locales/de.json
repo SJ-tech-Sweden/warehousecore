@@ -1169,6 +1169,7 @@
       "deselectAll": "Auswahl aufheben",
       "selectProduct": "Produkt {{name}} auswählen",
       "deselectProduct": "Produkt {{name}} abwählen",
+      "confirmBulkDelete": "{{count}} ausgewählte(s) Produkt(e) löschen?",
       "bulkEditTitle": "Produkte bearbeiten",
       "bulkEditDescription": "Änderungen auf {{count}} ausgewählte(s) Produkt(e) anwenden. Nur ausgefüllte Felder werden aktualisiert.",
       "bulkDeleteSuccess": "{{products}} Produkt(e) und {{devices}} Gerät(e) gelöscht.",

@@ -1169,6 +1169,7 @@
       "deselectAll": "Deselect all",
       "selectProduct": "Select product {{name}}",
       "deselectProduct": "Deselect product {{name}}",
+      "confirmBulkDelete": "Delete {{count}} selected product(s)?",
       "bulkEditTitle": "Bulk Edit Products",
       "bulkEditDescription": "Apply changes to {{count}} selected product(s). Only filled fields will be updated.",
       "bulkDeleteSuccess": "Deleted {{products}} product(s) and {{devices}} device(s).",

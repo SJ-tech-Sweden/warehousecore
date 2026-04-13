@@ -873,6 +873,8 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                   <th className="w-10 px-3 py-3">
                     <button
                       type="button"
+                      role="checkbox"
+                      aria-checked={allProductsSelected}
                       onClick={toggleSelectAllProducts}
                       className="text-gray-400 hover:text-white"
                       aria-label={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
@@ -894,6 +896,8 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                     <td className="w-10 px-3 py-3 align-top">
                       <button
                         type="button"
+                        role="checkbox"
+                        aria-checked={selectedProducts.has(product.product_id)}
                         onClick={() => toggleProductSelection(product.product_id)}
                         className="text-gray-400 hover:text-white"
                         aria-label={selectedProducts.has(product.product_id) ? t('admin.products.deselectProduct', { name: product.name }) : t('admin.products.selectProduct', { name: product.name })}

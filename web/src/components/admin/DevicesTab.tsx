@@ -431,7 +431,12 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
       await fetchDevices();
     } catch (error) {
       console.error('Failed to bulk delete devices:', error);
-      alert(t('admin.devices.errors.bulkDelete'));
+      const axiosErr = error as { response?: { data?: { error?: string; message?: string } } };
+      const errorMessage =
+        axiosErr?.response?.data?.error ||
+        axiosErr?.response?.data?.message ||
+        t('admin.devices.errors.bulkDelete');
+      alert(errorMessage);
     }
   };
 
@@ -632,6 +637,8 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                   <th className="w-10 px-3 py-3">
                     <button
                       type="button"
+                      role="checkbox"
+                      aria-checked={allFilteredSelected}
                       onClick={toggleSelectAll}
                       className="text-gray-400 hover:text-white"
                       aria-label={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
@@ -657,6 +664,8 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                     <td className="w-10 px-3 py-3">
                       <button
                         type="button"
+                        role="checkbox"
+                        aria-checked={selectedDevices.has(device.device_id)}
                         onClick={() => toggleDeviceSelection(device.device_id)}
                         className="text-gray-400 hover:text-white"
                         aria-label={selectedDevices.has(device.device_id) ? t('admin.devices.deselectDevice', { id: device.device_id }) : t('admin.devices.selectDevice', { id: device.device_id })}
