@@ -105,7 +105,7 @@ func withNilDB(t *testing.T) {
 }
 
 // TestAuthMiddleware_NoCredentials_NoDB verifies that when the database is
-// unavailable and no credentials are provided, a 500 is returned.
+// unavailable and no credentials are provided, a 401 is returned.
 func TestAuthMiddleware_NoCredentials_NoDB(t *testing.T) {
 	withNilDB(t)
 
