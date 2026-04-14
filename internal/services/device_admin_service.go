@@ -429,7 +429,7 @@ func RemoveLabelFile(labelPath string) {
 		log.Printf("[DEVICE] Skipping label path outside base dir: %s", labelPath)
 		return
 	}
-	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Printf("[DEVICE] Failed to remove label %s: %v", fullPath, err)
 	}
 }

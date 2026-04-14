@@ -654,7 +654,11 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
                       aria-label={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
                       title={allFilteredSelected ? t('admin.devices.deselectAll') : t('admin.devices.selectAll')}
                     >
-                      {allFilteredSelected ? <CheckSquare className="w-4 h-4" /> : selectedDevices.size > 0 ? <MinusSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      {(() => {
+                        if (allFilteredSelected) return <CheckSquare className="w-4 h-4" />;
+                        if (selectedDevices.size > 0) return <MinusSquare className="w-4 h-4" />;
+                        return <Square className="w-4 h-4" />;
+                      })()}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-300">ID</th>

@@ -887,7 +887,11 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                       aria-label={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
                       title={allProductsSelected ? t('admin.products.deselectAll') : t('admin.products.selectAll')}
                     >
-                      {allProductsSelected ? <CheckSquare className="w-4 h-4" /> : selectedProducts.size > 0 ? <MinusSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      {(() => {
+                        if (allProductsSelected) return <CheckSquare className="w-4 h-4" />;
+                        if (selectedProducts.size > 0) return <MinusSquare className="w-4 h-4" />;
+                        return <Square className="w-4 h-4" />;
+                      })()}
                     </button>
                   </th>
                   <th className="px-4 py-3 text-left font-semibold">{t('products.title')}</th>
