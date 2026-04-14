@@ -883,12 +883,21 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[PRODUCT DELETE] Deleting product %d (%s) with %d associated device(s)", id, productName, deviceCount)
 
+	// Start a transaction for atomic device + product deletion
+	tx, err := db.Begin()
+	if err != nil {
+		log.Printf("[PRODUCT DELETE ERROR] Failed to start transaction: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete product"})
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	// Cascade delete: Delete all associated devices first
 	var labelPaths []string
 	if deviceCount > 0 {
 		// Get device IDs and label paths for logging and cleanup
 		var deviceIDs []string
-		rows, err := db.Query("SELECT deviceID, label_path FROM devices WHERE productID = $1", id)
+		rows, err := tx.Query("SELECT deviceID, label_path FROM devices WHERE productID = $1", id)
 		if err != nil {
 			log.Printf("[PRODUCT DELETE] Failed to query device label paths for product %d: %v", id, err)
 		}
@@ -909,7 +918,7 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[PRODUCT DELETE] Deleting %d devices: %v", len(deviceIDs), deviceIDs)
 
 		// Delete all devices for this product
-		result, err := db.Exec("DELETE FROM devices WHERE productID = $1", id)
+		result, err := tx.Exec("DELETE FROM devices WHERE productID = $1", id)
 		if err != nil {
 			log.Printf("[PRODUCT DELETE ERROR] Failed to delete devices for product %d: %v", id, err)
 			respondJSON(w, http.StatusInternalServerError, map[string]string{
@@ -923,8 +932,8 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[PRODUCT DELETE] Successfully deleted %d devices for product %d", deletedDevices, id)
 	}
 
-	// Now delete the product
-	result, err := db.Exec("DELETE FROM products WHERE productID = $1", id)
+	// Now delete the product (within the same transaction)
+	result, err := tx.Exec("DELETE FROM products WHERE productID = $1", id)
 	if err != nil {
 		log.Printf("[PRODUCT DELETE ERROR] Failed to delete product %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete product"})
@@ -937,9 +946,15 @@ func DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := tx.Commit(); err != nil {
+		log.Printf("[PRODUCT DELETE ERROR] Failed to commit transaction for product %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete product"})
+		return
+	}
+
 	log.Printf("[PRODUCT DELETE] Successfully deleted product %d (%s)", id, productName)
 
-	// Clean up device label files after successful deletion
+	// Clean up device label files after successful commit
 	cleanupDeviceLabelFiles(labelPaths, "PRODUCT DELETE")
 
 	// Include device count in response
@@ -1170,7 +1185,8 @@ func BulkUpdateProducts(w http.ResponseWriter, r *http.Request) {
 			WHERE product_id IN (%s)`, strings.Join(placeholders, ","))
 		if _, err := tx.Exec(syncQuery, syncArgs...); err != nil {
 			log.Printf("[BULK PRODUCT UPDATE] Failed to sync product_packages.price: %v", err)
-			// Non-fatal: log but don't fail the whole operation
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to sync package pricing"})
+			return
 		}
 	}
 

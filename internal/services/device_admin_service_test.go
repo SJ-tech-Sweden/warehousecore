@@ -17,7 +17,7 @@ func TestRemoveLabelFile_EmptyPath(t *testing.T) {
 
 func TestRemoveLabelFile_PathTraversal(t *testing.T) {
 	// A path with ".." should be rejected (not remove any file).
-	// Create a temp file outside of web/dist to make sure it survives.
+	// Create a temp file outside of the label base dir to make sure it survives.
 	tmpDir := t.TempDir()
 	target := filepath.Join(tmpDir, "should-not-delete.txt")
 	if err := os.WriteFile(target, []byte("secret"), 0o644); err != nil {
@@ -38,17 +38,21 @@ func TestRemoveLabelFile_NonExistentFile(t *testing.T) {
 }
 
 func TestRemoveLabelFile_ValidPath(t *testing.T) {
-	// Create a real label file inside web/dist and confirm removal.
-	baseDir := filepath.Join("web", "dist", "labels")
-	if err := os.MkdirAll(baseDir, 0o755); err != nil {
+	// Use t.TempDir() as the label base directory to isolate filesystem side effects.
+	tmpDir := t.TempDir()
+	originalBaseDir := labelBaseDir
+	labelBaseDir = tmpDir
+	t.Cleanup(func() { labelBaseDir = originalBaseDir })
+
+	labelsDir := filepath.Join(tmpDir, "labels")
+	if err := os.MkdirAll(labelsDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	labelFile := filepath.Join(baseDir, "test-device-label.pdf")
+	labelFile := filepath.Join(labelsDir, "test-device-label.pdf")
 	if err := os.WriteFile(labelFile, []byte("label-data"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(labelFile) // cleanup in case removal fails
 
 	RemoveLabelFile("/labels/test-device-label.pdf")
 

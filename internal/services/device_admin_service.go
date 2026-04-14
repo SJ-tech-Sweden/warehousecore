@@ -412,13 +412,17 @@ func (s *DeviceAdminService) deleteDeviceInTx(ctx context.Context, tx *sql.Tx, d
 	return "", nil
 }
 
+// labelBaseDir is the base directory for label files.
+// It defaults to "web/dist" and can be overridden in tests.
+var labelBaseDir = filepath.Join("web", "dist")
+
 // RemoveLabelFile removes a device label file from disk.
-// Paths are sanitized to prevent path traversal outside the web/dist directory.
+// Paths are sanitized to prevent path traversal outside the label base directory.
 func RemoveLabelFile(labelPath string) {
 	if labelPath == "" {
 		return
 	}
-	baseDir, err := filepath.Abs(filepath.Join("web", "dist"))
+	baseDir, err := filepath.Abs(labelBaseDir)
 	if err != nil {
 		log.Printf("[DEVICE] Failed to resolve base dir for label cleanup: %v", err)
 		return
