@@ -29,6 +29,10 @@ var websiteRevalidator = services.NewRevalidatorFromEnv()
 // Delegates to services.RemoveLabelFile for path sanitization and traversal protection.
 func cleanupDeviceLabelFiles(labelPaths []string, logPrefix string) {
 	for _, lp := range labelPaths {
+		if strings.TrimSpace(lp) == "" {
+			log.Printf("%s: skipping empty label path during cleanup", logPrefix)
+			continue
+		}
 		services.RemoveLabelFile(lp)
 	}
 }

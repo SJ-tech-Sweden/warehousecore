@@ -611,6 +611,16 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setSelectedProducts(new Set());
   }, [debouncedSearch, categoryFilter]);
 
+  // Prune stale selections when the product list changes (e.g. after refresh)
+  useEffect(() => {
+    setSelectedProducts(prev => {
+      if (prev.size === 0) return prev;
+      const currentIDs = new Set(sortedProducts.map(p => p.product_id));
+      const pruned = new Set([...prev].filter(id => currentIDs.has(id)));
+      return pruned.size === prev.size ? prev : pruned;
+    });
+  }, [sortedProducts]);
+
   const toggleSelectAllProducts = () => {
     if (selectedProducts.size === sortedProducts.length) {
       setSelectedProducts(new Set());

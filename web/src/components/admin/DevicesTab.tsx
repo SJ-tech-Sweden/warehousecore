@@ -221,6 +221,16 @@ export function DevicesTab({ initialProductFilter, initialEditDeviceId, onEditCo
     setSelectedDevices(new Set());
   }, [debouncedSearch, statusFilter, productFilter, zoneFilter]);
 
+  // Prune stale selections when the device list changes (e.g. after refresh)
+  useEffect(() => {
+    setSelectedDevices(prev => {
+      if (prev.size === 0) return prev;
+      const currentIDs = new Set(filteredDevices.map(d => d.device_id));
+      const pruned = new Set([...prev].filter(id => currentIDs.has(id)));
+      return pruned.size === prev.size ? prev : pruned;
+    });
+  }, [filteredDevices]);
+
   const statusLabel = (status?: string) => {
     if (!status) return '-';
     return t(`admin.devices.statuses.${normalizeDeviceStatus(status)}`, status);
