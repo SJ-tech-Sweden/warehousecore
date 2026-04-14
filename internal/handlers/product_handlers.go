@@ -1744,6 +1744,10 @@ func ConvertProductToCable(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Connector1, Connector2, and Type are required"})
 		return
 	}
+	if input.MM2 != nil && *input.MM2 <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cross-section (mm2) must be greater than 0"})
+		return
+	}
 
 	var cableID int64
 	err = db.QueryRow(
