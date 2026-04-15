@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -290,6 +291,17 @@ func BulkDeleteDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Deduplicate IDs to prevent inflated failure counts and redundant delete attempts
+	seenIDs := make(map[string]struct{}, len(req.IDs))
+	uniqueIDs := make([]string, 0, len(req.IDs))
+	for _, id := range req.IDs {
+		if _, dup := seenIDs[id]; !dup {
+			seenIDs[id] = struct{}{}
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+	req.IDs = uniqueIDs
+
 	service := services.NewDeviceAdminService()
 	result, err := service.BulkDeleteDevices(r.Context(), req.IDs)
 	if err != nil {
@@ -305,10 +317,15 @@ func BulkDeleteDevices(w http.ResponseWriter, r *http.Request) {
 
 	message := fmt.Sprintf("Deleted %d device(s)", result.Deleted)
 	if result.Deleted == 0 && result.Failed > 0 {
-		// Build a summary from per-device failure reasons
-		reasons := make([]string, 0, len(result.FailedErrors))
-		for id, reason := range result.FailedErrors {
-			reasons = append(reasons, fmt.Sprintf("%s: %s", id, reason))
+		// Build a summary from per-device failure reasons, sorted by device ID for stable output
+		deviceIDs := make([]string, 0, len(result.FailedErrors))
+		for id := range result.FailedErrors {
+			deviceIDs = append(deviceIDs, id)
+		}
+		sort.Strings(deviceIDs)
+		reasons := make([]string, 0, len(deviceIDs))
+		for _, id := range deviceIDs {
+			reasons = append(reasons, fmt.Sprintf("%s: %s", id, result.FailedErrors[id]))
 		}
 		if len(reasons) > 0 {
 			message = fmt.Sprintf("No devices were deleted. Errors: %s", strings.Join(reasons, "; "))

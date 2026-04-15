@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"github.com/lib/pq"
 )
 
 // ===========================
@@ -231,6 +233,54 @@ func TestBulkDeleteDevices_CommitFailure_NoLabelCleanup(t *testing.T) {
 	// Label file must NOT be cleaned up because the commit failed.
 	if _, statErr := os.Stat(labelFile); os.IsNotExist(statErr) {
 		t.Error("label file was cleaned up despite commit failure — cleanup must only run after successful commit")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestBulkDeleteDevices_FKViolation_UserFriendlyMessage(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	// Device with FK violation: savepoint, delete returns pq error 23503, rollback + release
+	mock.ExpectExec("SAVEPOINT device_delete_0").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery("DELETE FROM devices WHERE deviceID = \\$1 RETURNING label_path").
+		WithArgs("DEV_LINKED").
+		WillReturnError(&pq.Error{Code: "23503", Message: "update or delete on table \"devices\" violates foreign key constraint"})
+	mock.ExpectExec("ROLLBACK TO SAVEPOINT device_delete_0").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("RELEASE SAVEPOINT device_delete_0").WillReturnResult(sqlmock.NewResult(0, 0))
+
+	// No commit expected — deleted == 0, so tx is rolled back by defer
+	mock.ExpectRollback()
+
+	svc := newTestService(db)
+	result, err := svc.BulkDeleteDevices(context.Background(), []string{"DEV_LINKED"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Deleted != 0 {
+		t.Errorf("expected 0 deleted, got %d", result.Deleted)
+	}
+	if result.Failed != 1 {
+		t.Errorf("expected 1 failed, got %d", result.Failed)
+	}
+	if len(result.FailedIDs) != 1 || result.FailedIDs[0] != "DEV_LINKED" {
+		t.Errorf("expected FailedIDs=[DEV_LINKED], got %v", result.FailedIDs)
+	}
+
+	// Verify the error message is user-friendly (from the pq 23503 branch)
+	reason, ok := result.FailedErrors["DEV_LINKED"]
+	if !ok {
+		t.Fatal("expected FailedErrors to contain DEV_LINKED")
+	}
+	if !strings.Contains(reason, "still linked to cases, jobs, or history entries") {
+		t.Errorf("expected user-friendly FK violation message, got: %s", reason)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
