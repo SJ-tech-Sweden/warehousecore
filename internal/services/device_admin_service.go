@@ -457,7 +457,7 @@ func (s *DeviceAdminService) FetchDevice(ctx context.Context, deviceID string) (
 		       COALESCE(d.condition_rating, 0), COALESCE(d.usage_hours, 0), d.purchaseDate, d.retire_date, d.warranty_end_date,
 		       d.lastmaintenance, d.nextmaintenance,
 		       d.notes, d.label_path,
-		       COALESCE(p.name, '') AS product_name,
+		       COALESCE(p.name, cab.name, '') AS product_name,
 		       COALESCE(cat.name, '') AS product_category,
 		       COALESCE(z.name, '') AS zone_name,
 		       COALESCE(z.code, '') AS zone_code,
