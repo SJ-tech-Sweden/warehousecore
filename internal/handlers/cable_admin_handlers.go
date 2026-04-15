@@ -594,6 +594,11 @@ func GetCableDevices(w http.ResponseWriter, r *http.Request) {
 
 		responses = append(responses, toDeviceAdminResponse(&device))
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("[CABLE DEVICES] Row iteration error for cable %d: %v", cableID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cable devices"})
+		return
+	}
 
 	if responses == nil {
 		responses = []DeviceAdminResponse{}

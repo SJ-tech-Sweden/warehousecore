@@ -1058,6 +1058,7 @@ export function CablesTab() {
                       type="text"
                       value={devicePrefix}
                       onChange={e => setDevicePrefix(e.target.value.toUpperCase())}
+                      maxLength={20}
                       placeholder={t('admin.cables.devicePrefixPlaceholder')}
                       className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-cyan-400 text-sm w-32"
                       title={t('admin.cables.devicePrefix')}
@@ -1070,7 +1071,7 @@ export function CablesTab() {
                       min="1"
                       max="100"
                       value={deviceQuantity}
-                      onChange={e => setDeviceQuantity(parseInt(e.target.value) || 1)}
+                      onChange={e => setDeviceQuantity(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
                       placeholder={t('admin.cables.deviceQuantityPlaceholder')}
                       className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-cyan-400 text-sm w-24"
                       title={t('admin.cables.deviceQuantity')}
