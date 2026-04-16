@@ -137,7 +137,7 @@ func GetAllCables(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		log.Printf("Error querying cables: %v", err)
-		http.Error(w, "Failed to fetch cables", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cables"})
 		return
 	}
 	defer rows.Close()
@@ -170,8 +170,7 @@ func GetAllCables(w http.ResponseWriter, r *http.Request) {
 		cables = []Cable{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cables)
+	respondJSON(w, http.StatusOK, cables)
 }
 
 // GetCable retrieves a single cable by ID
@@ -181,7 +180,7 @@ func GetCable(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid cable ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable ID"})
 		return
 	}
 
@@ -225,17 +224,16 @@ func GetCable(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Cable not found", http.StatusNotFound)
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
 		return
 	}
 	if err != nil {
 		log.Printf("Error fetching cable: %v", err)
-		http.Error(w, "Failed to fetch cable", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cable"})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cable)
+	respondJSON(w, http.StatusOK, cable)
 }
 
 // CreateCable creates a new cable
@@ -250,17 +248,17 @@ func CreateCable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
 	// Validation
 	if input.Length <= 0 {
-		http.Error(w, "Length must be greater than 0", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Length must be greater than 0"})
 		return
 	}
 	if input.Connector1 <= 0 || input.Connector2 <= 0 || input.Typ <= 0 {
-		http.Error(w, "Connector1, Connector2, and Type are required", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Connector1, Connector2, and Type are required"})
 		return
 	}
 
@@ -271,15 +269,13 @@ func CreateCable(w http.ResponseWriter, r *http.Request) {
 	err := db.QueryRow(query, input.Connector1, input.Connector2, input.Typ, input.Length, input.MM2, input.Name).Scan(&id)
 	if err != nil {
 		log.Printf("Error creating cable: %v", err)
-		http.Error(w, fmt.Sprintf("Failed to create cable: %v", err), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to create cable: %v", err)})
 		return
 	}
 
 	log.Printf("[CABLE CREATE] Created cable ID %d", id)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"cable_id": id,
 		"message":  "Cable created successfully",
 	})
@@ -292,7 +288,7 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid cable ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable ID"})
 		return
 	}
 
@@ -306,13 +302,13 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
 	}
 
 	// Validation
 	if input.Length != nil && *input.Length <= 0 {
-		http.Error(w, "Length must be greater than 0", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Length must be greater than 0"})
 		return
 	}
 
@@ -355,7 +351,7 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(updates) == 0 {
-		http.Error(w, "No fields to update", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "No fields to update"})
 		return
 	}
 
@@ -366,20 +362,19 @@ func UpdateCable(w http.ResponseWriter, r *http.Request) {
 	result, err := db.Exec(query, args...)
 	if err != nil {
 		log.Printf("Error updating cable: %v", err)
-		http.Error(w, "Failed to update cable", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update cable"})
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Cable not found", http.StatusNotFound)
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
 		return
 	}
 
 	log.Printf("[CABLE UPDATE] Updated cable ID %d", id)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Cable updated successfully"})
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Cable updated successfully"})
 }
 
 // DeleteCable deletes a cable
@@ -389,7 +384,7 @@ func DeleteCable(w http.ResponseWriter, r *http.Request) {
 
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid cable ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable ID"})
 		return
 	}
 
@@ -398,20 +393,19 @@ func DeleteCable(w http.ResponseWriter, r *http.Request) {
 	result, err := db.Exec("DELETE FROM cables WHERE cableID = $1", id)
 	if err != nil {
 		log.Printf("Error deleting cable: %v", err)
-		http.Error(w, "Failed to delete cable", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete cable"})
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		http.Error(w, "Cable not found", http.StatusNotFound)
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
 		return
 	}
 
 	log.Printf("[CABLE DELETE] Deleted cable ID %d", id)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Cable deleted successfully"})
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Cable deleted successfully"})
 }
 
 // GetCableConnectors retrieves all cable connector types
@@ -423,7 +417,7 @@ func GetCableConnectors(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Printf("Error querying cable connectors: %v", err)
-		http.Error(w, "Failed to fetch cable connectors", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cable connectors"})
 		return
 	}
 	defer rows.Close()
@@ -443,8 +437,7 @@ func GetCableConnectors(w http.ResponseWriter, r *http.Request) {
 		connectors = []CableConnector{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(connectors)
+	respondJSON(w, http.StatusOK, connectors)
 }
 
 // GetCableTypes retrieves all cable types
@@ -465,7 +458,7 @@ func GetCableTypes(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Printf("Error querying cable types: %v", err)
-		http.Error(w, "Failed to fetch cable types", http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch cable types"})
 		return
 	}
 	defer rows.Close()
@@ -485,8 +478,7 @@ func GetCableTypes(w http.ResponseWriter, r *http.Request) {
 		types = []CableType{}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(types)
+	respondJSON(w, http.StatusOK, types)
 }
 
 // GetCableDevices retrieves all devices associated with a cable
@@ -651,18 +643,6 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 
-	// Verify cable exists
-	var exists bool
-	if err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM cables WHERE cableID = $1)", cableID).Scan(&exists); err != nil {
-		log.Printf("[CABLE DEVICE CREATE] Failed to verify cable %d existence: %v", cableID, err)
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify cable"})
-		return
-	}
-	if !exists {
-		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
-		return
-	}
-
 	// Use a transaction with AllocateDeviceCounter for safe, all-or-nothing device creation
 	ctx := r.Context()
 	tx, err := db.BeginTx(ctx, nil)
@@ -676,6 +656,18 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 		}
 	}()
+
+	// Verify cable exists inside the transaction to prevent race with concurrent deletes
+	var exists bool
+	if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM cables WHERE cableID = $1)", cableID).Scan(&exists); err != nil {
+		log.Printf("[CABLE DEVICE CREATE] Failed to verify cable %d existence: %v", cableID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to verify cable"})
+		return
+	}
+	if !exists {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
+		return
+	}
 
 	startCounter, err := services.AllocateDeviceCounter(ctx, tx, prefix)
 	if err != nil {
@@ -705,9 +697,15 @@ func CreateDevicesForCable(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("[CABLE DEVICE CREATE] Failed to insert device %s: %v", deviceID, err)
 			var pqErr *pq.Error
-			if errors.As(err, &pqErr) && pqErr.Code == "23505" {
-				respondJSON(w, http.StatusConflict, map[string]string{"error": fmt.Sprintf("Device ID %s already exists", deviceID)})
-				return
+			if errors.As(err, &pqErr) {
+				if pqErr.Code == "23505" {
+					respondJSON(w, http.StatusConflict, map[string]string{"error": fmt.Sprintf("Device ID %s already exists", deviceID)})
+					return
+				}
+				if pqErr.Code == "23503" {
+					respondJSON(w, http.StatusNotFound, map[string]string{"error": "Cable not found"})
+					return
+				}
 			}
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to create device %s", deviceID)})
 			return
