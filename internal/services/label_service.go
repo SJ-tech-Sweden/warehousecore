@@ -726,21 +726,17 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 
 	// Save file
 	filename := fmt.Sprintf("%s_label.png", safeDeviceID)
-	filePath := filepath.Join(labelsDir, filename)
 
-	// Verify the resolved path is within the labels directory, including symlink resolution
+	// Resolve the labels directory (constant path) to handle symlinks
 	resolvedLabelsDir, err := filepath.EvalSymlinks(labelsDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve labels directory: %w", err)
 	}
 
-	targetDir := filepath.Dir(filePath)
-	resolvedTargetDir, err := filepath.EvalSymlinks(targetDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve target directory: %w", err)
-	}
+	// Build target path from resolved constant directory + sanitized filename
+	resolvedFilePath := filepath.Join(resolvedLabelsDir, filename)
 
-	resolvedFilePath := filepath.Join(resolvedTargetDir, filename)
+	// Verify the resolved path stays within the labels directory
 	relPath, err := filepath.Rel(resolvedLabelsDir, resolvedFilePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to validate file path: %w", err)
@@ -749,10 +745,18 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 		return "", fmt.Errorf("invalid file path: outside allowed directory")
 	}
 
-	// Write to a temporary file created inside the validated directory and
-	// atomically rename it into place. This avoids the TOCTOU race between
+	// Refuse to write if the target path is an existing symlink file —
+	// prevents an attacker from redirecting writes outside the labels directory
+	if info, err := os.Lstat(resolvedFilePath); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("invalid file path: target is a symlink")
+		}
+	}
+
+	// Write to a temporary file created inside the resolved labels directory
+	// and atomically rename it into place. This avoids the TOCTOU race between
 	// checking the destination path and writing to it.
-	tempFile, err := os.CreateTemp(resolvedTargetDir, filename+".*.tmp")
+	tempFile, err := os.CreateTemp(resolvedLabelsDir, ".label.*.tmp")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary label file: %w", err)
 	}
