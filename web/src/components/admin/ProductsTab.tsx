@@ -1710,11 +1710,11 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={cableFormData.mm2 ?? ''}
+                      value={cableFormData.mm2 || ''}
                       onChange={e =>
                         setCableFormData({
                           ...cableFormData,
-                          mm2: e.target.value as (typeof cableFormData)['mm2'],
+                          mm2: e.target.value === '' ? 0 : parseFloat(e.target.value),
                         })
                       }
                       className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
