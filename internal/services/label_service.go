@@ -695,14 +695,15 @@ func (s *LabelService) GenerateLabelForZone(zoneID int64, templateID int) (map[s
 
 // SaveLabelImage saves a base64-encoded label image to disk and updates the device record
 func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (string, error) {
-	// Sanitize deviceID to prevent path traversal — only keep alphanumeric, dash, underscore
+	// Validate deviceID to prevent path traversal and filename collisions —
+	// only allow alphanumeric characters, dash, and underscore.
 	safeDeviceID := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
 			return r
 		}
 		return -1
 	}, deviceID)
-	if safeDeviceID == "" {
+	if safeDeviceID == "" || safeDeviceID != deviceID {
 		return "", fmt.Errorf("device ID must contain only alphanumeric characters, dashes, or underscores")
 	}
 
@@ -740,7 +741,7 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 		return "", fmt.Errorf("invalid file path: outside allowed directory")
 	}
 
-	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
+	if err := os.WriteFile(absFilePath, imageData, 0644); err != nil {
 		return "", fmt.Errorf("failed to write label file: %w", err)
 	}
 

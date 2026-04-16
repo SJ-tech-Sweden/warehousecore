@@ -246,6 +246,7 @@ export function CablesTab() {
 
   const handleOpenDevicesModal = useCallback(async (cableId: number) => {
     setDevicesModal({ cableId });
+    setCableDevices([]);
     setLoadingDevices(true);
     setDevicePrefix('');
     setDeviceQuantity(1);
