@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 
 	"warehousecore/internal/models"
@@ -1756,6 +1758,17 @@ func ConvertProductToCable(w http.ResponseWriter, r *http.Request) {
 	).Scan(&cableID)
 	if err != nil {
 		log.Printf("[CONVERT CABLE] Failed to create cable from product %d: %v", id, err)
+		var pqErr *pq.Error
+		if stderrors.As(err, &pqErr) {
+			switch pqErr.Code {
+			case "23503":
+				respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid cable reference data"})
+				return
+			case "23505":
+				respondJSON(w, http.StatusConflict, map[string]string{"error": "Cable already exists"})
+				return
+			}
+		}
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create cable"})
 		return
 	}

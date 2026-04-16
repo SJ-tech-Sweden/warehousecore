@@ -695,6 +695,17 @@ func (s *LabelService) GenerateLabelForZone(zoneID int64, templateID int) (map[s
 
 // SaveLabelImage saves a base64-encoded label image to disk and updates the device record
 func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (string, error) {
+	// Sanitize deviceID to prevent path traversal — only keep alphanumeric, dash, underscore
+	safeDeviceID := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return -1
+	}, deviceID)
+	if safeDeviceID == "" {
+		return "", fmt.Errorf("invalid device ID")
+	}
+
 	// Remove base64 prefix if present
 	if len(base64Image) > 22 && base64Image[:22] == "data:image/png;base64," {
 		base64Image = base64Image[22:]
@@ -713,8 +724,21 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 	}
 
 	// Save file
-	filename := fmt.Sprintf("%s_label.png", deviceID)
+	filename := fmt.Sprintf("%s_label.png", safeDeviceID)
 	filePath := filepath.Join(labelsDir, filename)
+
+	// Verify the resolved path is within the labels directory
+	absLabelsDir, err := filepath.Abs(labelsDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve labels directory: %w", err)
+	}
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve file path: %w", err)
+	}
+	if !strings.HasPrefix(absFilePath, absLabelsDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid device ID")
+	}
 
 	if err := os.WriteFile(filePath, imageData, 0644); err != nil {
 		return "", fmt.Errorf("failed to write label file: %w", err)
