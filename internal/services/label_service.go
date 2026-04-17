@@ -23,7 +23,11 @@ import (
 	"warehousecore/internal/repository"
 )
 
-type LabelService struct{}
+type LabelService struct {
+	// LabelsDir overrides the default labels directory. When empty, defaults to
+	// "./web/dist/labels". Exposed for testing.
+	LabelsDir string
+}
 
 func NewLabelService() *LabelService {
 	log.Printf("[LABEL INIT] Label service initialized (using headless browser rendering)")
@@ -719,7 +723,10 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 	}
 
 	// Create labels directory if it doesn't exist
-	labelsDir := "./web/dist/labels"
+	labelsDir := s.LabelsDir
+	if labelsDir == "" {
+		labelsDir = "./web/dist/labels"
+	}
 	if err := os.MkdirAll(labelsDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create labels directory: %w", err)
 	}

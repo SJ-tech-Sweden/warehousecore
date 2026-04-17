@@ -9,7 +9,7 @@ import (
 )
 
 // TestSaveLabelImage_RejectsPathTraversal verifies that device IDs containing
-// path-traversal sequences are rejected.
+// path-traversal sequences are rejected with the device-ID validation error.
 func TestSaveLabelImage_RejectsPathTraversal(t *testing.T) {
 	s := &LabelService{}
 	badIDs := []string{
@@ -24,6 +24,9 @@ func TestSaveLabelImage_RejectsPathTraversal(t *testing.T) {
 		_, err := s.SaveLabelImage(id, "")
 		if err == nil {
 			t.Errorf("SaveLabelImage(%q): expected error for path traversal, got nil", id)
+		}
+		if err != nil && !strings.Contains(err.Error(), "device ID must contain only") {
+			t.Errorf("SaveLabelImage(%q): expected device ID validation error, got: %v", id, err)
 		}
 	}
 }
@@ -91,7 +94,7 @@ func TestSaveLabelImage_AcceptsValidDeviceIDs(t *testing.T) {
 }
 
 // TestSaveLabelImage_RejectsSymlinkTarget verifies that if the target path is
-// a symlink file, the write is refused.
+// a symlink file, SaveLabelImage refuses to write.
 func TestSaveLabelImage_RejectsSymlinkTarget(t *testing.T) {
 	// Create a temp labels directory
 	tmpDir := t.TempDir()
@@ -112,7 +115,45 @@ func TestSaveLabelImage_RejectsSymlinkTarget(t *testing.T) {
 		t.Skipf("cannot create symlinks on this platform: %v", err)
 	}
 
-	// Create a minimal valid PNG as base64
+	// Create a minimal valid PNG as base64 (1x1 white pixel PNG)
+	pngBytes := []byte{
+		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+		0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+		0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xde, 0x00, 0x00, 0x00,
+		0x0c, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+		0x00, 0x00, 0x02, 0x00, 0x01, 0xe2, 0x21, 0xbc, 0x33, 0x00, 0x00, 0x00,
+		0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+	}
+	b64Image := base64.StdEncoding.EncodeToString(pngBytes)
+
+	// Use a LabelService with LabelsDir pointing to our temp labels dir
+	s := &LabelService{LabelsDir: labelsDir}
+	_, err := s.SaveLabelImage("SYMTEST", b64Image)
+	if err == nil {
+		t.Fatal("SaveLabelImage should have refused to write to a symlink target")
+	}
+	if !strings.Contains(err.Error(), "symlink") {
+		t.Errorf("expected symlink-related error, got: %v", err)
+	}
+
+	// Verify the outside file was not modified
+	content, err := os.ReadFile(outsideFile)
+	if err != nil {
+		t.Fatalf("failed to read outside file: %v", err)
+	}
+	if string(content) != "secret" {
+		t.Errorf("outside file was modified: got %q, want %q", string(content), "secret")
+	}
+}
+
+// TestSaveLabelImage_AtomicWriteCreatesFile verifies that SaveLabelImage's
+// actual write path creates the label file with the expected content and leaves
+// no leftover temp files. The function will panic at the DB update step (no DB
+// in tests), so we recover from that and verify the file was written.
+func TestSaveLabelImage_AtomicWriteCreatesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	s := &LabelService{LabelsDir: tmpDir}
+
 	// 1x1 white pixel PNG
 	pngBytes := []byte{
 		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -124,68 +165,30 @@ func TestSaveLabelImage_RejectsSymlinkTarget(t *testing.T) {
 	}
 	b64Image := base64.StdEncoding.EncodeToString(pngBytes)
 
-	// Override the labels directory for this test by calling the internal logic
-	// directly. Since SaveLabelImage uses a hardcoded path, we test the Lstat
-	// protection by verifying the symlink check works on known paths.
-	info, err := os.Lstat(symlinkPath)
+	// SaveLabelImage will write the file successfully but then panic when
+	// trying to update the DB (no DB connection in unit tests). We recover
+	// from the panic so we can verify the file was written correctly.
+	func() {
+		defer func() { recover() }()
+		s.SaveLabelImage("ATOMICTEST", b64Image)
+	}()
+
+	// Verify the label file was created at the expected path with correct content
+	expectedPath := filepath.Join(tmpDir, "ATOMICTEST_label.png")
+	content, err := os.ReadFile(expectedPath)
 	if err != nil {
-		t.Fatalf("Lstat failed: %v", err)
+		t.Fatalf("ReadFile(%q) failed: %v", expectedPath, err)
 	}
-	if info.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("expected symlink, got regular file")
+	if string(content) != string(pngBytes) {
+		t.Errorf("saved file content mismatch: got %d bytes, want %d bytes", len(content), len(pngBytes))
 	}
 
-	// Verify the symlink detection logic that SaveLabelImage uses:
-	// the function should detect this as a symlink and refuse to write
-	_ = b64Image // base64 image is valid but we test the symlink detection path
-}
-
-// TestSaveLabelImage_AtomicWriteCreatesFile verifies that the temp-file-then-rename
-// logic works by checking that os.CreateTemp + os.Rename produces the expected file.
-func TestSaveLabelImage_AtomicWriteCreatesFile(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Simulate the atomic write pattern used in SaveLabelImage
-	data := []byte("test-label-data")
-	targetPath := filepath.Join(tmpDir, "TEST_label.png")
-
-	tempFile, err := os.CreateTemp(tmpDir, ".label.*.tmp")
+	// Verify no leftover temp files
+	matches, err := filepath.Glob(filepath.Join(tmpDir, ".label.*.tmp"))
 	if err != nil {
-		t.Fatalf("CreateTemp failed: %v", err)
+		t.Fatalf("Glob failed: %v", err)
 	}
-	tempPath := tempFile.Name()
-
-	if err := tempFile.Chmod(0644); err != nil {
-		tempFile.Close()
-		os.Remove(tempPath)
-		t.Fatalf("Chmod failed: %v", err)
-	}
-	if _, err := tempFile.Write(data); err != nil {
-		tempFile.Close()
-		os.Remove(tempPath)
-		t.Fatalf("Write failed: %v", err)
-	}
-	if err := tempFile.Close(); err != nil {
-		os.Remove(tempPath)
-		t.Fatalf("Close failed: %v", err)
-	}
-
-	if err := os.Rename(tempPath, targetPath); err != nil {
-		os.Remove(tempPath)
-		t.Fatalf("Rename failed: %v", err)
-	}
-
-	// Verify the file exists at the target path with correct content
-	content, err := os.ReadFile(targetPath)
-	if err != nil {
-		t.Fatalf("ReadFile failed: %v", err)
-	}
-	if string(content) != string(data) {
-		t.Errorf("file content = %q, want %q", string(content), string(data))
-	}
-
-	// Verify temp file no longer exists
-	if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
-		t.Errorf("temp file still exists after rename: %v", err)
+	if len(matches) != 0 {
+		t.Errorf("found leftover temp files after SaveLabelImage: %v", matches)
 	}
 }
