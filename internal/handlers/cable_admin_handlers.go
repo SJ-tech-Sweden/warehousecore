@@ -566,7 +566,13 @@ func GetCableDevices(w http.ResponseWriter, r *http.Request) {
 			LIMIT 1
 		) lj ON true
 		WHERE d.cable_id = $1
-		ORDER BY d.deviceID ASC
+		ORDER BY
+			regexp_replace(d.deviceID, '\d+$', '') ASC,
+			CASE
+				WHEN d.deviceID ~ '\d+$' THEN CAST(SUBSTRING(d.deviceID FROM '\d+$') AS BIGINT)
+				ELSE NULL
+			END ASC NULLS LAST,
+			d.deviceID ASC
 	`
 
 	rows, err := db.Query(query, cableID)
