@@ -913,6 +913,7 @@
       "manageDevices": "Geräte verwalten",
       "devicesTitle": "Geräte für Kabel #{{id}}",
       "noDevices": "Diesem Kabel sind keine Geräte zugewiesen.",
+      "loadingDevices": "Geräte werden geladen...",
       "deviceCount": "{{count}} Gerät",
       "deviceCount_other": "{{count}} Geräte",
       "addDevices": "Geräte hinzufügen",

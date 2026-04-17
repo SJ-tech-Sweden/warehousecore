@@ -1098,7 +1098,7 @@ export function CablesTab() {
               <div className="overflow-y-auto flex-1">
                 {loadingDevices ? (
                   <div className="p-6 text-center text-gray-400 text-sm">
-                    {t('admin.cables.loading')}
+                    {t('admin.cables.loadingDevices')}
                   </div>
                 ) : cableDevices.length === 0 ? (
                   <div className="p-6 text-center text-gray-400 text-sm">

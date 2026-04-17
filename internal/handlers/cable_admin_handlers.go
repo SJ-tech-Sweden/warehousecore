@@ -262,7 +262,7 @@ func CreateCable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if input.MM2 != nil && *input.MM2 <= 0 {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "MM2 must be greater than 0"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cross-section (mm2) must be greater than 0"})
 		return
 	}
 

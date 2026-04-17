@@ -913,6 +913,7 @@
       "manageDevices": "Manage devices",
       "devicesTitle": "Devices for Cable #{{id}}",
       "noDevices": "No devices assigned to this cable.",
+      "loadingDevices": "Loading devices...",
       "deviceCount": "{{count}} device",
       "deviceCount_other": "{{count}} devices",
       "addDevices": "Add devices",

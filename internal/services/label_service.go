@@ -784,6 +784,23 @@ func (s *LabelService) SaveLabelImage(deviceID string, base64Image string) (stri
 		return "", fmt.Errorf("failed to close temporary label file: %w", err)
 	}
 
+	// Before renaming, check if the destination already exists.
+	// On Windows, os.Rename fails if the destination exists, so we need to
+	// remove it first. Also reject symlinks and directories at the destination.
+	if destInfo, err := os.Lstat(resolvedFilePath); err == nil {
+		if destInfo.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("refusing to replace symlink label file: %s", resolvedFilePath)
+		}
+		if destInfo.IsDir() {
+			return "", fmt.Errorf("refusing to replace directory with label file: %s", resolvedFilePath)
+		}
+		if err := os.Remove(resolvedFilePath); err != nil {
+			return "", fmt.Errorf("failed to remove existing label file: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("failed to inspect existing label file: %w", err)
+	}
+
 	if err := os.Rename(tempFilePath, resolvedFilePath); err != nil {
 		return "", fmt.Errorf("failed to move label file into place: %w", err)
 	}
