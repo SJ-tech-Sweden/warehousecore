@@ -1796,7 +1796,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                 <button
                   onClick={() => {
                     if (convertSubmitting) return;
-                    setConvertSubmitting(false);
                     setCableConvertModal(null);
                   }}
                   disabled={convertSubmitting}
