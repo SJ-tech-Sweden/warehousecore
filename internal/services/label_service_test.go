@@ -115,7 +115,7 @@ func TestSaveLabelImage_RejectsEmptyDeviceID(t *testing.T) {
 }
 
 // TestSaveLabelImage_AcceptsValidDeviceIDs verifies that well-formed device IDs
-// pass the validation stage (they will fail later at base64 decode or DB,
+// pass the validation stage (they will fail later at the DB availability check,
 // but the important thing is they are NOT rejected by the ID check).
 func TestSaveLabelImage_AcceptsValidDeviceIDs(t *testing.T) {
 	ensureNilDB(t)
