@@ -128,11 +128,12 @@ func TestSaveLabelImage_AcceptsValidDeviceIDs(t *testing.T) {
 		"a",
 		"A-B_C",
 	}
-	// A valid base64 PNG is needed to pass the decode step; we use a trivially
-	// invalid one so the function fails at decode — not at deviceID validation.
-	invalidBase64 := "not-valid-base64!!!"
+	// Because ensureNilDB(t) forces the DB check to fail first, this test is not
+	// asserting the base64 decode path. The image payload is only placeholder
+	// input; the key assertion is that valid device IDs are not rejected.
+	imageData := "not-valid-base64!!!"
 	for _, id := range validIDs {
-		_, err := s.SaveLabelImage(id, invalidBase64)
+		_, err := s.SaveLabelImage(id, imageData)
 		if err == nil {
 			t.Fatalf("SaveLabelImage(%q): expected an error (decode or DB), got nil", id)
 		}
