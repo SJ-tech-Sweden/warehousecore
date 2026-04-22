@@ -2021,22 +2021,33 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 	for deviceRows.Next() {
 		var deviceID string
 		if scanErr := deviceRows.Scan(&deviceID); scanErr != nil {
-			log.Printf("[CONVERT CASE] Failed to scan device ID: %v", scanErr)
-			continue
+			log.Printf("[CONVERT CASE] Failed to scan device ID for product %d: %v", id, scanErr)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read product devices"})
+			return
 		}
 		deviceIDs = append(deviceIDs, deviceID)
 	}
-
-	// Determine how many cases to create: one per device, or one if there are no devices
-	count := len(deviceIDs)
-	if count == 0 {
-		count = 1
+	if err = deviceRows.Err(); err != nil {
+		log.Printf("[CONVERT CASE] Row iteration error for product %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read product devices"})
+		return
 	}
 
-	caseIDs := make([]int64, 0, count)
-	for i := 0; i < count; i++ {
+	// Begin transaction so case inserts and device associations are atomic
+	tx, err := db.Begin()
+	if err != nil {
+		log.Printf("[CONVERT CASE] Failed to begin transaction for product %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to start transaction"})
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var caseIDs []int64
+
+	if len(deviceIDs) == 0 {
+		// No devices: create a single unlinked case
 		var caseID int64
-		err = db.QueryRow(`
+		err = tx.QueryRow(`
 			INSERT INTO cases (name, description, width, height, depth, weight, status)
 			VALUES ($1, $2, $3, $4, $5, $6, 'free')
 			RETURNING caseID
@@ -2046,25 +2057,44 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create case"})
 			return
 		}
-
-		// Associate the device with the new case when devices exist
-		if i < len(deviceIDs) {
-			_, err = db.Exec(`INSERT INTO devicescases (deviceID, caseID) VALUES ($1, $2)`, deviceIDs[i], caseID)
+		caseIDs = append(caseIDs, caseID)
+	} else {
+		// Create one case per device and associate each
+		for _, deviceID := range deviceIDs {
+			var caseID int64
+			err = tx.QueryRow(`
+				INSERT INTO cases (name, description, width, height, depth, weight, status)
+				VALUES ($1, $2, $3, $4, $5, $6, 'free')
+				RETURNING caseID
+			`, name, descPtr, wVal, hVal, dVal, weightVal).Scan(&caseID)
 			if err != nil {
-				log.Printf("[CONVERT CASE] Failed to associate device %s with case %d: %v", deviceIDs[i], caseID, err)
+				log.Printf("[CONVERT CASE] Failed to create case for device %s (product %d): %v", deviceID, id, err)
+				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create case"})
+				return
+			}
+
+			_, err = tx.Exec(`INSERT INTO devicescases (deviceID, caseID) VALUES ($1, $2)`, deviceID, caseID)
+			if err != nil {
+				log.Printf("[CONVERT CASE] Failed to associate device %s with case %d: %v", deviceID, caseID, err)
 				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to associate device with case"})
 				return
 			}
-		}
 
-		caseIDs = append(caseIDs, caseID)
+			caseIDs = append(caseIDs, caseID)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		log.Printf("[CONVERT CASE] Failed to commit transaction for product %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to commit conversion"})
+		return
 	}
 
 	log.Printf("[CONVERT CASE] Product %d converted to %d case(s): %v", id, len(caseIDs), caseIDs)
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"case_ids":   caseIDs,
 		"case_count": len(caseIDs),
-		"message":    "Product converted to case successfully",
+		"message":    fmt.Sprintf("Product converted to %d case(s) successfully", len(caseIDs)),
 	})
 }
 
