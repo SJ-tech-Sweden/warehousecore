@@ -37,8 +37,8 @@ type ProductFieldValue struct {
 }
 
 var (
-	validFieldNameRe  = regexp.MustCompile(`^[a-z][a-z0-9_]{0,98}[a-z0-9]$|^[a-z]$`)
-	validFieldTypes   = map[string]bool{"text": true, "number": true, "integer": true, "select": true, "boolean": true}
+	validFieldNameRe = regexp.MustCompile(`^[a-z][a-z0-9_]{0,98}[a-z0-9]$|^[a-z]$`)
+	validFieldTypes  = map[string]bool{"text": true, "number": true, "integer": true, "select": true, "boolean": true}
 )
 
 // GetProductFieldDefinitions retrieves all product field definitions ordered by sort_order

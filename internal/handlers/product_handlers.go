@@ -2023,5 +2023,3 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 		"message": "Product converted to case successfully",
 	})
 }
-
-
