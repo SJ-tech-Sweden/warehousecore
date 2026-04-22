@@ -2065,6 +2065,46 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 		}
 		caseIDs = append(caseIDs, caseID)
 	} else {
+		// Validate that none of the devices are already associated with a case.
+		rows, queryErr := tx.Query(`
+			SELECT deviceID
+			FROM devicescases
+			WHERE deviceID = ANY($1)
+		`, pq.Array(deviceIDs))
+		if queryErr != nil {
+			log.Printf("[CONVERT CASE] Failed to check existing case associations for product %d: %v", id, queryErr)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate device case associations"})
+			return
+		}
+
+		var associatedDeviceIDs []string
+		for rows.Next() {
+			var associatedDeviceID string
+			if scanErr := rows.Scan(&associatedDeviceID); scanErr != nil {
+				rows.Close()
+				log.Printf("[CONVERT CASE] Failed to read existing case association for product %d: %v", id, scanErr)
+				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate device case associations"})
+				return
+			}
+			associatedDeviceIDs = append(associatedDeviceIDs, associatedDeviceID)
+		}
+		if err = rows.Err(); err != nil {
+			rows.Close()
+			log.Printf("[CONVERT CASE] Failed while checking existing case associations for product %d: %v", id, err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate device case associations"})
+			return
+		}
+		rows.Close()
+
+		if len(associatedDeviceIDs) > 0 {
+			sort.Strings(associatedDeviceIDs)
+			log.Printf("[CONVERT CASE] Cannot convert product %d: devices already associated with case(s): %v", id, associatedDeviceIDs)
+			respondJSON(w, http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("device(s) already associated with case(s): %s", strings.Join(associatedDeviceIDs, ", ")),
+			})
+			return
+		}
+
 		// Create one case per device and associate each
 		for _, deviceID := range deviceIDs {
 			var caseID int64
