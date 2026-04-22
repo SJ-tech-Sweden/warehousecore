@@ -2009,7 +2009,22 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch all devices belonging to this product
-	deviceRows, err := db.Query(`SELECT deviceID FROM devices WHERE productID = $1 ORDER BY deviceID ASC`, id)
+	// Begin transaction so device reads, case inserts, and device associations are atomic
+	tx, err := db.Begin()
+	if err != nil {
+		log.Printf("[CONVERT CASE] Failed to begin transaction for product %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to start transaction"})
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	deviceRows, err := tx.Query(`
+		SELECT deviceID
+		FROM devices
+		WHERE productID = $1
+		ORDER BY deviceID ASC
+		FOR UPDATE
+	`, id)
 	if err != nil {
 		log.Printf("[CONVERT CASE] Failed to fetch devices for product %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch product devices"})
@@ -2038,15 +2053,6 @@ func ConvertProductToCase(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to finalize product devices"})
 		return
 	}
-
-	// Begin transaction so case inserts and device associations are atomic
-	tx, err := db.Begin()
-	if err != nil {
-		log.Printf("[CONVERT CASE] Failed to begin transaction for product %d: %v", id, err)
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to start transaction"})
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	var caseIDs []int64
 
