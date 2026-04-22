@@ -13,8 +13,8 @@ import (
 	"warehousecore/internal/repository"
 )
 
-// withNilDB sets the repository DB handles to nil for the duration of the test
-// and restores them afterwards.
+// withNilDB temporarily replaces the repository DB handles with nil for the
+// duration of the test and restores them afterwards via t.Cleanup.
 func withNilDB(t *testing.T) {
 	t.Helper()
 	origGorm := repository.GormDB
@@ -107,14 +107,10 @@ func TestServiceAPI_Routes_NotFoundWithoutAuth(t *testing.T) {
 	}
 }
 
-// TestServiceAPI_CableIDInvalidFormat verifies that a non-numeric cable ID
-// results in 400 (after successful API key auth). We need a real DB for this,
-// but we can still verify the shape of the error with nil DB: the APIKeyMiddleware
-// fires first and returns 500, so with a nil DB we get 500 not 400.
-// This test documents the expected 400 when DB is available.
+// TestServiceAPI_CableRoute_Exists verifies that the /service/cables/{id} route
+// is registered correctly by confirming that a request without an API key returns
+// 401 (auth check fires before the handler, confirming the route is wired up).
 func TestServiceAPI_CableRoute_Exists(t *testing.T) {
-	// Just verify the route is registered correctly; auth check is enough
-	// without a real DB.
 	router := serviceRouter()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/service/cables/not-a-number", nil)
