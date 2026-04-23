@@ -273,37 +273,44 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 	if currentFieldType == "select" && input.FieldType == "select" && validatedOptions != nil {
 		// Parse incoming new options into a set for O(1) lookup.
 		var newOptions []string
-		if err := json.Unmarshal([]byte(*validatedOptions), &newOptions); err == nil && len(newOptions) > 0 {
-			newOptSet := make(map[string]struct{}, len(newOptions))
-			for _, o := range newOptions {
-				newOptSet[o] = struct{}{}
+		if unmarshalErr := json.Unmarshal([]byte(*validatedOptions), &newOptions); unmarshalErr != nil {
+			log.Printf("Error parsing validated options for definition %d: %v", id, unmarshalErr)
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Failed to parse options"})
+			return
+		}
+		newOptSet := make(map[string]struct{}, len(newOptions))
+		for _, o := range newOptions {
+			newOptSet[o] = struct{}{}
+		}
+		// Collect distinct values currently stored for this field.
+		storedRows, qErr := db.Query(
+			`SELECT DISTINCT value FROM product_field_values WHERE field_definition_id=$1`, id)
+		if qErr != nil {
+			log.Printf("Error fetching stored values for definition %d: %v", id, qErr)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
+			return
+		}
+		defer storedRows.Close()
+		var orphaned []string
+		for storedRows.Next() {
+			var sv string
+			if scanErr := storedRows.Scan(&sv); scanErr != nil {
+				continue
 			}
-			// Collect distinct values currently stored for this field.
-			storedRows, qErr := db.Query(
-				`SELECT DISTINCT value FROM product_field_values WHERE field_definition_id=$1`, id)
-			if qErr != nil {
-				log.Printf("Error fetching stored values for definition %d: %v", id, qErr)
-				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
-				return
+			if _, ok := newOptSet[sv]; !ok {
+				orphaned = append(orphaned, sv)
 			}
-			defer storedRows.Close()
-			var orphaned []string
-			for storedRows.Next() {
-				var sv string
-				if scanErr := storedRows.Scan(&sv); scanErr != nil {
-					continue
-				}
-				if _, ok := newOptSet[sv]; !ok {
-					orphaned = append(orphaned, sv)
-				}
-			}
-			_ = storedRows.Err()
-			if len(orphaned) > 0 {
-				respondJSON(w, http.StatusBadRequest, map[string]string{
-					"error": fmt.Sprintf("Cannot remove options that have stored values: %s", strings.Join(orphaned, ", ")),
-				})
-				return
-			}
+		}
+		if rowsErr := storedRows.Err(); rowsErr != nil {
+			log.Printf("Error iterating stored values for definition %d: %v", id, rowsErr)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
+			return
+		}
+		if len(orphaned) > 0 {
+			respondJSON(w, http.StatusBadRequest, map[string]string{
+				"error": fmt.Sprintf("Cannot remove options that have stored values: %s", strings.Join(orphaned, ", ")),
+			})
+			return
 		}
 	}
 

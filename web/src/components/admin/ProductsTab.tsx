@@ -667,7 +667,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
             .filter(([k, v]) => {
               if (v !== '') return true; // always include non-empty (upsert)
               // Include empty only if the field had a stored value when loaded (explicit delete)
-              return !!(loadedFieldValues[k]);
+              return loadedFieldValues[k] !== undefined && loadedFieldValues[k] !== '';
             })
         );
 
