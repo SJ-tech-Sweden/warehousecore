@@ -75,13 +75,13 @@ BEGIN
     -- Populate select options from the lookup tables.
     UPDATE product_field_definitions
     SET options = (
-        SELECT json_agg(name ORDER BY name)::text FROM cable_connectors
+        SELECT COALESCE(json_agg(name ORDER BY name), '[]'::json)::text FROM cable_connectors
     )
     WHERE name IN ('connector_1', 'connector_2');
 
     UPDATE product_field_definitions
     SET options = (
-        SELECT json_agg(name ORDER BY name)::text FROM cable_types
+        SELECT COALESCE(json_agg(name ORDER BY name), '[]'::json)::text FROM cable_types
     )
     WHERE name = 'cable_type';
 

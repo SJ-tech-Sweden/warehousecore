@@ -638,9 +638,11 @@ func exportProductsWithCableFields() ([]byte, error) {
 			MAX(CASE WHEN pfd.name = 'cable_length' THEN pfv.value END) AS cable_length,
 			MAX(CASE WHEN pfd.name = 'cable_mm2'   THEN pfv.value END) AS cable_mm2
 		FROM products p
+		JOIN categories c ON c.categoryID = p.categoryID
 		JOIN product_field_values pfv ON pfv.product_id = p.productID
 		JOIN product_field_definitions pfd ON pfd.id = pfv.field_definition_id
-		WHERE pfd.name IN ('connector_1', 'connector_2', 'cable_type', 'cable_length', 'cable_mm2')
+		WHERE c.name = 'Cables'
+		  AND pfd.name IN ('connector_1', 'connector_2', 'cable_type', 'cable_length', 'cable_mm2')
 		GROUP BY p.productID, p.name
 		ORDER BY p.name
 	`

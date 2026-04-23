@@ -761,7 +761,7 @@ export interface ProductFieldValue {
   field_definition_id: number;
   name: string;
   label: string;
-  field_type: string;
+  field_type: ProductFieldDefinition['field_type'];
   options?: string | null;
   unit?: string | null;
   sort_order: number;

@@ -668,11 +668,15 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
           }
         }
 
-        // For editing: only save when field values were successfully loaded (to avoid wiping
-        // existing values after a transient load error). For new products: only save when there
-        // are values to persist.
+        // For editing: block submit if field values failed to load to avoid silently dropping
+        // user edits. For new products: only save when there are values to persist.
+        if (editingProduct !== null && !fieldValuesLoaded) {
+          window.alert(t('admin.products.errors.fieldValuesSave', { defaultValue: 'Failed to save custom field values' }));
+          setSubmitting(false);
+          return;
+        }
         const shouldSaveFieldValues = editingProduct !== null
-          ? fieldValuesLoaded
+          ? true
           : Object.keys(normalizedValues).length > 0;
         if (shouldSaveFieldValues) {
           try {
