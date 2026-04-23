@@ -19,18 +19,17 @@ import (
 // withErrorDB injects a sqlmock DB that returns connection errors, simulating
 // a database that is unavailable. It returns the mock so callers can register
 // exactly as many expectations as they need and optionally verify them.
-// A t.Cleanup is registered that restores the original DB, verifies all
-// expectations were met, and closes the mock DB.
+// A t.Cleanup is registered that restores the original DB (via the repository
+// mutex helper), verifies all expectations were met, and closes the mock DB.
 func withErrorDB(t *testing.T) sqlmock.Sqlmock {
 	t.Helper()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	origSQL := repository.DB
-	repository.DB = db
+	restore := repository.WithTestSQLDB(db)
 	t.Cleanup(func() {
-		repository.DB = origSQL
+		restore()
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("unmet sqlmock expectations: %v", err)
 		}
@@ -97,7 +96,7 @@ func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
 	for _, path := range paths {
 		// Register one expectation before each request so sqlmock can verify
 		// the middleware is actually querying the DB on every call.
-		mock.ExpectQuery(`SELECT id, last_used_at FROM api_keys`).WillReturnError(errors.New("connection refused"))
+		mock.ExpectQuery(`SELECT id FROM api_keys`).WillReturnError(errors.New("connection refused"))
 
 		t.Run(path, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -155,10 +154,10 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Inject the mock DB into the repository.
-	origSQL := repository.DB
-	repository.DB = db
-	t.Cleanup(func() { repository.DB = origSQL })
+	// Inject the mock DB into the repository using the mutex-protected helper
+	// to avoid cross-package data races when packages run in parallel.
+	restore := repository.WithTestSQLDB(db)
+	t.Cleanup(restore)
 
 	cableID := int64(42)
 

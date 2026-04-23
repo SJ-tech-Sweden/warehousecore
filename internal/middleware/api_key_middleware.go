@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"warehousecore/internal/repository"
 )
@@ -55,11 +54,10 @@ func isAPIKeyValid(raw string) (bool, error) {
 	hash := hashAPIKey(raw)
 
 	var id int
-	var lastUsedAt sql.NullTime
 	err := db.QueryRow(
-		`SELECT id, last_used_at FROM api_keys WHERE api_key_hash = $1 AND is_active = TRUE LIMIT 1`,
+		`SELECT id FROM api_keys WHERE api_key_hash = $1 AND is_active = TRUE LIMIT 1`,
 		hash,
-	).Scan(&id, &lastUsedAt)
+	).Scan(&id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil // key not found – credential mismatch
@@ -67,14 +65,15 @@ func isAPIKeyValid(raw string) (bool, error) {
 		return false, fmt.Errorf("api_key query: %w", err)
 	}
 
-	// Throttle last_used_at updates: only write if the recorded time is more
-	// than 5 minutes old (or has never been set). This avoids unnecessary
-	// write contention on high-frequency service-to-service traffic.
-	const updateInterval = 5 * time.Minute
-	if !lastUsedAt.Valid || time.Since(lastUsedAt.Time) > updateInterval {
-		if _, err := db.Exec("UPDATE api_keys SET last_used_at = $1 WHERE id = $2", time.Now(), id); err != nil {
-			log.Printf("WARN [WarehouseCore]: failed to update last_used_at for API key (id=%d): %v", id, err)
-		}
+	// Throttle last_used_at updates using a conditional UPDATE at the DB level.
+	// Because the WHERE clause checks the current value atomically, concurrent
+	// requests for the same key only trigger one write per 5-minute window even
+	// under burst load – avoiding the read-then-update race in application code.
+	if _, err := db.Exec(
+		`UPDATE api_keys SET last_used_at = NOW() WHERE id = $1 AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '5 minutes')`,
+		id,
+	); err != nil {
+		log.Printf("WARN [WarehouseCore]: failed to update last_used_at for API key (id=%d): %v", id, err)
 	}
 
 	return true, nil

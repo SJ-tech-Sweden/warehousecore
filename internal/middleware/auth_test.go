@@ -92,16 +92,12 @@ func TestExtractAPIKey_NonBearerAuth(t *testing.T) {
 
 // withNilDB explicitly sets the repository DB handles to nil and restores
 // them after the test so the tests are isolated from any prior state.
+// Uses repository.WithTestDatabases so cross-package concurrent tests are
+// serialized via the repository mutex and cannot race on the global handles.
 func withNilDB(t *testing.T) {
 	t.Helper()
-	origGorm := repository.GormDB
-	origSQL := repository.DB
-	repository.GormDB = nil
-	repository.DB = nil
-	t.Cleanup(func() {
-		repository.GormDB = origGorm
-		repository.DB = origSQL
-	})
+	restore := repository.WithTestDatabases(nil, nil)
+	t.Cleanup(restore)
 }
 
 // TestAuthMiddleware_NoCredentials_NoDB verifies that when the database is
