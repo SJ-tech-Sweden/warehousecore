@@ -1073,7 +1073,7 @@ https://warehouse.example.com/api/v1/service
 
 ### Endpoints
 
-#### `GET /service/cables`
+#### `GET /cables`
 
 Returns the full cable catalog with optional filtering.
 
@@ -1116,7 +1116,7 @@ curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
 ]
 ```
 
-#### `GET /service/cables/{id}`
+#### `GET /cables/{id}`
 
 Returns a single cable by ID.
 
@@ -1136,7 +1136,7 @@ curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
 | 404    | Cable not found           |
 | 500    | Internal server error     |
 
-#### `GET /service/devices/{id}`
+#### `GET /devices/{id}`
 
 Returns device metadata including `cable_id` for decoupled RentalCore lookups.
 
@@ -1179,11 +1179,11 @@ npx @redocly/cli preview-docs docs/openapi.decouple.yml
 
 ### Rate Limits
 
-Service endpoints inherit the global API rate limit configured under **Admin → API Limits**. For high-frequency integrations, cache cable metadata locally (cables rarely change) and only poll `GET /service/devices/{id}` when you need live status.
+Service endpoints inherit the global API rate limit configured under **Admin → API Limits**. For high-frequency integrations, cache cable metadata locally (cables rarely change) and only poll `GET /devices/{id}` when you need live status.
 
 ---
 
-### New Tables (WarehouseCore-specific)
+## Database Schema
 
 **storage_zones** - Logical warehouse areas
 - zone_id, code, name, type, description, parent_zone_id, capacity, is_active

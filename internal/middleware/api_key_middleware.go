@@ -20,19 +20,23 @@ func APIKeyMiddleware(next http.Handler) http.Handler {
 			key = strings.TrimSpace(r.URL.Query().Get("api_key"))
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		if key == "" {
-			http.Error(w, "missing API key", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"error":"missing API key"}`)
 			return
 		}
 
 		valid, err := isAPIKeyValid(key)
 		if err != nil {
 			log.Printf("[APIKEY] database error during key validation: %v", err)
-			http.Error(w, `{"error":"Database unavailable"}`, http.StatusInternalServerError)
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, `{"error":"Database unavailable"}`)
 			return
 		}
 		if !valid {
-			http.Error(w, "invalid API key", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"error":"invalid API key"}`)
 			return
 		}
 

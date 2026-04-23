@@ -1,11 +1,13 @@
 package handlers_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/gorilla/mux"
 
 	"warehousecore/internal/handlers"
@@ -60,13 +62,17 @@ func TestServiceAPI_MissingAPIKey(t *testing.T) {
 			if rr.Code != http.StatusUnauthorized {
 				t.Errorf("path %s: expected 401 without API key, got %d", path, rr.Code)
 			}
+			if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+				t.Errorf("path %s: expected Content-Type application/json, got %q", path, ct)
+			}
 		})
 	}
 }
 
-// TestServiceAPI_InvalidAPIKey_NoDB verifies that a request with an API key
-// gets HTTP 500 when the database is unavailable (not a misleading 401).
-func TestServiceAPI_InvalidAPIKey_NoDB(t *testing.T) {
+// TestServiceAPI_APIKey_DBUnavailable_Returns500 verifies that when a key is
+// present but the database is unavailable, the middleware returns 500 (not a
+// misleading 401 "invalid key").
+func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
 	withNilDB(t)
 	router := serviceRouter()
 
@@ -85,6 +91,9 @@ func TestServiceAPI_InvalidAPIKey_NoDB(t *testing.T) {
 
 			if rr.Code != http.StatusInternalServerError {
 				t.Errorf("path %s: expected 500 when DB nil with API key, got %d", path, rr.Code)
+			}
+			if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+				t.Errorf("path %s: expected Content-Type application/json, got %q", path, ct)
 			}
 		})
 	}
@@ -123,43 +132,77 @@ func TestServiceAPI_CableRoute_Exists(t *testing.T) {
 	}
 }
 
-// TestGetDevice_ResponseIncludesCableIDField verifies that the GetDevice
-// handler response struct includes a cable_id field. We test this by checking
-// that the JSON produced when the handler would respond with an empty response
-// (which we can infer from the struct tags) includes the field key when set.
-// Since we can't call the handler without a DB, we use a compile-time check:
-// this test will fail to compile if the DeviceResponse (local to GetDevice)
-// no longer has a CableID field accessible via the JSON key "cable_id".
-func TestGetDevice_ResponseStruct_HasCableID(t *testing.T) {
-	// Build a representative response object and verify cable_id appears in JSON.
-	type deviceResponseShape struct {
-		DeviceID string `json:"device_id"`
-		CableID  *int64 `json:"cable_id,omitempty"`
-		Status   string `json:"status"`
-	}
-
-	cableID := int64(123)
-	resp := deviceResponseShape{
-		DeviceID: "DEV001",
-		CableID:  &cableID,
-		Status:   "in_storage",
-	}
-
-	data, err := json.Marshal(resp)
+// TestGetDevice_ResponseIncludesCableID exercises the GetDevice handler with a
+// mocked SQL database and verifies that the JSON response includes the cable_id
+// field when a cable is associated with the device.
+func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
+	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("failed to marshal response: %v", err)
+		t.Fatalf("failed to open sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	// Inject the mock DB into the repository.
+	origSQL := repository.DB
+	repository.DB = db
+	t.Cleanup(func() { repository.DB = origSQL })
+
+	cableID := int64(42)
+
+	// The GetDevice query selects many columns; we must match them in order.
+	rows := sqlmock.NewRows([]string{
+		"deviceID", "productID",
+		"product_name", "product_description", "product_category", "subcategory",
+		"manufacturer_name", "brand_name",
+		"product_weight", "product_width", "product_height", "product_depth",
+		"maintenance_interval", "power_consumption",
+		"serialnumber", "rfid", "barcode", "qr_code",
+		"status", "zone_id", "condition_rating", "usage_hours", "label_path",
+		"purchase_date", "notes",
+		"zone_name", "zone_code", "case_name", "job_number",
+		"cable_id",
+	}).AddRow(
+		"DEV001", sql.NullInt64{Int64: 1, Valid: true},
+		"Test Product", "A test device", "Audio", "",
+		"Shure", "Shure",
+		float64(0), float64(0), float64(0), float64(0),
+		0, float64(0),
+		sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{},
+		"in_storage", sql.NullInt64{}, float64(4.5), float64(10.0), sql.NullString{},
+		sql.NullString{}, sql.NullString{},
+		"Shelf A", "WDL-01", "", "",
+		sql.NullInt64{Int64: cableID, Valid: true},
+	)
+
+	mock.ExpectQuery(`SELECT d\.deviceID`).WillReturnRows(rows)
+
+	// Build a router that routes to GetDevice without any auth middleware.
+	router := mux.NewRouter()
+	router.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
+
+	req := httptest.NewRequest(http.MethodGet, "/devices/DEV001", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 
-	var m map[string]interface{}
-	if err := json.Unmarshal(data, &m); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
+	var body map[string]interface{}
+	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	if _, ok := m["cable_id"]; !ok {
-		t.Error("expected cable_id field in device response JSON, but it was absent")
+	rawCableID, ok := body["cable_id"]
+	if !ok {
+		t.Fatal("expected cable_id field in GetDevice response, but it was absent")
+	}
+	if rawCableID != float64(cableID) {
+		t.Errorf("expected cable_id=%d, got %v", cableID, rawCableID)
 	}
 
-	if m["cable_id"] != float64(123) {
-		t.Errorf("expected cable_id=123, got %v", m["cable_id"])
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled sqlmock expectations: %v", err)
 	}
 }
+
