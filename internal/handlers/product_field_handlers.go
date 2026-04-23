@@ -242,6 +242,8 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 
 	// Reject field_type changes when existing values are stored for this definition,
 	// as the stored values may no longer be valid for the new type.
+	// Also reject options changes for select fields when the new option set would
+	// orphan (invalidate) any currently stored value.
 	var currentFieldType string
 	var valuesExist bool
 	err = db.QueryRow(`SELECT field_type FROM product_field_definitions WHERE id=$1`, id).Scan(&currentFieldType)
@@ -264,6 +266,44 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 		if valuesExist {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cannot change field_type when values exist for this field"})
 			return
+		}
+	}
+	// For select fields: reject options changes that would orphan stored values
+	// (i.e., stored values that are not present in the new options list).
+	if currentFieldType == "select" && input.FieldType == "select" && validatedOptions != nil {
+		// Parse incoming new options into a set for O(1) lookup.
+		var newOptions []string
+		if err := json.Unmarshal([]byte(*validatedOptions), &newOptions); err == nil && len(newOptions) > 0 {
+			newOptSet := make(map[string]struct{}, len(newOptions))
+			for _, o := range newOptions {
+				newOptSet[o] = struct{}{}
+			}
+			// Collect distinct values currently stored for this field.
+			storedRows, qErr := db.Query(
+				`SELECT DISTINCT value FROM product_field_values WHERE field_definition_id=$1`, id)
+			if qErr != nil {
+				log.Printf("Error fetching stored values for definition %d: %v", id, qErr)
+				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
+				return
+			}
+			defer storedRows.Close()
+			var orphaned []string
+			for storedRows.Next() {
+				var sv string
+				if scanErr := storedRows.Scan(&sv); scanErr != nil {
+					continue
+				}
+				if _, ok := newOptSet[sv]; !ok {
+					orphaned = append(orphaned, sv)
+				}
+			}
+			_ = storedRows.Err()
+			if len(orphaned) > 0 {
+				respondJSON(w, http.StatusBadRequest, map[string]string{
+					"error": fmt.Sprintf("Cannot remove options that have stored values: %s", strings.Join(orphaned, ", ")),
+				})
+				return
+			}
 		}
 	}
 
@@ -391,7 +431,15 @@ type fieldDefMeta struct {
 
 // validateFieldValue checks that value is acceptable for the given field definition.
 // An empty value is allowed only for non-required fields (it signals deletion).
+// For non-text types the value is trimmed before validation; for required text
+// fields a whitespace-only value is treated as empty (and therefore invalid).
 func validateFieldValue(name, value string, def fieldDefMeta) error {
+	// Trim whitespace for non-text types; for required text treat whitespace-only as empty.
+	if def.FieldType != "text" {
+		value = strings.TrimSpace(value)
+	} else if def.IsRequired && strings.TrimSpace(value) == "" {
+		value = ""
+	}
 	if value == "" {
 		if def.IsRequired {
 			return fmt.Errorf("field '%s' is required and cannot be empty", name)
@@ -545,6 +593,21 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate all names exist and values are acceptable before touching the DB.
+	// First normalize: trim whitespace for non-text field types so that the trimmed
+	// value is both validated and written to the DB. For required text fields treat
+	// a whitespace-only value as empty (triggering the required-field error).
+	for _, name := range names {
+		meta, ok := nameToMeta[name]
+		if !ok {
+			continue
+		}
+		val := body.Values[name]
+		if meta.FieldType != "text" {
+			body.Values[name] = strings.TrimSpace(val)
+		} else if meta.IsRequired && strings.TrimSpace(val) == "" {
+			body.Values[name] = ""
+		}
+	}
 	for _, name := range names {
 		meta, ok := nameToMeta[name]
 		if !ok {

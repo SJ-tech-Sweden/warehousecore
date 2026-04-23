@@ -221,6 +221,10 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   // Custom field definitions and values
   const [fieldDefinitions, setFieldDefinitions] = useState<ProductFieldDefinition[]>([]);
   const [productFieldValues, setProductFieldValues] = useState<Record<string, string>>({});
+  // Snapshot of field values as loaded from the backend. Used on save to filter out
+  // fields that were never set and haven't been changed (avoids no-op DELETEs for
+  // every empty optional field on every save).
+  const [loadedFieldValues, setLoadedFieldValues] = useState<Record<string, string>>({});
   // True only when field values were successfully loaded for the product being edited.
   // Used to guard against accidentally clearing values when the load failed.
   const [fieldValuesLoaded, setFieldValuesLoaded] = useState(false);
@@ -437,6 +441,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setProductDevices([]);
     setDevicesToDelete(new Set());
     setProductFieldValues({});
+    setLoadedFieldValues({});
     setFieldValuesLoaded(false);
   }, []);
 
@@ -472,6 +477,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setFormData(initialFormData);
     setEditingProduct(null);
     setProductFieldValues({});
+    setLoadedFieldValues({});
     setFieldValuesLoaded(false);
     setModalOpen(true);
   };
@@ -491,6 +497,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
           valuesMap[fv.name] = fv.value;
         }
         setProductFieldValues(valuesMap);
+        setLoadedFieldValues(valuesMap);
         setFieldValuesLoaded(true);
       } catch (e) {
         console.error('Failed to load field values:', e);
@@ -645,14 +652,22 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
         // Build a lookup of field type by name so we know which fields to trim.
         const fieldTypeByName = Object.fromEntries(fieldDefinitions.map(f => [f.name, f.field_type]));
         // Normalize values: trim whitespace only for non-text fields (number, integer, select,
-        // boolean). Text fields preserve leading/trailing whitespace; empty-string entries are
-        // kept intentionally because the backend treats them as an explicit delete signal.
+        // boolean). Text fields preserve leading/trailing whitespace.
+        // Then filter to only include:
+        //   • Non-empty values (upsert)
+        //   • Fields that were non-empty when loaded but are now empty (explicit delete)
+        // This avoids sending no-op DELETE requests for optional fields that were never set.
         const normalizedValues = Object.fromEntries(
           Object.entries(productFieldValues)
             .map(([k, v]) => {
               const ftype = fieldTypeByName[k];
               const normalized = ftype && ftype !== 'text' ? v.trim() : v;
               return [k, normalized] as const;
+            })
+            .filter(([k, v]) => {
+              if (v !== '') return true; // always include non-empty (upsert)
+              // Include empty only if the field had a stored value when loaded (explicit delete)
+              return !!(loadedFieldValues[k]);
             })
         );
 
@@ -1763,17 +1778,29 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                                 {field.label}{field.unit ? ` (${field.unit})` : ''}{field.is_required ? ' *' : ''}
                               </label>
                               {field.field_type === 'select' ? (
-                                <select
-                                  id={fieldInputId}
-                                  value={productFieldValues[field.name] ?? ''}
-                                  onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
-                                  className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg text-white focus:ring-1 focus:ring-accent-red focus:border-accent-red"
-                                >
-                                  <option value="">—</option>
-                                  {parseOptionsArray(field.options).map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
+                                (() => {
+                                  const currentVal = productFieldValues[field.name] ?? '';
+                                  const opts = parseOptionsArray(field.options);
+                                  const isInvalid = currentVal !== '' && !opts.includes(currentVal);
+                                  return (
+                                    <select
+                                      id={fieldInputId}
+                                      value={currentVal}
+                                      onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                      className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg text-white focus:ring-1 focus:ring-accent-red focus:border-accent-red"
+                                    >
+                                      <option value="">—</option>
+                                      {isInvalid && (
+                                        <option value={currentVal} className="text-yellow-400">
+                                          ⚠ {currentVal}
+                                        </option>
+                                      )}
+                                      {opts.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  );
+                                })()
                               ) : (
                                 <input
                                   id={fieldInputId}
