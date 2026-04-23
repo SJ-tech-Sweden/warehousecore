@@ -779,6 +779,8 @@ export const productFieldDefinitionsApi = {
 
 export const productFieldValuesApi = {
   get: (productId: number) => api.get<ProductFieldValue[]>(`/admin/products/${productId}/field-values`),
-  set: (productId: number, values: Record<string, string>) =>
-    api.put(`/admin/products/${productId}/field-values`, { values }),
+  // When values is undefined the "values" key is omitted from the JSON body, which
+  // the backend treats as a no-op. Pass an explicit map (even empty) to update/clear values.
+  set: (productId: number, values?: Record<string, string>) =>
+    api.put(`/admin/products/${productId}/field-values`, values !== undefined ? { values } : {}),
 };

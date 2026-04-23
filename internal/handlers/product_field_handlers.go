@@ -484,6 +484,48 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Enforce required fields that are NOT in the incoming request map.
+	// Each such field must already have a stored value; if not, the update would leave
+	// a required field empty.
+	missingRows, err := db.QueryContext(r.Context(), `
+		SELECT d.name
+		FROM product_field_definitions d
+		WHERE d.is_required = true
+		  AND d.name != ANY($1)
+		  AND NOT EXISTS(
+		      SELECT 1 FROM product_field_values v
+		      WHERE v.product_id = $2 AND v.field_definition_id = d.id
+		  )
+	`, pq.Array(names), productID)
+	if err != nil {
+		log.Printf("Error checking required fields for product %d: %v", productID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate required fields"})
+		return
+	}
+	defer missingRows.Close()
+	var missingRequired []string
+	for missingRows.Next() {
+		var fieldName string
+		if err := missingRows.Scan(&fieldName); err != nil {
+			log.Printf("Error scanning missing required field: %v", err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate required fields"})
+			return
+		}
+		missingRequired = append(missingRequired, fieldName)
+	}
+	if err := missingRows.Err(); err != nil {
+		log.Printf("Error iterating missing required fields for product %d: %v", productID, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate required fields"})
+		return
+	}
+	if len(missingRequired) > 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]interface{}{
+			"error":  "Missing required field(s)",
+			"fields": missingRequired,
+		})
+		return
+	}
+
 	// Apply all updates/deletes inside a single transaction bound to the request context.
 	tx, err := db.BeginTx(r.Context(), nil)
 	if err != nil {

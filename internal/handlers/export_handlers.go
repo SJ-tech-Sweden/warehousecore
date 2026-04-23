@@ -629,7 +629,7 @@ func exportProductsWithCableFields() ([]byte, error) {
 
 	// Fetch products that have at least one cable-related field value
 	query := `
-		SELECT DISTINCT
+		SELECT
 			p.productID,
 			p.name,
 			MAX(CASE WHEN pfd.name = 'connector_1' THEN pfv.value END) AS connector_1,

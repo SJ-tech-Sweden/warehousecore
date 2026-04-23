@@ -221,6 +221,9 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   // Custom field definitions and values
   const [fieldDefinitions, setFieldDefinitions] = useState<ProductFieldDefinition[]>([]);
   const [productFieldValues, setProductFieldValues] = useState<Record<string, string>>({});
+  // True only when field values were successfully loaded for the product being edited.
+  // Used to guard against accidentally clearing values when the load failed.
+  const [fieldValuesLoaded, setFieldValuesLoaded] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
@@ -412,6 +415,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setProductDevices([]);
     setDevicesToDelete(new Set());
     setProductFieldValues({});
+    setFieldValuesLoaded(false);
   }, []);
 
   const closeDetailModal = () => {
@@ -446,6 +450,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setFormData(initialFormData);
     setEditingProduct(null);
     setProductFieldValues({});
+    setFieldValuesLoaded(false);
     setModalOpen(true);
   };
 
@@ -464,9 +469,11 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
           valuesMap[fv.name] = fv.value;
         }
         setProductFieldValues(valuesMap);
+        setFieldValuesLoaded(true);
       } catch (e) {
         console.error('Failed to load field values:', e);
-        setProductFieldValues({});
+        // Do not reset productFieldValues here; fieldValuesLoaded stays false,
+        // so handleSubmit will skip the field-values save and avoid wiping existing data.
       }
     } catch (error) {
       console.error('Failed to load product details:', error);
@@ -613,13 +620,21 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       }
 
       if (fieldDefinitions.length > 0 && productId) {
-        try {
-          await productFieldValuesApi.set(productId, productFieldValues);
-        } catch (e) {
-          console.error('Failed to save field values:', e);
-          window.alert(t('admin.products.errors.save'));
-          setSubmitting(false);
-          return;
+        // For editing: only save when field values were successfully loaded (to avoid wiping
+        // existing values after a transient load error). For new products: only save when the
+        // user actually entered values.
+        const shouldSaveFieldValues = editingProduct !== null
+          ? fieldValuesLoaded
+          : Object.values(productFieldValues).some(v => v.trim() !== '');
+        if (shouldSaveFieldValues) {
+          try {
+            await productFieldValuesApi.set(productId, productFieldValues);
+          } catch (e) {
+            console.error('Failed to save field values:', e);
+            window.alert(t('admin.products.errors.save'));
+            setSubmitting(false);
+            return;
+          }
         }
       }
 
