@@ -19,6 +19,7 @@ WarehouseCore is the digital twin of the Weidelbach warehouse, providing real-ti
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [API Documentation](#api-documentation)
+- [Service API (RentalCore Integration)](#service-api-rentalcore-integration)
 - [Product Pictures](#product-pictures)
 - [Database Schema](#database-schema)
 - [Deployment](#deployment)
@@ -1046,9 +1047,77 @@ curl http://localhost:8081/api/v1/health
 
 ---
 
-## Database Schema
+## Service API (RentalCore Integration)
 
-### New Tables (WarehouseCore-specific)
+WarehouseCore exposes a dedicated **Service API** that allows RentalCore (and other trusted services) to fetch device metadata without requiring a browser session or admin privileges. All service endpoints require a valid `X-API-Key` header.
+
+### Authentication
+
+Service calls are authenticated via a shared API key. Create a service key in the Admin Dashboard under **Admin → API Keys** (or via `POST /api/v1/admin/api-keys`).
+
+```bash
+# Create a service key for RentalCore (run once, store the returned api_key securely)
+curl -b "session_id=<your-admin-session>" \
+  -X POST https://warehouse.example.com/api/v1/admin/api-keys \
+  -H "Content-Type: application/json" \
+  -d '{"name":"rentalcore-service","is_admin":false}'
+```
+
+The returned `api_key` value must be kept secret and passed as the `X-API-Key` header on every service request.
+
+### Base URL
+
+```
+https://warehouse.example.com/api/v1/service
+```
+
+### Endpoints
+
+#### `GET /devices/{id}`
+
+Returns device metadata for decoupled RentalCore lookups.
+
+**Example:**
+
+```bash
+curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
+  "https://warehouse.example.com/api/v1/service/devices/DEV001"
+```
+
+**Response:**
+
+```json
+{
+  "device_id": "DEV001",
+  "product_id": 42,
+  "product_name": "Funkmikrofon Shure SM58",
+  "status": "in_storage",
+  "zone_id": 7,
+  "zone_name": "Shelf A",
+  "condition_rating": 4.5,
+  "usage_hours": 120.0
+}
+```
+
+### OpenAPI Specification
+
+The full service API contract is documented in [`docs/openapi.decouple.yml`](docs/openapi.decouple.yml). You can validate or generate client code with:
+
+```bash
+# Validate with openapi-cli
+npx @redocly/cli lint docs/openapi.decouple.yml
+
+# Or view interactively
+npx @redocly/cli preview-docs docs/openapi.decouple.yml
+```
+
+### Rate Limits
+
+WarehouseCore does not enforce application-level rate limiting on these service endpoints. If request throttling is required, configure it at your deployment layer (for example, a reverse proxy or API gateway).
+
+---
+
+## Database Schema
 
 **storage_zones** - Logical warehouse areas
 - zone_id, code, name, type, description, parent_zone_id, capacity, is_active

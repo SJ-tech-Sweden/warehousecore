@@ -1,0 +1,264 @@
+openapi: "3.1.0"
+
+info:
+  title: WarehouseCore Service API
+  version: "1.0.0"
+  description: |
+    Read-only service API for RentalCore (and other trusted services) to fetch
+    device metadata from WarehouseCore without relying on cross-database
+    foreign keys.
+
+    **Authentication:** All endpoints require the `X-API-Key` header containing a
+    valid, active API key created in the WarehouseCore admin panel
+    (Admin → API Keys). Non-admin service keys are sufficient.
+
+    **Base path:** `/api/v1/service`
+
+servers:
+  - url: https://warehouse.example.com/api/v1/service
+    description: Production
+  - url: http://localhost:8081/api/v1/service
+    description: Local development
+
+security:
+  - apiKey: []
+
+paths:
+  /devices/{id}:
+    get:
+      operationId: getDevice
+      summary: Get device by ID
+      description: |
+        Returns device metadata for decoupled RentalCore lookups.
+      tags:
+        - Devices
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Device ID (string, e.g. "DEV001").
+          schema:
+            type: string
+            example: "DEV001"
+      responses:
+        "200":
+          description: Device found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+              example:
+                device_id: "DEV001"
+                product_id: 42
+                product_name: "Funkmikrofon Shure SM58"
+                product_category: "Audio"
+                status: "in_storage"
+                zone_id: 7
+                zone_name: "Shelf A"
+                zone_code: "WDL-RG-01-F-01"
+                condition_rating: 4.5
+                usage_hours: 120.0
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key issued via the WarehouseCore Admin panel (Admin → API Keys).
+        Service keys do not require `is_admin=true`.
+
+  schemas:
+    Device:
+      type: object
+      required:
+        - device_id
+        - status
+        - condition_rating
+        - usage_hours
+      properties:
+        device_id:
+          type: string
+          description: Unique device identifier.
+          example: "DEV001"
+        product_id:
+          type: ["integer", "null"]
+          description: Associated product ID.
+          example: 42
+        product_name:
+          type: string
+          description: Product display name.
+          example: "Funkmikrofon Shure SM58"
+        product_description:
+          type: string
+          description: Product description.
+          example: "Dynamic vocal microphone"
+        product_category:
+          type: string
+          description: Product category name.
+          example: "Audio"
+        subcategory:
+          type: string
+          description: Product subcategory name.
+          example: "Microphones"
+        manufacturer_name:
+          type: string
+          description: Manufacturer name.
+          example: "Shure"
+        brand_name:
+          type: string
+          description: Brand name.
+          example: "Shure"
+        product_weight:
+          type: number
+          format: float
+          description: Product weight in kg.
+          example: 0.6
+        product_width:
+          type: number
+          format: float
+          description: Product width in cm.
+          example: 10.0
+        product_height:
+          type: number
+          format: float
+          description: Product height in cm.
+          example: 5.0
+        product_depth:
+          type: number
+          format: float
+          description: Product depth in cm.
+          example: 8.0
+        maintenance_interval:
+          type: integer
+          description: Maintenance interval in days (0 = not set).
+          example: 365
+        power_consumption:
+          type: number
+          format: float
+          description: Power consumption in watts (0 = not set).
+          example: 12.0
+        serial_number:
+          type: ["string", "null"]
+          description: Device serial number.
+          example: "SN123456"
+        rfid:
+          type: ["string", "null"]
+          description: RFID tag value.
+        barcode:
+          type: ["string", "null"]
+          description: Barcode value.
+          example: "4711"
+        qr_code:
+          type: ["string", "null"]
+          description: QR code value.
+          example: "DEV001-QR"
+        status:
+          type: string
+          description: Current device status.
+          enum:
+            - in_storage
+            - on_job
+            - defective
+            - repair
+            - rented
+          example: "in_storage"
+        zone_id:
+          type: ["integer", "null"]
+          description: Current storage zone ID.
+          example: 7
+        zone_name:
+          type: string
+          description: Current storage zone name.
+          example: "Shelf A"
+        zone_code:
+          type: string
+          description: Current storage zone code.
+          example: "WDL-RG-01-F-01"
+        case_name:
+          type: string
+          description: Name of the case the device is in (empty if not in a case).
+          example: "Case-01"
+        job_number:
+          type: string
+          description: Current job number if device is on a job.
+          example: "JOB000042"
+        condition_rating:
+          type: number
+          format: float
+          description: Device condition rating (0–5).
+          example: 4.5
+        usage_hours:
+          type: number
+          format: float
+          description: Cumulative usage hours.
+          example: 120.0
+        purchase_date:
+          type: ["string", "null"]
+          format: date
+          description: Purchase date (YYYY-MM-DD).
+          example: "2023-01-15"
+        notes:
+          type: ["string", "null"]
+          description: Free-text notes.
+        label_path:
+          type: ["string", "null"]
+          description: Path to a generated label file.
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+          example: "Device not found"
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Invalid device ID"
+
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "invalid API key"
+
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Device not found"
+
+    InternalServerError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Failed to fetch device"
+
+tags:
+  - name: Devices
+    description: Device metadata endpoints.
