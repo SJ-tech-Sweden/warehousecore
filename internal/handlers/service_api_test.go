@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,17 +16,22 @@ import (
 	"warehousecore/internal/repository"
 )
 
-// withNilDB temporarily replaces the repository DB handles with nil for the
-// duration of the test and restores them afterwards via t.Cleanup.
-func withNilDB(t *testing.T) {
+// withErrorDB injects a sqlmock DB that returns a connection error on any
+// query, simulating a database that is unavailable. This is preferred over
+// setting repository.DB = nil because it avoids mutating global nil state
+// that could race with concurrent package-level tests.
+func withErrorDB(t *testing.T) {
 	t.Helper()
-	origGorm := repository.GormDB
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	mock.ExpectQuery(".*").WillReturnError(errors.New("connection refused"))
 	origSQL := repository.DB
-	repository.GormDB = nil
-	repository.DB = nil
+	repository.DB = db
 	t.Cleanup(func() {
-		repository.GormDB = origGorm
 		repository.DB = origSQL
+		db.Close()
 	})
 }
 
@@ -71,9 +77,10 @@ func TestServiceAPI_MissingAPIKey(t *testing.T) {
 
 // TestServiceAPI_APIKey_DBUnavailable_Returns500 verifies that when a key is
 // present but the database is unavailable, the middleware returns 500 (not a
-// misleading 401 "invalid key").
+// misleading 401 "invalid key"). Uses a sqlmock DB that returns a connection
+// error to avoid mutating global nil state.
 func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
-	withNilDB(t)
+	withErrorDB(t)
 	router := serviceRouter()
 
 	paths := []string{
@@ -90,7 +97,7 @@ func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
 			router.ServeHTTP(rr, req)
 
 			if rr.Code != http.StatusInternalServerError {
-				t.Errorf("path %s: expected 500 when DB nil with API key, got %d", path, rr.Code)
+				t.Errorf("path %s: expected 500 when DB unavailable with API key, got %d", path, rr.Code)
 			}
 			if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
 				t.Errorf("path %s: expected Content-Type application/json, got %q", path, ct)
@@ -205,4 +212,3 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 		t.Errorf("unfulfilled sqlmock expectations: %v", err)
 	}
 }
-

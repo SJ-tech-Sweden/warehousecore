@@ -102,8 +102,6 @@ paths:
                   cable_type_name: "Power Cable"
         "401":
           $ref: "#/components/responses/Unauthorized"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -148,8 +146,6 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -193,8 +189,6 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/TooManyRequests"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -435,17 +429,6 @@ components:
             $ref: "#/components/schemas/Error"
           example:
             error: "Cable not found"
-
-    TooManyRequests:
-      description: |
-        Rate limit exceeded. Back off and retry after a short delay.
-        Configure limits under Admin → API Limits.
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
-          example:
-            error: "rate limit exceeded"
 
     InternalServerError:
       description: Unexpected server error.

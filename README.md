@@ -1179,7 +1179,7 @@ npx @redocly/cli preview-docs docs/openapi.decouple.yml
 
 ### Rate Limits
 
-Service endpoints inherit the global API rate limit configured under **Admin → API Limits**. For high-frequency integrations, cache cable metadata locally (cables rarely change) and only poll `GET /devices/{id}` when you need live status.
+WarehouseCore does not enforce application-level rate limiting on these service endpoints. If request throttling is required, configure it at your deployment layer (for example, a reverse proxy or API gateway). For high-frequency integrations, cache cable metadata locally (cables rarely change) and only poll `GET /devices/{id}` when you need live status.
 
 ---
 
