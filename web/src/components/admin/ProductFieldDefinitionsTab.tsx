@@ -96,6 +96,10 @@ export function ProductFieldDefinitionsTab() {
         .split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 0);
+      if (lines.length === 0) {
+        window.alert(t('admin.fieldDefinitions.errors.selectOptionsRequired', { defaultValue: 'Select fields must include at least one option.' }));
+        return;
+      }
       options = JSON.stringify(lines);
     }
 

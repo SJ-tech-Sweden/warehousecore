@@ -620,11 +620,11 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       }
 
       if (fieldDefinitions.length > 0 && productId) {
-        // Normalize values: trim whitespace, omit empty entries (backend deletes those rows).
+        // Normalize values: trim whitespace. Empty-string entries are intentionally kept so
+        // that clearing a field sends an explicit delete to the backend.
         const normalizedValues = Object.fromEntries(
           Object.entries(productFieldValues)
             .map(([k, v]) => [k, v.trim()] as const)
-            .filter(([, v]) => v !== '')
         );
 
         // For new products: validate required fields client-side before calling the API.

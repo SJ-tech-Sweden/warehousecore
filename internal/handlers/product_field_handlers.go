@@ -139,7 +139,11 @@ func CreateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 	input.Label = strings.TrimSpace(input.Label)
 	if input.Unit != nil {
 		trimmed := strings.TrimSpace(*input.Unit)
-		input.Unit = &trimmed
+		if trimmed == "" {
+			input.Unit = nil
+		} else {
+			input.Unit = &trimmed
+		}
 	}
 
 	if !validFieldNameRe.MatchString(input.Name) {
@@ -211,7 +215,11 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 	input.Label = strings.TrimSpace(input.Label)
 	if input.Unit != nil {
 		trimmed := strings.TrimSpace(*input.Unit)
-		input.Unit = &trimmed
+		if trimmed == "" {
+			input.Unit = nil
+		} else {
+			input.Unit = &trimmed
+		}
 	}
 
 	if input.Label == "" {

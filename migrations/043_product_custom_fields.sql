@@ -176,20 +176,23 @@ BEGIN
         END LOOP;
     END;
 
-    -- -----------------------------------------------------------------------
-    -- 3d. Clean up cable-specific columns and tables.
-    -- -----------------------------------------------------------------------
-
-    -- Remove FK constraint and index added by migration 042, then drop the column.
-    ALTER TABLE devices DROP CONSTRAINT IF EXISTS fk_devices_cable_id;
-    DROP  INDEX  IF EXISTS idx_devices_cable_id;
-    ALTER TABLE devices DROP COLUMN IF EXISTS cable_id;
-
-    -- Drop cable tables (FK-safe order: dependent first).
-    DROP TABLE IF EXISTS cables;
-    DROP TABLE IF EXISTS cable_connectors;
-    DROP TABLE IF EXISTS cable_types;
-
 END $$;
+
+-- ---------------------------------------------------------------------------
+-- 3d. Clean up cable-specific columns and tables.
+--     These DDL statements always run (guarded by IF EXISTS) so that a
+--     partially-migrated environment (cables already gone, column still
+--     present) is also correctly cleaned up.
+-- ---------------------------------------------------------------------------
+
+-- Remove FK constraint and index added by migration 042, then drop the column.
+ALTER TABLE devices DROP CONSTRAINT IF EXISTS fk_devices_cable_id;
+DROP  INDEX  IF EXISTS idx_devices_cable_id;
+ALTER TABLE devices DROP COLUMN IF EXISTS cable_id;
+
+-- Drop cable tables (FK-safe order: dependent first).
+DROP TABLE IF EXISTS cables;
+DROP TABLE IF EXISTS cable_connectors;
+DROP TABLE IF EXISTS cable_types;
 
 COMMIT;
