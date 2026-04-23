@@ -1741,6 +1741,7 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                               <input
                                 id={fieldInputId}
                                 type="checkbox"
+                                aria-label={`${field.label}${field.unit ? ` (${field.unit})` : ''}${field.is_required ? ' *' : ''}`}
                                 checked={productFieldValues[field.name] === 'true'}
                                 onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.checked ? 'true' : 'false' }))}
                                 className="w-5 h-5 rounded"
