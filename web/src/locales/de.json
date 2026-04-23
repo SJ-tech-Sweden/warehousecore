@@ -1185,7 +1185,9 @@
         "convertToCable": "Produkt konnte nicht in Kabel umgewandelt werden.",
         "loadCableMetadata": "Kabelstecker/Typen konnten nicht geladen werden.",
         "bulkDelete": "Ausgewählte Produkte konnten nicht gelöscht werden.",
-        "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden."
+        "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden.",
+        "requiredFields": "Bitte füllen Sie alle Pflichtfelder aus.",
+        "fieldValuesSave": "Feldwerte konnten nicht gespeichert werden."
       },
       "convertToCase": "In Case umwandeln",
       "convertToCable": "In Kabel umwandeln",

@@ -292,14 +292,13 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
 
   const loadMetadata = useCallback(async () => {
     try {
-      const [catRes, subRes, subbierRes, brandRes, manufacturerRes, countTypeRes, fieldDefsRes] = await Promise.all([
+      const [catRes, subRes, subbierRes, brandRes, manufacturerRes, countTypeRes] = await Promise.all([
         api.get<Category[]>('/admin/categories'),
         api.get<Subcategory[]>('/admin/subcategories'),
         api.get<Subbiercategory[]>('/admin/subbiercategories'),
         api.get<Brand[]>('/admin/brands'),
         api.get<Manufacturer[]>('/admin/manufacturers'),
         api.get<CountType[]>('/admin/count-types'),
-        productFieldDefinitionsApi.list(),
       ]);
 
       setCategories(catRes.data || []);
@@ -308,11 +307,17 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       setBrands(brandRes.data || []);
       setManufacturers(manufacturerRes.data || []);
       setCountTypes(countTypeRes.data || []);
-      setFieldDefinitions(fieldDefsRes.data || []);
 
       setMetadataLoaded(true);
     } catch (error) {
       console.error('Failed to load metadata:', error);
+    }
+
+    try {
+      const fieldDefsRes = await productFieldDefinitionsApi.list();
+      setFieldDefinitions(fieldDefsRes.data || []);
+    } catch (error) {
+      console.error('Failed to load field definitions:', error);
     }
   }, []);
 

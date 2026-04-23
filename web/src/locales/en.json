@@ -1185,7 +1185,9 @@
         "convertToCable": "Failed to convert product to cable.",
         "loadCableMetadata": "Failed to load cable connectors/types.",
         "bulkDelete": "Failed to delete selected products.",
-        "bulkUpdate": "Failed to update selected products."
+        "bulkUpdate": "Failed to update selected products.",
+        "requiredFields": "Please fill in all required fields.",
+        "fieldValuesSave": "Failed to save field values."
       },
       "convertToCase": "Convert to case",
       "convertToCable": "Convert to cable",

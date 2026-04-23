@@ -240,6 +240,33 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 
 	db := repository.GetSQLDB()
 
+	// Reject field_type changes when existing values are stored for this definition,
+	// as the stored values may no longer be valid for the new type.
+	var currentFieldType string
+	var valuesExist bool
+	err = db.QueryRow(`SELECT field_type FROM product_field_definitions WHERE id=$1`, id).Scan(&currentFieldType)
+	if err == sql.ErrNoRows {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Field definition not found"})
+		return
+	}
+	if err != nil {
+		log.Printf("Error fetching product field definition %d: %v", id, err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
+		return
+	}
+	if currentFieldType != input.FieldType {
+		err = db.QueryRow(`SELECT EXISTS(SELECT 1 FROM product_field_values WHERE field_definition_id=$1)`, id).Scan(&valuesExist)
+		if err != nil {
+			log.Printf("Error checking field values for definition %d: %v", id, err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
+			return
+		}
+		if valuesExist {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cannot change field_type when values exist for this field"})
+			return
+		}
+	}
+
 	var d ProductFieldDefinition
 	err = db.QueryRow(`
 		UPDATE product_field_definitions
