@@ -3,11 +3,13 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
@@ -43,8 +45,8 @@ var (
 	validFieldTypes  = map[string]bool{"text": true, "number": true, "integer": true, "select": true, "boolean": true}
 )
 
-// validateFieldOptions checks that options is valid JSON string array for 'select' type,
-// clears it for other types, and errors on invalid JSON for 'select'.
+// validateFieldOptions checks that options is a valid JSON string array for 'select' type,
+// clears it for other types, and errors on invalid JSON or non-string elements for 'select'.
 func validateFieldOptions(fieldType string, options *string) (*string, error) {
 	if fieldType != "select" {
 		// non-select fields must not store options
@@ -54,7 +56,7 @@ func validateFieldOptions(fieldType string, options *string) (*string, error) {
 		empty := "[]"
 		return &empty, nil
 	}
-	var parsed []interface{}
+	var parsed []string
 	if err := json.Unmarshal([]byte(*options), &parsed); err != nil {
 		return nil, fmt.Errorf("options must be a valid JSON array of strings")
 	}
@@ -112,6 +114,13 @@ func CreateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	input.Name = strings.TrimSpace(input.Name)
+	input.Label = strings.TrimSpace(input.Label)
+	if input.Unit != nil {
+		trimmed := strings.TrimSpace(*input.Unit)
+		input.Unit = &trimmed
+	}
+
 	if !validFieldNameRe.MatchString(input.Name) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Field name must start with a lowercase letter and contain only lowercase letters, digits, and underscores"})
 		return
@@ -141,6 +150,11 @@ func CreateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 	`, input.Name, input.Label, input.FieldType, validatedOptions, input.Unit, input.SortOrder, input.IsRequired).
 		Scan(&d.ID, &d.Name, &d.Label, &d.FieldType, &d.Options, &d.Unit, &d.SortOrder, &d.IsRequired)
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			respondJSON(w, http.StatusConflict, map[string]string{"error": "A field definition with this name already exists"})
+			return
+		}
 		log.Printf("Error creating product field definition: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create field definition"})
 		return
@@ -171,6 +185,13 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		return
+	}
+
+	input.Name = strings.TrimSpace(input.Name)
+	input.Label = strings.TrimSpace(input.Label)
+	if input.Unit != nil {
+		trimmed := strings.TrimSpace(*input.Unit)
+		input.Unit = &trimmed
 	}
 
 	if !validFieldNameRe.MatchString(input.Name) {
@@ -207,6 +228,11 @@ func UpdateProductFieldDefinition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			respondJSON(w, http.StatusConflict, map[string]string{"error": "A field definition with this name already exists"})
+			return
+		}
 		log.Printf("Error updating product field definition %d: %v", id, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update field definition"})
 		return
@@ -382,8 +408,8 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Apply all updates/deletes inside a single transaction
-	tx, err := db.Begin()
+	// Apply all updates/deletes inside a single transaction bound to the request context
+	tx, err := db.BeginTx(r.Context(), nil)
 	if err != nil {
 		log.Printf("Error starting transaction for SetProductFieldValues product %d: %v", productID, err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to set field values"})
@@ -394,13 +420,13 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 	for fieldName, value := range body.Values {
 		defID := nameToID[fieldName]
 		if value == "" {
-			if _, err := tx.Exec(`DELETE FROM product_field_values WHERE product_id=$1 AND field_definition_id=$2`, productID, defID); err != nil {
+			if _, err := tx.ExecContext(r.Context(), `DELETE FROM product_field_values WHERE product_id=$1 AND field_definition_id=$2`, productID, defID); err != nil {
 				log.Printf("Error deleting field value for product %d, definition %d: %v", productID, defID, err)
 				respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete field value"})
 				return
 			}
 		} else {
-			if _, err := tx.Exec(`
+			if _, err := tx.ExecContext(r.Context(), `
 				INSERT INTO product_field_values (product_id, field_definition_id, value)
 				VALUES ($1, $2, $3)
 				ON CONFLICT (product_id, field_definition_id) DO UPDATE SET value = EXCLUDED.value

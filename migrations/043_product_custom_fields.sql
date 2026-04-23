@@ -97,6 +97,7 @@ BEGIN
         v_fd_type           INTEGER;
         v_fd_length         INTEGER;
         v_fd_mm2            INTEGER;
+        v_dual_count        INTEGER;
     BEGIN
         SELECT categoryID INTO v_cable_category_id
         FROM categories WHERE LOWER(name) = 'cables' LIMIT 1;
@@ -126,11 +127,22 @@ BEGIN
             )
             RETURNING productID INTO v_product_id;
 
-            -- Re-link any devices that were associated with this cable.
+            -- Report and migrate ALL devices associated with this cable.
+            -- Devices that already had a productID would silently lose their cable
+            -- association when cable_id is dropped; warn before overwriting.
+            SELECT COUNT(*) INTO v_dual_count
+            FROM devices
+            WHERE cable_id = v_cable.cableID AND productID IS NOT NULL;
+
+            IF v_dual_count > 0 THEN
+                RAISE NOTICE 'Cable "%" (cableID=%): % device(s) had both productID and cable_id set. '
+                             'Their productID is being updated to the new cable-product (%).',
+                    v_cable.name, v_cable.cableID, v_dual_count, v_product_id;
+            END IF;
+
             UPDATE devices
             SET productID = v_product_id
-            WHERE cable_id = v_cable.cableID
-              AND productID IS NULL;
+            WHERE cable_id = v_cable.cableID;
 
             -- Insert field values, skipping NULLs silently.
             IF v_cable.c1name IS NOT NULL THEN
