@@ -612,6 +612,21 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       price_per_unit: formData.price_per_unit ?? null,
     };
 
+    // Pre-validate required custom fields before creating the product, so the product is
+    // not persisted without its required field values.  Use trim() for all types to align
+    // with the backend behaviour (whitespace-only values are treated as empty).
+    if (fieldDefinitions.length > 0 && editingProduct === null) {
+      const missingRequired = fieldDefinitions.filter(f => {
+        if (!f.is_required) return false;
+        return (productFieldValues[f.name] ?? '').trim() === '';
+      });
+      if (missingRequired.length > 0) {
+        window.alert(`${t('admin.products.errors.requiredFields', { defaultValue: 'Required custom fields' })}: ${missingRequired.map(f => f.label).join(', ')}`);
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
       let productId = editingProduct;
 
@@ -670,18 +685,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
               return loadedFieldValues[k] !== undefined && loadedFieldValues[k] !== '';
             })
         );
-
-        // For new products: validate required fields client-side before calling the API.
-        if (editingProduct === null) {
-          const missingRequired = fieldDefinitions.filter(
-            f => f.is_required && !normalizedValues[f.name]
-          );
-          if (missingRequired.length > 0) {
-            window.alert(`${t('admin.products.errors.requiredFields', { defaultValue: 'Required custom fields' })}: ${missingRequired.map(f => f.label).join(', ')}`);
-            setSubmitting(false);
-            return;
-          }
-        }
 
         // For editing: block submit if field values failed to load to avoid silently dropping
         // user edits. For new products: only save when there are values to persist.
