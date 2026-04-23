@@ -621,11 +621,12 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
 
       if (fieldDefinitions.length > 0 && productId) {
         // For editing: only save when field values were successfully loaded (to avoid wiping
-        // existing values after a transient load error). For new products: only save when the
-        // user actually entered values.
+        // existing values after a transient load error). For new products: save when the user
+        // entered values OR when any required definitions exist (so the backend enforces them).
+        const hasRequiredDefinitions = fieldDefinitions.some(f => f.is_required);
         const shouldSaveFieldValues = editingProduct !== null
           ? fieldValuesLoaded
-          : Object.values(productFieldValues).some(v => v.trim() !== '');
+          : Object.values(productFieldValues).some(v => v.trim() !== '') || hasRequiredDefinitions;
         if (shouldSaveFieldValues) {
           try {
             await productFieldValuesApi.set(productId, productFieldValues);

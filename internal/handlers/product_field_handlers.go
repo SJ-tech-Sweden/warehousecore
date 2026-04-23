@@ -46,21 +46,42 @@ var (
 )
 
 // validateFieldOptions checks that options is a valid JSON string array for 'select' type,
-// clears it for other types, and errors on invalid JSON or non-string elements for 'select'.
+// requires at least one non-empty unique option, trims each element, clears options for
+// non-select types, and returns the normalised JSON string on success.
 func validateFieldOptions(fieldType string, options *string) (*string, error) {
 	if fieldType != "select" {
 		// non-select fields must not store options
 		return nil, nil
 	}
-	if options == nil || *options == "" {
-		empty := "[]"
-		return &empty, nil
+	if options == nil || strings.TrimSpace(*options) == "" {
+		return nil, fmt.Errorf("options must contain at least one value for select fields")
 	}
 	var parsed []string
 	if err := json.Unmarshal([]byte(*options), &parsed); err != nil {
 		return nil, fmt.Errorf("options must be a valid JSON array of strings")
 	}
-	return options, nil
+	if len(parsed) == 0 {
+		return nil, fmt.Errorf("options must contain at least one value for select fields")
+	}
+	normalized := make([]string, 0, len(parsed))
+	seen := make(map[string]struct{}, len(parsed))
+	for _, opt := range parsed {
+		trimmed := strings.TrimSpace(opt)
+		if trimmed == "" {
+			return nil, fmt.Errorf("options must not contain empty values")
+		}
+		if _, exists := seen[trimmed]; exists {
+			return nil, fmt.Errorf("options must not contain duplicate values")
+		}
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+	normalizedJSON, err := json.Marshal(normalized)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize options")
+	}
+	s := string(normalizedJSON)
+	return &s, nil
 }
 
 // GetProductFieldDefinitions retrieves all product field definitions ordered by sort_order
@@ -409,7 +430,22 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// An empty map is an explicit "clear all field values for this product".
+	// Reject the clear if any required field definitions exist, to prevent
+	// required values from being removed through this path.
 	if len(body.Values) == 0 {
+		var hasRequired bool
+		if err := db.QueryRowContext(
+			r.Context(),
+			`SELECT EXISTS(SELECT 1 FROM product_field_definitions WHERE is_required = TRUE)`,
+		).Scan(&hasRequired); err != nil {
+			log.Printf("Error checking required field definitions for product %d: %v", productID, err)
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate field values"})
+			return
+		}
+		if hasRequired {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cannot clear field values while required field definitions exist"})
+			return
+		}
 		tx, err := db.BeginTx(r.Context(), nil)
 		if err != nil {
 			log.Printf("Error starting transaction for SetProductFieldValues product %d: %v", productID, err)
@@ -491,7 +527,7 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 		SELECT d.name
 		FROM product_field_definitions d
 		WHERE d.is_required = true
-		  AND d.name != ANY($1)
+		  AND NOT (d.name = ANY($1))
 		  AND NOT EXISTS(
 		      SELECT 1 FROM product_field_values v
 		      WHERE v.product_id = $2 AND v.field_definition_id = d.id
