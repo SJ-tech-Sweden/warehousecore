@@ -45,8 +45,6 @@ func serviceRouter() *mux.Router {
 	router := mux.NewRouter()
 	service := router.PathPrefix("/api/v1/service").Subrouter()
 	service.Use(middleware.APIKeyMiddleware)
-	service.HandleFunc("/cables", handlers.GetAllCables).Methods("GET")
-	service.HandleFunc("/cables/{id}", handlers.GetCable).Methods("GET")
 	service.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
 	return router
 }
@@ -57,8 +55,6 @@ func TestServiceAPI_MissingAPIKey(t *testing.T) {
 	router := serviceRouter()
 
 	paths := []string{
-		"/api/v1/service/cables",
-		"/api/v1/service/cables/1",
 		"/api/v1/service/devices/DEV001",
 	}
 
@@ -88,8 +84,6 @@ func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
 	router := serviceRouter()
 
 	paths := []string{
-		"/api/v1/service/cables",
-		"/api/v1/service/cables/1",
 		"/api/v1/service/devices/DEV001",
 	}
 
@@ -128,26 +122,10 @@ func TestServiceAPI_Routes_NotFoundWithoutAuth(t *testing.T) {
 	}
 }
 
-// TestServiceAPI_CableRoute_Exists verifies that the /service/cables/{id} route
-// is registered correctly by confirming that a request without an API key returns
-// 401 (auth check fires before the handler, confirming the route is wired up).
-func TestServiceAPI_CableRoute_Exists(t *testing.T) {
-	router := serviceRouter()
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/service/cables/not-a-number", nil)
-	// No API key → should get 401, confirming route exists
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401 (auth check before handler), got %d", rr.Code)
-	}
-}
-
-// TestGetDevice_ResponseIncludesCableID exercises the GetDevice handler with a
-// mocked SQL database and verifies that the JSON response includes the cable_id
-// field when a cable is associated with the device.
-func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
+// TestGetDevice_ResponseHasNoCableID verifies that the GetDevice handler no
+// longer includes a cable_id field in its response. Cables were removed as a
+// separate entity and migrated into products with custom field values.
+func TestGetDevice_ResponseHasNoCableID(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to open sqlmock: %v", err)
@@ -163,9 +141,8 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 		db.Close()
 	})
 
-	cableID := int64(42)
-
-	// The GetDevice query selects many columns; we must match them in order.
+	// The GetDevice query selects 29 columns (cable_id was removed in the
+	// product custom fields migration).
 	rows := sqlmock.NewRows([]string{
 		"deviceID", "productID",
 		"product_name", "product_description", "product_category", "subcategory",
@@ -176,7 +153,6 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 		"status", "zone_id", "condition_rating", "usage_hours", "label_path",
 		"purchase_date", "notes",
 		"zone_name", "zone_code", "case_name", "job_number",
-		"cable_id",
 	}).AddRow(
 		"DEV001", sql.NullInt64{Int64: 1, Valid: true},
 		"Test Product", "A test device", "Audio", "",
@@ -187,7 +163,6 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 		"in_storage", sql.NullInt64{}, float64(4.5), float64(10.0), sql.NullString{},
 		sql.NullString{}, sql.NullString{},
 		"Shelf A", "WDL-01", "", "",
-		sql.NullInt64{Int64: cableID, Valid: true},
 	)
 
 	mock.ExpectQuery(`SELECT d\.deviceID`).WillReturnRows(rows)
@@ -209,12 +184,8 @@ func TestGetDevice_ResponseIncludesCableID(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	rawCableID, ok := body["cable_id"]
-	if !ok {
-		t.Fatal("expected cable_id field in GetDevice response, but it was absent")
-	}
-	if rawCableID != float64(cableID) {
-		t.Errorf("expected cable_id=%d, got %v", cableID, rawCableID)
+	if _, ok := body["cable_id"]; ok {
+		t.Error("cable_id field should not be present in GetDevice response after cable migration")
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

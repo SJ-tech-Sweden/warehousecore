@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
-  Cable,
   CheckSquare,
   Eye,
   GitBranch,
@@ -19,8 +18,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { api, cablesAdminApi, ledApi, productConvertApi, productsAdminApi } from '../../lib/api';
-import type { CableConnector, CableType as CableTypeData, Device } from '../../lib/api';
+import { api, ledApi, productConvertApi, productsAdminApi, productFieldDefinitionsApi, productFieldValuesApi } from '../../lib/api';
+import type { Device, ProductFieldDefinition } from '../../lib/api';
 import { ModalPortal } from '../ModalPortal';
 import { DeviceTreeTab } from './DeviceTreeTab';
 import { DeviceDetailModal } from '../DeviceDetailModal';
@@ -156,6 +155,17 @@ const parseInteger = (value: string): number | undefined => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
+/** Safely parses a JSON string array; returns [] on null, empty string, or invalid JSON. */
+function parseOptionsArray(options: string | null | undefined): string[] {
+  if (!options) return [];
+  try {
+    const parsed = JSON.parse(options);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function useDebouncedValue<T>(value: T, delay: number) {
   const [debounced, setDebounced] = useState(value);
 
@@ -208,12 +218,19 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkEditData, setBulkEditData] = useState<{ category_id?: number; brand_id?: number; manufacturer_id?: number; item_cost_per_day?: number }>({});
 
-  // Convert-to-cable modal state
-  const [cableConvertModal, setCableConvertModal] = useState<{ productId: number; productName: string } | null>(null);
-  const [cableConnectors, setCableConnectors] = useState<CableConnector[]>([]);
-  const [cableTypes, setCableTypes] = useState<CableTypeData[]>([]);
-  const [cableFormData, setCableFormData] = useState<{ connector1: number; connector2: number; typ: number; length: number; mm2: number | undefined }>({ connector1: 0, connector2: 0, typ: 0, length: 1, mm2: undefined });
-  const [convertSubmitting, setConvertSubmitting] = useState(false);
+  // Custom field definitions and values
+  const [fieldDefinitions, setFieldDefinitions] = useState<ProductFieldDefinition[]>([]);
+  // True when the field definitions API call failed during metadata load.
+  // Used to block product saves so required custom fields can't be bypassed.
+  const [fieldDefsLoadFailed, setFieldDefsLoadFailed] = useState(false);
+  const [productFieldValues, setProductFieldValues] = useState<Record<string, string>>({});
+  // Snapshot of field values as loaded from the backend. Used on save to filter out
+  // fields that were never set and haven't been changed (avoids no-op DELETEs for
+  // every empty optional field on every save).
+  const [loadedFieldValues, setLoadedFieldValues] = useState<Record<string, string>>({});
+  // True only when field values were successfully loaded for the product being edited.
+  // Used to guard against accidentally clearing values when the load failed.
+  const [fieldValuesLoaded, setFieldValuesLoaded] = useState(false);
 
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
@@ -302,6 +319,15 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     } catch (error) {
       console.error('Failed to load metadata:', error);
     }
+
+    try {
+      const fieldDefsRes = await productFieldDefinitionsApi.list();
+      setFieldDefinitions(fieldDefsRes.data || []);
+      setFieldDefsLoadFailed(false);
+    } catch (error) {
+      console.error('Failed to load field definitions:', error);
+      setFieldDefsLoadFailed(true);
+    }
   }, []);
 
   const ensureMetadataLoaded = useCallback(async () => {
@@ -317,6 +343,23 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
   useEffect(() => {
     loadMetadata();
   }, [loadMetadata]);
+
+  // Initialize required boolean custom-field values to 'false' when the modal is open,
+  // so required boolean fields are always satisfiable without an explicit toggle.
+  // Optional booleans are left unset (empty) so they can remain unset on save.
+  useEffect(() => {
+    if (!modalOpen || fieldDefinitions.length === 0) return;
+    setProductFieldValues(prev => {
+      const updates: Record<string, string> = {};
+      for (const def of fieldDefinitions) {
+        if (def.field_type === 'boolean' && def.is_required && prev[def.name] !== 'true' && prev[def.name] !== 'false') {
+          updates[def.name] = 'false';
+        }
+      }
+      if (Object.keys(updates).length === 0) return prev;
+      return { ...prev, ...updates };
+    });
+  }, [modalOpen, fieldDefinitions]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -402,6 +445,9 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     setFormData(initialFormData);
     setProductDevices([]);
     setDevicesToDelete(new Set());
+    setProductFieldValues({});
+    setLoadedFieldValues({});
+    setFieldValuesLoaded(false);
   }, []);
 
   const closeDetailModal = () => {
@@ -435,6 +481,9 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     await ensureMetadataLoaded();
     setFormData(initialFormData);
     setEditingProduct(null);
+    setProductFieldValues({});
+    setLoadedFieldValues({});
+    setFieldValuesLoaded(false);
     setModalOpen(true);
   };
 
@@ -446,6 +495,20 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       setEditingProduct(productId);
       setModalOpen(true);
       await loadProductDevices(productId);
+      try {
+        const { data: fieldValues } = await productFieldValuesApi.get(productId);
+        const valuesMap: Record<string, string> = {};
+        for (const fv of fieldValues) {
+          valuesMap[fv.name] = fv.value;
+        }
+        setProductFieldValues(valuesMap);
+        setLoadedFieldValues(valuesMap);
+        setFieldValuesLoaded(true);
+      } catch (e) {
+        console.error('Failed to load field values:', e);
+        // Do not reset productFieldValues here; fieldValuesLoaded stays false,
+        // so handleSubmit will skip the field-values save and avoid wiping existing data.
+      }
     } catch (error) {
       console.error('Failed to load product details:', error);
       window.alert(t('admin.products.errors.loadProduct'));
@@ -518,46 +581,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     }
   };
 
-  const handleOpenCableConvertModal = async (productId: number, productName: string) => {
-    try {
-      const [connRes, typRes] = await Promise.all([
-        cablesAdminApi.getConnectors(),
-        cablesAdminApi.getTypes(),
-      ]);
-      setCableConnectors(connRes.data);
-      setCableTypes(typRes.data);
-      setCableFormData({ connector1: 0, connector2: 0, typ: 0, length: 1, mm2: undefined });
-      setCableConvertModal({ productId, productName });
-    } catch (error) {
-      console.error('Failed to load cable metadata:', error);
-      window.alert(t('admin.products.errors.loadCableMetadata'));
-    }
-  };
-
-  const handleConvertToCable = async () => {
-    if (!cableConvertModal) return;
-    if (cableFormData.connector1 <= 0 || cableFormData.connector2 <= 0 || cableFormData.typ <= 0 || cableFormData.length <= 0) {
-      return;
-    }
-    setConvertSubmitting(true);
-    try {
-      await productConvertApi.toCable(cableConvertModal.productId, {
-        connector1: cableFormData.connector1,
-        connector2: cableFormData.connector2,
-        typ: cableFormData.typ,
-        length: cableFormData.length,
-        mm2: cableFormData.mm2 ?? undefined,
-      });
-      setCableConvertModal(null);
-      window.alert(t('admin.products.convertToCableSuccess'));
-    } catch (error) {
-      console.error('Failed to convert product to cable:', error);
-      window.alert(t('admin.products.errors.convertToCable'));
-    } finally {
-      setConvertSubmitting(false);
-    }
-  };
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -594,6 +617,40 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       price_per_unit: formData.price_per_unit ?? null,
     };
 
+    // Block saves when field definitions failed to load — we can't validate or save
+    // required custom fields reliably if the definitions are unavailable.
+    if (fieldDefsLoadFailed) {
+      window.alert(t('admin.products.errors.fieldDefsLoadFailed', { defaultValue: 'Custom field definitions failed to load. Please refresh and try again.' }));
+      setSubmitting(false);
+      return;
+    }
+
+    // For editing: block submit if the existing field values failed to load. This avoids
+    // silently dropping user edits while still preventing accidental overwrites after a
+    // transient load error.  Check this BEFORE required-field validation so we don't
+    // incorrectly flag required fields as missing when we simply don't know the stored values.
+    if (editingProduct !== null && !fieldValuesLoaded) {
+      window.alert(t('admin.products.errors.fieldValuesLoadFailed', { defaultValue: 'Custom field values failed to load. Please refresh and try again.' }));
+      setSubmitting(false);
+      return;
+    }
+
+    // Pre-validate required custom fields before creating or updating the product, so
+    // the product is never persisted without its required field values.
+    // Use trim() for all types to align with the backend behaviour (whitespace-only values
+    // are treated as empty).
+    if (fieldDefinitions.length > 0) {
+      const missingRequired = fieldDefinitions.filter(f => {
+        if (!f.is_required) return false;
+        return String(productFieldValues[f.name] ?? '').trim() === '';
+      });
+      if (missingRequired.length > 0) {
+        window.alert(`${t('admin.products.errors.requiredFields', { defaultValue: 'Required custom fields' })}: ${missingRequired.map(f => f.label).join(', ')}`);
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
       let productId = editingProduct;
 
@@ -626,6 +683,45 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
           } catch (deviceError) {
             console.error('Failed to create devices:', deviceError);
             window.alert(t('admin.products.errors.deviceCreate'));
+          }
+        }
+      }
+
+      if (fieldDefinitions.length > 0 && productId) {
+        // Build a lookup of field type by name so we know which fields to trim.
+        const fieldTypeByName = Object.fromEntries(fieldDefinitions.map(f => [f.name, f.field_type]));
+        // Normalize values: trim whitespace only for non-text fields (number, integer, select,
+        // boolean). Text fields preserve leading/trailing whitespace.
+        // Then filter to only include:
+        //   • Non-empty values (upsert)
+        //   • Fields that were non-empty when loaded but are now empty (explicit delete)
+        // This avoids sending no-op DELETE requests for optional fields that were never set.
+        const normalizedValues = Object.fromEntries(
+          Object.entries(productFieldValues)
+            .map(([k, v]) => {
+              const ftype = fieldTypeByName[k];
+              const normalized = ftype && ftype !== 'text' ? v.trim() : v;
+              return [k, normalized] as const;
+            })
+            .filter(([k, v]) => {
+              if (v !== '') return true; // always include non-empty (upsert)
+              // Include empty only if the field had a stored value when loaded (explicit delete)
+              return loadedFieldValues[k] !== undefined && loadedFieldValues[k] !== '';
+            })
+        );
+
+        // Skip the API call entirely when there are no normalized field-value
+        // changes: omitting the update is a no-op, while an explicit `{ values: {} }`
+        // payload is also a no-op on the backend.
+        const hasFieldValueChanges = Object.keys(normalizedValues).length > 0;
+        if (hasFieldValueChanges) {
+          try {
+            await productFieldValuesApi.set(productId, normalizedValues);
+          } catch (e) {
+            console.error('Failed to save field values:', e);
+            window.alert(t('admin.products.errors.fieldValuesSave', { defaultValue: 'Failed to save custom field values' }));
+            setSubmitting(false);
+            return;
           }
         }
       }
@@ -1058,14 +1154,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                           <PackageOpen className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleOpenCableConvertModal(product.product_id, product.name)}
-                          className="rounded-lg bg-teal-600/80 p-2 text-white transition hover:bg-teal-600"
-                          title={t('admin.products.convertToCable')}
-                          aria-label={t('admin.products.convertToCable')}
-                        >
-                          <Cable className="h-4 w-4" />
-                        </button>
-                        <button
                           onClick={() => handleDelete(product.product_id, product.name)}
                           className="rounded-lg bg-red-600/80 p-2 text-white transition hover:bg-red-600"
                           title={t('common.delete')}
@@ -1139,14 +1227,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                     aria-label={t('admin.products.convertToCase')}
                   >
                     <PackageOpen className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleOpenCableConvertModal(product.product_id, product.name)}
-                    className="rounded-lg bg-teal-600/80 p-2 text-white transition hover:bg-teal-600"
-                    title={t('admin.products.convertToCable')}
-                    aria-label={t('admin.products.convertToCable')}
-                  >
-                    <Cable className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(product.product_id, product.name)}
@@ -1693,6 +1773,74 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
                   </p>
                 </div>
 
+                {fieldDefinitions.length > 0 && (
+                  <div className="col-span-2 border-t border-gray-700 pt-4">
+                    <h3 className="text-lg font-semibold text-white mb-3">{t('admin.products.customFieldsSectionTitle', { defaultValue: 'Custom Fields' })}</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {fieldDefinitions.map(field => {
+                        const fieldInputId = `product-custom-field-${field.id}`;
+                        return (
+                        <div key={field.id}>
+                          {field.field_type === 'boolean' ? (
+                            <label htmlFor={fieldInputId} className="flex items-center gap-2 text-sm font-medium text-gray-300 cursor-pointer">
+                              <input
+                                id={fieldInputId}
+                                type="checkbox"
+                                aria-label={`${field.label}${field.unit ? ` (${field.unit})` : ''}${field.is_required ? ' *' : ''}`}
+                                checked={productFieldValues[field.name] === 'true'}
+                                onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.checked ? 'true' : 'false' }))}
+                                className="w-5 h-5 rounded"
+                              />
+                              {field.label}{field.unit ? ` (${field.unit})` : ''}{field.is_required ? ' *' : ''}
+                            </label>
+                          ) : (
+                            <>
+                              <label htmlFor={fieldInputId} className="block text-sm font-medium text-gray-300 mb-1">
+                                {field.label}{field.unit ? ` (${field.unit})` : ''}{field.is_required ? ' *' : ''}
+                              </label>
+                              {field.field_type === 'select' ? (
+                                (() => {
+                                  const currentVal = productFieldValues[field.name] ?? '';
+                                  const opts = parseOptionsArray(field.options);
+                                  const isInvalid = currentVal !== '' && !opts.includes(currentVal);
+                                  return (
+                                    <select
+                                      id={fieldInputId}
+                                      value={currentVal}
+                                      onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                      className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg text-white focus:ring-1 focus:ring-accent-red focus:border-accent-red"
+                                    >
+                                      <option value="">—</option>
+                                      {isInvalid && (
+                                        <option value={currentVal} className="text-yellow-400">
+                                          ⚠ {currentVal}
+                                        </option>
+                                      )}
+                                      {opts.map(opt => (
+                                        <option key={opt} value={opt}>{opt}</option>
+                                      ))}
+                                    </select>
+                                  );
+                                })()
+                              ) : (
+                                <input
+                                  id={fieldInputId}
+                                  type={field.field_type === 'number' || field.field_type === 'integer' ? 'number' : 'text'}
+                                  step={field.field_type === 'number' ? 'any' : field.field_type === 'integer' ? '1' : undefined}
+                                  value={productFieldValues[field.name] ?? ''}
+                                  onChange={e => setProductFieldValues(prev => ({ ...prev, [field.name]: e.target.value }))}
+                                  className="w-full px-3 py-2 bg-dark-700 border border-gray-600 rounded-lg text-white focus:ring-1 focus:ring-accent-red focus:border-accent-red"
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -1783,143 +1931,6 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
         isOpen={!!deviceDetail}
         onClose={() => setDeviceDetail(null)}
       />
-
-      {/* Convert to Cable Modal */}
-      {cableConvertModal && (
-        <ModalPortal>
-          <div className="fixed inset-0 z-[120] flex min-h-screen items-center justify-center bg-black/80 p-4">
-            <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl p-6 max-w-lg w-full">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-white">
-                  {t('admin.products.convertToCableTitle', { name: cableConvertModal.productName })}
-                </h3>
-                <button
-                  onClick={() => {
-                    if (convertSubmitting) return;
-                    setCableConvertModal(null);
-                  }}
-                  disabled={convertSubmitting}
-                  className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-gray-400 disabled:hover:bg-transparent"
-                  title={convertSubmitting ? t('common.loading') : t('common.close')}
-                  aria-label={t('common.close')}
-                  aria-disabled={convertSubmitting}
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">
-                    {t('admin.cables.connector1')} <span className="text-accent-red">*</span>
-                  </label>
-                  <SearchableSelect
-                    value={cableFormData.connector1 ? String(cableFormData.connector1) : ''}
-                    onChange={v => setCableFormData({ ...cableFormData, connector1: v ? Number(v) : 0 })}
-                    options={cableConnectors.map(c => ({ value: String(c.connector_id), label: c.name + (c.gender ? ` (${c.gender})` : '') }))}
-                    placeholder={t('admin.cables.selectConnector')}
-                    required
-                    className="w-full"
-                    title={t('admin.cables.connector1')}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">
-                    {t('admin.cables.connector2')} <span className="text-accent-red">*</span>
-                  </label>
-                  <SearchableSelect
-                    value={cableFormData.connector2 ? String(cableFormData.connector2) : ''}
-                    onChange={v => setCableFormData({ ...cableFormData, connector2: v ? Number(v) : 0 })}
-                    options={cableConnectors.map(c => ({ value: String(c.connector_id), label: c.name + (c.gender ? ` (${c.gender})` : '') }))}
-                    placeholder={t('admin.cables.selectConnector')}
-                    required
-                    className="w-full"
-                    title={t('admin.cables.connector2')}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white">
-                    {t('admin.cables.type')} <span className="text-accent-red">*</span>
-                  </label>
-                  <SearchableSelect
-                    value={cableFormData.typ ? String(cableFormData.typ) : ''}
-                    onChange={v => setCableFormData({ ...cableFormData, typ: v ? Number(v) : 0 })}
-                    options={cableTypes.map(ct => ({ value: String(ct.cable_type_id), label: ct.name }))}
-                    placeholder={t('admin.cables.selectType')}
-                    required
-                    className="w-full"
-                    title={t('admin.cables.type')}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">
-                      {t('admin.cables.length')} (m) <span className="text-accent-red">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={cableFormData.length}
-                      onChange={e => setCableFormData({ ...cableFormData, length: parseFloat(e.target.value) || 0 })}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
-                      title={t('admin.cables.length')}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-white">
-                      {t('admin.cables.crossSectionShort')} (mm²)
-                    </label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={cableFormData.mm2 ?? ''}
-                      onChange={e => {
-                        const parsedMm2 = parseFloat(e.target.value);
-                        setCableFormData({
-                          ...cableFormData,
-                          mm2: e.target.value === '' || Number.isNaN(parsedMm2) || parsedMm2 <= 0 ? undefined : parsedMm2,
-                        });
-                      }}
-                      className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-white placeholder-gray-500 outline-none transition focus:border-accent-red"
-                      title={t('admin.cables.crossSectionShort')}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!convertSubmitting) {
-                        setCableConvertModal(null);
-                      }
-                    }}
-                    disabled={convertSubmitting}
-                    className="rounded-lg bg-white/10 px-4 py-2 text-white hover:bg-white/20 transition disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConvertToCable}
-                    disabled={convertSubmitting || cableFormData.connector1 <= 0 || cableFormData.connector2 <= 0 || cableFormData.typ <= 0 || cableFormData.length <= 0}
-                    className="rounded-lg bg-teal-600 px-4 py-2 text-white hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-busy={convertSubmitting}
-                  >
-                    {convertSubmitting ? <RefreshCcw className="h-4 w-4 animate-spin" aria-hidden="true" /> : t('admin.products.convertToCable')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
 
       {/* Bulk Edit Products Modal */}
       {bulkEditOpen && (

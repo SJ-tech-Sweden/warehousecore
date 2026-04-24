@@ -374,7 +374,8 @@
       "currency": "Währung",
       "eventory": "Eventory",
       "export": "CSV-Export",
-      "devices": "Geräte"
+      "devices": "Geräte",
+      "fieldDefinitions": "Benutzerdefinierte Felder"
     },
     "eventory": {
       "title": "Eventory-Integration",
@@ -1184,7 +1185,11 @@
         "convertToCable": "Produkt konnte nicht in Kabel umgewandelt werden.",
         "loadCableMetadata": "Kabelstecker/Typen konnten nicht geladen werden.",
         "bulkDelete": "Ausgewählte Produkte konnten nicht gelöscht werden.",
-        "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden."
+        "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden.",
+        "requiredFields": "Bitte füllen Sie alle Pflichtfelder aus.",
+        "fieldValuesSave": "Feldwerte konnten nicht gespeichert werden.",
+        "fieldValuesLoadFailed": "Feldwerte konnten nicht geladen werden. Bitte Seite aktualisieren und erneut versuchen.",
+        "fieldDefsLoadFailed": "Felddefinitionen konnten nicht geladen werden. Bitte Seite aktualisieren und erneut versuchen."
       },
       "convertToCase": "In Case umwandeln",
       "convertToCable": "In Kabel umwandeln",
@@ -1206,7 +1211,55 @@
       "bulkEditDescription": "Änderungen auf {{count}} ausgewählte(s) Produkt(e) anwenden. Nur ausgefüllte Felder werden aktualisiert.",
       "bulkDeleteSuccess": "{{products}} Produkt(e) und {{devices}} Gerät(e) gelöscht.",
       "bulkUpdateSuccess": "{{count}} Produkt(e) aktualisiert.",
-      "skippedPackages": "{{count}} Paketprodukt(e) wurden übersprungen."
+      "skippedPackages": "{{count}} Paketprodukt(e) wurden übersprungen.",
+      "customFieldsSectionTitle": "Benutzerdefinierte Felder"
+    },
+    "fieldDefinitions": {
+      "title": "Benutzerdefinierte Felder",
+      "subtitle": "Felder definieren, die zu jedem Produkt hinzugefügt werden können",
+      "newField": "Neues Feld",
+      "createField": "Benutzerdefiniertes Feld erstellen",
+      "editField": "Benutzerdefiniertes Feld bearbeiten",
+      "noFields": "Noch keine benutzerdefinierten Felder definiert",
+      "confirmDelete": "Dieses benutzerdefinierte Feld löschen? Alle Werte für dieses Feld gehen verloren.",
+      "columns": {
+        "name": "Name",
+        "label": "Bezeichnung",
+        "type": "Typ",
+        "unit": "Einheit",
+        "options": "Optionen",
+        "required": "Pflichtfeld",
+        "sortOrder": "Reihenfolge",
+        "actions": "Aktionen"
+      },
+      "fields": {
+        "name": "Feldname",
+        "namePlaceholder": "z.B. stecker_1 (Kleinbuchstaben, nur Unterstriche)",
+        "nameReadOnly": "Der Feldname kann nach der Erstellung nicht mehr geändert werden.",
+        "label": "Anzeigename",
+        "labelPlaceholder": "z.B. Stecker 1",
+        "type": "Feldtyp",
+        "unit": "Einheit",
+        "unitPlaceholder": "z.B. m, mm², kg",
+        "sortOrder": "Sortierreihenfolge",
+        "required": "Pflichtfeld",
+        "options": "Optionen (eine pro Zeile)",
+        "optionsPlaceholder": "XLR\nTRS\nRCA",
+        "optionsHelp": "Eine Option pro Zeile für Auswahlfelder eingeben"
+      },
+      "types": {
+        "text": "Text",
+        "number": "Zahl (dezimal)",
+        "integer": "Zahl (ganzzahlig)",
+        "select": "Auswahl (Dropdown)",
+        "boolean": "Ja/Nein (Checkbox)"
+      },
+      "errors": {
+        "save": "Felddefinition konnte nicht gespeichert werden",
+        "delete": "Felddefinition konnte nicht gelöscht werden",
+        "load": "Felddefinitionen konnten nicht geladen werden",
+        "selectOptionsRequired": "Bitte geben Sie mindestens eine Auswahloption an"
+      }
     }
   },
   "scan": {
@@ -1775,7 +1828,9 @@
     "productsSubtitle": "Produktstammdaten verwalten.",
     "cablesTitle": "Kabelverwaltung",
     "cablesSubtitle": "Kabeltypen und Zuordnungen pflegen.",
-    "devicesTabLabel": "Geräte"
+    "devicesTabLabel": "Geräte",
+    "customFieldsTitle": "Benutzerdefinierte Felder",
+    "customFieldsSubtitle": "Benutzerdefinierte Attribute für Produkte verwalten"
   },
   "roleGuard": {
     "loading": "Lade Berechtigungen...",

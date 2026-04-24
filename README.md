@@ -1049,7 +1049,7 @@ curl http://localhost:8081/api/v1/health
 
 ## Service API (RentalCore Integration)
 
-WarehouseCore exposes a dedicated **Service API** that allows RentalCore (and other trusted services) to fetch cable and device metadata without requiring a browser session or admin privileges. All service endpoints require a valid `X-API-Key` header.
+WarehouseCore exposes a dedicated **Service API** that allows RentalCore (and other trusted services) to fetch device metadata without requiring a browser session or admin privileges. All service endpoints require a valid `X-API-Key` header.
 
 ### Authentication
 
@@ -1073,72 +1073,9 @@ https://warehouse.example.com/api/v1/service
 
 ### Endpoints
 
-#### `GET /cables`
-
-Returns the full cable catalog with optional filtering.
-
-**Query Parameters:**
-
-| Parameter    | Type    | Description                               |
-|-------------|---------|-------------------------------------------|
-| `search`    | string  | Full-text search (name, connectors, type) |
-| `connector1`| integer | Filter by connector 1 ID                  |
-| `connector2`| integer | Filter by connector 2 ID                  |
-| `type`      | integer | Filter by cable type ID                   |
-| `length_min`| float   | Minimum length in metres                  |
-| `length_max`| float   | Maximum length in metres                  |
-
-**Example:**
-
-```bash
-curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
-  "https://warehouse.example.com/api/v1/service/cables?search=CEE&length_min=5"
-```
-
-**Response:**
-
-```json
-[
-  {
-    "cable_id": 123,
-    "name": "CEE 16A to Schuko 10m",
-    "connector1": 1,
-    "connector2": 2,
-    "typ": 1,
-    "length": 10.0,
-    "mm2": 2.5,
-    "connector1_name": "CEE 16A",
-    "connector1_gender": "male",
-    "connector2_name": "Schuko",
-    "connector2_gender": "female",
-    "cable_type_name": "Power Cable"
-  }
-]
-```
-
-#### `GET /cables/{id}`
-
-Returns a single cable by ID.
-
-**Example:**
-
-```bash
-curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
-  "https://warehouse.example.com/api/v1/service/cables/123"
-```
-
-**Error Responses:**
-
-| Status | Description               |
-|--------|---------------------------|
-| 400    | Invalid cable ID format   |
-| 401    | Missing or invalid API key|
-| 404    | Cable not found           |
-| 500    | Internal server error     |
-
 #### `GET /devices/{id}`
 
-Returns device metadata including `cable_id` for decoupled RentalCore lookups.
+Returns device metadata for decoupled RentalCore lookups.
 
 **Example:**
 
@@ -1155,15 +1092,12 @@ curl -H "X-API-Key: $WAREHOUSE_API_KEY" \
   "product_id": 42,
   "product_name": "Funkmikrofon Shure SM58",
   "status": "in_storage",
-  "cable_id": 123,
   "zone_id": 7,
   "zone_name": "Shelf A",
   "condition_rating": 4.5,
   "usage_hours": 120.0
 }
 ```
-
-> **Note:** `cable_id` is also included in the standard `GET /api/v1/devices/{id}` response (no API key required).
 
 ### OpenAPI Specification
 
@@ -1179,7 +1113,7 @@ npx @redocly/cli preview-docs docs/openapi.decouple.yml
 
 ### Rate Limits
 
-WarehouseCore does not enforce application-level rate limiting on these service endpoints. If request throttling is required, configure it at your deployment layer (for example, a reverse proxy or API gateway). For high-frequency integrations, cache cable metadata locally (cables rarely change) and only poll `GET /devices/{id}` when you need live status.
+WarehouseCore does not enforce application-level rate limiting on these service endpoints. If request throttling is required, configure it at your deployment layer (for example, a reverse proxy or API gateway).
 
 ---
 
