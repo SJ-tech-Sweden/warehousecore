@@ -220,6 +220,9 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
 
   // Custom field definitions and values
   const [fieldDefinitions, setFieldDefinitions] = useState<ProductFieldDefinition[]>([]);
+  // True when the field definitions API call failed during metadata load.
+  // Used to block product saves so required custom fields can't be bypassed.
+  const [fieldDefsLoadFailed, setFieldDefsLoadFailed] = useState(false);
   const [productFieldValues, setProductFieldValues] = useState<Record<string, string>>({});
   // Snapshot of field values as loaded from the backend. Used on save to filter out
   // fields that were never set and haven't been changed (avoids no-op DELETEs for
@@ -320,8 +323,10 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
     try {
       const fieldDefsRes = await productFieldDefinitionsApi.list();
       setFieldDefinitions(fieldDefsRes.data || []);
+      setFieldDefsLoadFailed(false);
     } catch (error) {
       console.error('Failed to load field definitions:', error);
+      setFieldDefsLoadFailed(true);
     }
   }, []);
 
@@ -611,6 +616,14 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       generic_barcode: formData.generic_barcode?.trim() || null,
       price_per_unit: formData.price_per_unit ?? null,
     };
+
+    // Block saves when field definitions failed to load — we can't validate or save
+    // required custom fields reliably if the definitions are unavailable.
+    if (fieldDefsLoadFailed) {
+      window.alert(t('admin.products.errors.fieldDefsLoadFailed', { defaultValue: 'Custom field definitions failed to load. Please refresh and try again.' }));
+      setSubmitting(false);
+      return;
+    }
 
     // Pre-validate required custom fields before creating the product, so the product is
     // not persisted without its required field values.  Use trim() for all types to align

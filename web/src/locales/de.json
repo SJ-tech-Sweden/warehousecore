@@ -1187,7 +1187,8 @@
         "bulkDelete": "Ausgewählte Produkte konnten nicht gelöscht werden.",
         "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden.",
         "requiredFields": "Bitte füllen Sie alle Pflichtfelder aus.",
-        "fieldValuesSave": "Feldwerte konnten nicht gespeichert werden."
+        "fieldValuesSave": "Feldwerte konnten nicht gespeichert werden.",
+        "fieldDefsLoadFailed": "Felddefinitionen konnten nicht geladen werden. Bitte Seite aktualisieren und erneut versuchen."
       },
       "convertToCase": "In Case umwandeln",
       "convertToCable": "In Kabel umwandeln",
