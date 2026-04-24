@@ -1188,6 +1188,7 @@
         "bulkUpdate": "Ausgewählte Produkte konnten nicht aktualisiert werden.",
         "requiredFields": "Bitte füllen Sie alle Pflichtfelder aus.",
         "fieldValuesSave": "Feldwerte konnten nicht gespeichert werden.",
+        "fieldValuesLoadFailed": "Feldwerte konnten nicht geladen werden. Bitte Seite aktualisieren und erneut versuchen.",
         "fieldDefsLoadFailed": "Felddefinitionen konnten nicht geladen werden. Bitte Seite aktualisieren und erneut versuchen."
       },
       "convertToCase": "In Case umwandeln",

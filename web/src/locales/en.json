@@ -1188,6 +1188,7 @@
         "bulkUpdate": "Failed to update selected products.",
         "requiredFields": "Please fill in all required fields.",
         "fieldValuesSave": "Failed to save field values.",
+        "fieldValuesLoadFailed": "Custom field values failed to load. Please refresh and try again.",
         "fieldDefsLoadFailed": "Custom field definitions failed to load. Please refresh and try again."
       },
       "convertToCase": "Convert to case",
