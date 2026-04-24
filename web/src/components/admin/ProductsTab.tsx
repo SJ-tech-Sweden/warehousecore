@@ -625,10 +625,21 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
       return;
     }
 
-    // Pre-validate required custom fields before creating the product, so the product is
-    // not persisted without its required field values.  Use trim() for all types to align
-    // with the backend behaviour (whitespace-only values are treated as empty).
-    if (fieldDefinitions.length > 0 && editingProduct === null) {
+    // For editing: block submit if the existing field values failed to load. This avoids
+    // silently dropping user edits while still preventing accidental overwrites after a
+    // transient load error.  Check this BEFORE required-field validation so we don't
+    // incorrectly flag required fields as missing when we simply don't know the stored values.
+    if (editingProduct !== null && !fieldValuesLoaded) {
+      window.alert(t('admin.products.errors.fieldValuesSave', { defaultValue: 'Failed to save custom field values' }));
+      setSubmitting(false);
+      return;
+    }
+
+    // Pre-validate required custom fields before creating or updating the product, so
+    // the product is never persisted without its required field values.
+    // Use trim() for all types to align with the backend behaviour (whitespace-only values
+    // are treated as empty).
+    if (fieldDefinitions.length > 0) {
       const missingRequired = fieldDefinitions.filter(f => {
         if (!f.is_required) return false;
         return String(productFieldValues[f.name] ?? '').trim() === '';
@@ -699,15 +710,9 @@ export function ProductsTab({ onOpenDevicesTab }: ProductsTabProps) {
             })
         );
 
-        // For editing: block submit if field values failed to load to avoid silently dropping
-        // user edits. Skip the API call entirely when there are no normalized field-value
+        // Skip the API call entirely when there are no normalized field-value
         // changes: omitting the update is a no-op, while an explicit `{ values: {} }`
-        // payload is the backend's clear-all path.
-        if (editingProduct !== null && !fieldValuesLoaded) {
-          window.alert(t('admin.products.errors.fieldValuesSave', { defaultValue: 'Failed to save custom field values' }));
-          setSubmitting(false);
-          return;
-        }
+        // payload is also a no-op on the backend.
         const hasFieldValueChanges = Object.keys(normalizedValues).length > 0;
         if (hasFieldValueChanges) {
           try {

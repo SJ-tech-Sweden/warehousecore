@@ -483,7 +483,9 @@ func validateFieldValue(name, value string, def fieldDefMeta) error {
 }
 
 // SetProductFieldValues upserts field values for a specific product atomically.
-// An empty "values" map explicitly clears all field values for the product.
+// Omitting the "values" key OR sending an empty map are both treated as no-ops.
+// Individual field values are deleted by omitting them from a subsequent request
+// (the backend only processes keys that are present in the map).
 // All field names are resolved in a single query; values are validated against their
 // field definitions before any writes; updates/deletes run inside a transaction.
 func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
@@ -502,8 +504,8 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// nil Values means the "values" key was omitted entirely — nothing to do.
-	if body.Values == nil {
+	// nil Values (key omitted) or an empty map are both no-ops — nothing to do.
+	if len(body.Values) == 0 {
 		respondJSON(w, http.StatusOK, map[string]string{"message": "Field values updated"})
 		return
 	}
@@ -518,44 +520,6 @@ func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
 	}
 	if !exists {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Product not found"})
-		return
-	}
-
-	// An empty map is an explicit "clear all field values for this product".
-	// Reject the clear if any required field definitions exist, to prevent
-	// required values from being removed through this path.
-	if len(body.Values) == 0 {
-		var hasRequired bool
-		if err := db.QueryRowContext(
-			r.Context(),
-			`SELECT EXISTS(SELECT 1 FROM product_field_definitions WHERE is_required = TRUE)`,
-		).Scan(&hasRequired); err != nil {
-			log.Printf("Error checking required field definitions for product %d: %v", productID, err)
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to validate field values"})
-			return
-		}
-		if hasRequired {
-			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Cannot clear field values while required field definitions exist"})
-			return
-		}
-		tx, err := db.BeginTx(r.Context(), nil)
-		if err != nil {
-			log.Printf("Error starting transaction for SetProductFieldValues product %d: %v", productID, err)
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to set field values"})
-			return
-		}
-		defer func() { _ = tx.Rollback() }()
-		if _, err := tx.ExecContext(r.Context(), `DELETE FROM product_field_values WHERE product_id=$1`, productID); err != nil {
-			log.Printf("Error clearing field values for product %d: %v", productID, err)
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to clear field values"})
-			return
-		}
-		if err := tx.Commit(); err != nil {
-			log.Printf("Error committing clear of field values for product %d: %v", productID, err)
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to clear field values"})
-			return
-		}
-		respondJSON(w, http.StatusOK, map[string]string{"message": "Field values updated"})
 		return
 	}
 

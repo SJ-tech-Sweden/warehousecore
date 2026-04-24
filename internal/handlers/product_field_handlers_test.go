@@ -231,21 +231,12 @@ func TestSetProductFieldValues_NilValues(t *testing.T) {
 	}
 }
 
-// TestSetProductFieldValues_EmptyWithRequiredDefs verifies that sending an
-// explicit empty map (clear-all) is rejected when required field definitions
-// exist.
-func TestSetProductFieldValues_EmptyWithRequiredDefs(t *testing.T) {
-	mock := withMockDB(t)
+// TestSetProductFieldValues_EmptyMapIsNoOp verifies that sending an explicit
+// empty map is treated as a no-op (200 OK) — consistent with omitting the
+// "values" key entirely.  Neither should clear existing field values.
+func TestSetProductFieldValues_EmptyMapIsNoOp(t *testing.T) {
+	_ = withMockDB(t) // no DB expectations — handler should return before touching the DB
 	router := productFieldRouter()
-
-	// Product exists check.
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-
-	// Required field definitions check — at least one required definition exists.
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 
 	body := `{"values":{}}`
 	req := httptest.NewRequest(http.MethodPut, "/admin/products/1/field-values", bytes.NewBufferString(body))
@@ -253,8 +244,8 @@ func TestSetProductFieldValues_EmptyWithRequiredDefs(t *testing.T) {
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 when clearing values with required fields, got %d; body: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty values map (no-op), got %d; body: %s", rr.Code, rr.Body.String())
 	}
 }
 
