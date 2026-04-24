@@ -484,8 +484,8 @@ func validateFieldValue(name, value string, def fieldDefMeta) error {
 
 // SetProductFieldValues upserts field values for a specific product atomically.
 // Omitting the "values" key OR sending an empty map are both treated as no-ops.
-// Individual field values are deleted by omitting them from a subsequent request
-// (the backend only processes keys that are present in the map).
+// Individual non-required field values are deleted by including the field key with
+// an empty string value; omitting a field key leaves any existing stored value unchanged.
 // All field names are resolved in a single query; values are validated against their
 // field definitions before any writes; updates/deletes run inside a transaction.
 func SetProductFieldValues(w http.ResponseWriter, r *http.Request) {
