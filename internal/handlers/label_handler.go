@@ -12,7 +12,7 @@ import (
 	"warehousecore/internal/services"
 )
 
-var labelService = services.NewLabelService()
+var labelService services.LabelServiceInterface = services.NewLabelService()
 
 // GenerateQRCode generates a QR code
 // POST /api/v1/labels/qrcode

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Users, Layers, Lightbulb, Cpu, FolderTree, Database, Ruler, KeyRound, Tag, Download, DollarSign, Link2, Sliders } from 'lucide-react';
+import { Settings, Users, Layers, Lightbulb, Cpu, FolderTree, Database, Ruler, KeyRound, Tag, Download, DollarSign, Link2, Sliders, Building } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ZoneTypesTab } from '../components/admin/ZoneTypesTab';
 import { LEDSettingsTab } from '../components/admin/LEDSettingsTab';
@@ -7,6 +7,7 @@ import { RolesTab } from '../components/admin/RolesTab';
 import { LEDControllersTab } from '../components/admin/LEDControllersTab';
 import { CategoriesTab } from '../components/admin/CategoriesTab';
 import { APISettingsTab } from '../components/admin/APISettingsTab';
+import { CompanySettingsTab } from '../components/admin/CompanySettingsTab';
 import { CountTypesTab } from '../components/admin/CountTypesTab';
 import { APIKeysTab } from '../components/admin/APIKeysTab';
 import { BrandsManufacturersTab } from '../components/admin/BrandsManufacturersTab';
@@ -15,7 +16,7 @@ import { CurrencySettingsTab } from '../components/admin/CurrencySettingsTab';
 import { EventoryTab } from '../components/admin/EventoryTab';
 import { ProductFieldDefinitionsTab } from '../components/admin/ProductFieldDefinitionsTab';
 
-type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'brands' | 'counttypes' | 'roles' | 'apisettings' | 'apikeys' | 'export' | 'currency' | 'eventory' | 'fieldDefinitions';
+type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'brands' | 'counttypes' | 'roles' | 'apisettings' | 'apikeys' | 'export' | 'currency' | 'eventory' | 'fieldDefinitions' | 'companySettings';
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('zonetypes');
@@ -31,6 +32,7 @@ export function AdminPage() {
     { id: 'roles' as TabType, label: t('admin.tabs.roles'), icon: Users },
     { id: 'apisettings' as TabType, label: t('admin.tabs.apiSettings'), icon: Database },
     { id: 'currency' as TabType, label: t('admin.tabs.currency'), icon: DollarSign },
+    { id: 'companySettings' as TabType, label: t('admin.tabs.companySettings'), icon: Building },
     { id: 'eventory' as TabType, label: t('admin.tabs.eventory'), icon: Link2 },
     { id: 'fieldDefinitions' as TabType, label: t('admin.tabs.fieldDefinitions'), icon: Sliders },
     { id: 'apikeys' as TabType, label: t('admin.tabs.apiKeys'), icon: KeyRound },
@@ -85,6 +87,7 @@ export function AdminPage() {
         {activeTab === 'currency' && <CurrencySettingsTab />}
         {activeTab === 'eventory' && <EventoryTab />}
         {activeTab === 'fieldDefinitions' && <ProductFieldDefinitionsTab />}
+        {activeTab === 'companySettings' && <CompanySettingsTab />}
         {activeTab === 'apikeys' && <APIKeysTab />}
         {activeTab === 'export' && <ExportTab />}
       </div>

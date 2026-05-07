@@ -69,6 +69,51 @@ func ptrFloat64(n sql.NullFloat64) *float64 {
 	return &val
 }
 
+func rentalCoreBaseURL() string {
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("RENTALCORE_BASE_URL")), "/")
+}
+
+func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePath string) bool {
+	baseURL := rentalCoreBaseURL()
+	if baseURL == "" {
+		return false
+	}
+
+	requestURL := baseURL + servicePath
+	if rawQuery := strings.TrimSpace(r.URL.RawQuery); rawQuery != "" && !strings.Contains(servicePath, "?") {
+		requestURL += "?" + rawQuery
+	}
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, requestURL, nil)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create RentalCore request"})
+		return true
+	}
+	req.Header.Set("Accept", "application/json")
+	if apiKey := strings.TrimSpace(os.Getenv("RENTALCORE_API_KEY")); apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		log.Printf("Error proxying RentalCore service request %s: %v", servicePath, err)
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": "RentalCore unavailable"})
+		return true
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to read RentalCore response"})
+		return true
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(body)
+	return true
+}
+
 // PostgresPlaceholders converts MySQL ? placeholders to PostgreSQL $N placeholders
 // It also returns an argument counter that can be used for building dynamic queries
 type QueryBuilder struct {
@@ -1509,6 +1554,10 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 
 // GetJobs returns jobs filtered by status
 func GetJobs(w http.ResponseWriter, r *http.Request) {
+	if proxyRentalCoreServiceGET(w, r, "/api/v1/service/jobs") {
+		return
+	}
+
 	status := r.URL.Query().Get("status")
 
 	db := repository.GetSQLDB()
@@ -1538,7 +1587,6 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 
 	args := []interface{}{}
 	if status != "" {
-		// 'open' is a legacy status value meaning any non-terminal job
 		if strings.EqualFold(status, "open") {
 			query += " AND (s.status IS NULL OR s.status NOT IN ('Completed', 'Invoiced', 'Cancelled'))"
 		} else {
@@ -1606,9 +1654,12 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if proxyRentalCoreServiceGET(w, r, fmt.Sprintf("/api/v1/service/jobs/%d/summary", jobID)) {
+		return
+	}
+
 	db := repository.GetSQLDB()
 
-	// Get job details
 	var (
 		jobCode                             sql.NullString
 		description, startDate, endDate     sql.NullString
@@ -1637,7 +1688,6 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get devices for this job with their current status
 	rows, err := db.Query(`
 		SELECT jd.deviceID, d.status, d.barcode, d.qr_code,
 		       COALESCE(p.name, '') as product_name,
@@ -1666,7 +1716,7 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		Barcode     *string `json:"barcode,omitempty"`
 		QRCode      *string `json:"qr_code,omitempty"`
 		PackStatus  string  `json:"pack_status"`
-		Scanned     bool    `json:"scanned"` // true if pack_status is 'issued' or device status is 'on_job'
+		Scanned     bool    `json:"scanned"`
 	}
 
 	devices := []JobDevice{}
@@ -1687,19 +1737,15 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 			jd.QRCode = &qrCode.String
 		}
 
-		// Mark as scanned only if device is currently on_job
-		// If device is back in storage, it should not be highlighted as scanned
 		jd.Scanned = jd.Status == "on_job"
-
 		devices = append(devices, jd)
 	}
 
-	// Get product requirements for this job
 	type ProductRequirement struct {
 		ProductID   int    `json:"product_id"`
 		ProductName string `json:"product_name"`
 		Required    int    `json:"required"`
-		Assigned    int    `json:"assigned"` // devices of this product currently on_job
+		Assigned    int    `json:"assigned"`
 	}
 
 	reqRows, err := db.Query(`
@@ -3092,8 +3138,8 @@ func buildDeviceMap(deviceID, productName, status, barcode, qrCode, serialNumber
 func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 	db := repository.GetSQLDB()
 
-	// Query for device tree with categories - Include ALL categories, devices, consumables, and accessories
-	// This ensures newly created categories and consumables/accessories appear immediately in the tree
+	// Query for device tree including products without categories (placed under "Uncategorized")
+	// Start from products so standalone products (no category/subcategory) are included.
 	query := `
 		WITH latest_job AS (
 			SELECT jd.deviceID, jd.jobID
@@ -3103,20 +3149,39 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 				FROM jobdevices
 				GROUP BY deviceID
 			) latest ON jd.deviceID = latest.deviceID AND jd.jobID = latest.jobID
+		), products_cte AS (
+			SELECT
+				p.productID,
+				p.name as product_name,
+				p.is_consumable,
+				p.is_accessory,
+				COALESCE(p.stock_quantity, 0) as stock_quantity,
+				ct.abbreviation as unit,
+				sc.subcategoryID,
+				COALESCE(sc.name, '') as subcategory_name,
+				sbc.subbiercategoryID,
+				COALESCE(sbc.name, '') as subbiercategory_name,
+				c.categoryID,
+				COALESCE(c.name, 'Uncategorized') as category_name
+			FROM products p
+			LEFT JOIN subbiercategories sbc ON p.subbiercategoryID = sbc.subbiercategoryID
+			LEFT JOIN subcategories sc ON COALESCE(p.subcategoryID, sbc.subcategoryID) = sc.subcategoryID
+			LEFT JOIN categories c ON sc.categoryID = c.categoryID
+			LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
 		)
 		SELECT
-			c.categoryID,
-			c.name as category_name,
-			sc.subcategoryID,
-			sc.name as subcategory_name,
-			sbc.subbiercategoryID,
-			sbc.name as subbiercategory_name,
-			p.productID,
-			COALESCE(p.name, '') as product_name,
-			CASE WHEN p.is_consumable = TRUE THEN 1 ELSE 0 END as is_consumable,
-			CASE WHEN p.is_accessory = TRUE THEN 1 ELSE 0 END as is_accessory,
-			COALESCE(p.stock_quantity, 0) as stock_quantity,
-			COALESCE(ct.abbreviation, '') as unit,
+			COALESCE(pcte.categoryID, 0) as categoryID,
+			pcte.category_name,
+			pcte.subcategoryID,
+			pcte.subcategory_name,
+			pcte.subbiercategoryID,
+			pcte.subbiercategory_name,
+			pcte.productID,
+			COALESCE(pcte.product_name, '') as product_name,
+			CASE WHEN pcte.is_consumable = TRUE THEN 1 ELSE 0 END as is_consumable,
+			CASE WHEN pcte.is_accessory = TRUE THEN 1 ELSE 0 END as is_accessory,
+			COALESCE(pcte.stock_quantity, 0) as stock_quantity,
+			COALESCE(pcte.unit, '') as unit,
 			d.deviceID,
 			d.status,
 			d.barcode,
@@ -3136,18 +3201,14 @@ func GetDeviceTree(w http.ResponseWriter, r *http.Request) {
 			d.lastmaintenance,
 			d.nextmaintenance,
 			d.notes
-		FROM categories c
-		LEFT JOIN subcategories sc ON c.categoryID = sc.categoryID
-		LEFT JOIN subbiercategories sbc ON sc.subcategoryID = sbc.subcategoryID
-		LEFT JOIN products p ON (sbc.subbiercategoryID = p.subbiercategoryID OR (sc.subcategoryID = p.subcategoryID AND p.subbiercategoryID IS NULL))
-		LEFT JOIN count_types ct ON p.count_type_id = ct.count_type_id
-		LEFT JOIN devices d ON p.productID = d.productID
+		FROM products_cte pcte
+		LEFT JOIN devices d ON pcte.productID = d.productID
 		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
 		LEFT JOIN devicescases dc ON d.deviceID = dc.deviceID
 		LEFT JOIN cases cs ON dc.caseID = cs.caseID
 		LEFT JOIN latest_job lj ON d.deviceID = lj.deviceID
 		LEFT JOIN jobs j ON lj.jobID = j.jobID
-		ORDER BY c.name, sc.name, sbc.name, p.name, d.deviceID
+		ORDER BY pcte.category_name, pcte.subcategory_name, pcte.subbiercategory_name, pcte.product_name, d.deviceID
 	`
 
 	rows, err := db.Query(query)

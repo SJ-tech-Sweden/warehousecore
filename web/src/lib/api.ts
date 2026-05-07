@@ -5,10 +5,54 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Admin company settings shape (snake_case keys returned from backend)
+export interface AdminCompanySettings {
+  name?: string;
+  address_line1?: string;
+  address_line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+
+  tax_number?: string;
+  vat_number?: string;
+  invoice_prefix?: string;
+  invoice_footer?: string;
+  default_tax_rate?: number;
+  currency?: string;
+
+  bank_name?: string;
+  iban?: string;
+  bic?: string;
+  account_holder?: string;
+
+  ceo_name?: string;
+  register_court?: string;
+  register_number?: string;
+
+  brand_primary_color?: string;
+  brand_accent_color?: string;
+  brand_dark_mode?: boolean;
+  brand_logo_url?: string;
+
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_username?: string;
+  smtp_password?: string;
+  smtp_from_email?: string;
+  smtp_from_name?: string;
+  smtp_use_tls?: boolean;
+}
 
 // Types
 export interface Device {
@@ -629,6 +673,9 @@ export const adminSettingsApi = {
     api.put<CurrencySettings & { message: string }>('/admin/currency', {
       currency_symbol: symbol,
     }),
+  getCompany: () => api.get<AdminCompanySettings>('/admin/company-settings'),
+  updateCompany: (payload: Partial<AdminCompanySettings>) =>
+    api.put<AdminCompanySettings & { message?: string }>('/admin/company-settings', payload),
 };
 
 // Eventory integration

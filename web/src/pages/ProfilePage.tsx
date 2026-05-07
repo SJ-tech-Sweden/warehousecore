@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Shield, Save } from 'lucide-react';
+import { User, Mail, Shield, Save, Key } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
+import { authService } from '../services/auth';
 
 interface UserProfile {
   profile: {
@@ -33,6 +34,11 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMessage, setPwMessage] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -177,6 +183,55 @@ export function ProfilePage() {
             </div>
           )}
         </div>
+
+          {/* Change Password */}
+          <div className="glass-dark rounded-2xl p-6 space-y-4 mt-6">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Key className="w-5 h-5 text-accent-red" />{t('profilePage.changePasswordTitle')}</h3>
+            <p className="text-gray-400 text-sm">{t('profilePage.changePasswordHelp')}</p>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.currentPassword')}</label>
+              <input type="password" value={pwCurrent} onChange={(e)=>setPwCurrent(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.newPassword')}</label>
+              <input type="password" value={pwNew} onChange={(e)=>setPwNew(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.confirmPassword')}</label>
+              <input type="password" value={pwConfirm} onChange={(e)=>setPwConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+            </div>
+
+            <div className="pt-2">
+              <button onClick={async ()=>{
+                setPwSaving(true);
+                setPwMessage('');
+                try {
+                  if (pwNew !== pwConfirm) throw new Error('Passwords do not match');
+                  if (pwNew.length < 6) throw new Error('Password must be at least 6 characters');
+                  await authService.changePassword(pwCurrent, pwNew);
+                  setPwMessage(t('profilePage.passwordChangeSuccess'));
+                  setPwCurrent(''); setPwNew(''); setPwConfirm('');
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Failed to change password';
+                  setPwMessage(msg);
+                } finally {
+                  setPwSaving(false);
+                  setTimeout(()=>setPwMessage(''),3000);
+                }
+              }} disabled={pwSaving} className={`w-full py-3 px-6 rounded-xl font-semibold text-white ${pwSaving ? 'bg-gray-600' : 'bg-gradient-to-r from-accent-red to-red-700'}`}>
+                {pwSaving ? t('common.saving') : t('profilePage.changePasswordButton')}
+              </button>
+
+              {pwMessage && (
+                <div className={`mt-3 p-3 rounded-lg text-center text-sm font-semibold ${pwMessage === t('profilePage.passwordChangeSuccess') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {pwMessage}
+                </div>
+              )}
+            </div>
+          </div>
       </div>
     </div>
   );

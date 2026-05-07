@@ -110,7 +110,11 @@ func main() {
 	}
 	defer repository.CloseDatabase()
 
+	log.Println("DEBUG: reached post-InitDatabase")
+
+	log.Println("DEBUG: creating CompanyBrandingService")
 	brandingService = services.NewCompanyBrandingService(repository.GetDB())
+	log.Println("DEBUG: created CompanyBrandingService")
 
 	// Initialize LED service
 	log.Println("[LED] Initializing LED service...")
@@ -126,6 +130,12 @@ func main() {
 	controllerListener := led.NewControllerListener()
 	if controllerListener != nil {
 		controllerListener.Start()
+	}
+
+	// Ensure auto-admin assignment based on ENV (ADMIN_NAME_MATCH)
+	// Ensure default admin exists (create if no users present)
+	if err := services.NewRBACService().EnsureDefaultAdminFromEnv(); err != nil {
+		log.Printf("[RBAC] EnsureDefaultAdminFromEnv failed: %v", err)
 	}
 
 	// Ensure auto-admin assignment based on ENV (ADMIN_NAME_MATCH)
@@ -174,6 +184,9 @@ func main() {
 	// Public website feeds (no authentication required)
 	api.HandleFunc("/public/products", handlers.GetWebsiteProducts).Methods("GET")
 	api.HandleFunc("/public/packages", handlers.GetWebsitePackages).Methods("GET")
+
+	// Apply SSO middleware early so claims can populate request context
+	api.Use(middleware.SSOMiddleware)
 
 	// Protected routes - apply auth middleware
 	protected := api.PathPrefix("").Subrouter()
@@ -299,6 +312,10 @@ func main() {
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.AuthMiddleware)
 	admin.Use(middleware.RequireAdmin)
+	// Create role/user endpoints
+	admin.HandleFunc("/roles", handlers.CreateRole).Methods("POST")
+	admin.HandleFunc("/roles/{id}", handlers.UpdateRole).Methods("PUT")
+	admin.HandleFunc("/users", handlers.CreateUser).Methods("POST")
 	admin.HandleFunc("/zone-types", handlers.CreateZoneType).Methods("POST")
 	admin.HandleFunc("/zone-types/{id}", handlers.UpdateZoneType).Methods("PUT")
 	admin.HandleFunc("/zone-types/{id}", handlers.DeleteZoneType).Methods("DELETE")
@@ -314,6 +331,8 @@ func main() {
 	admin.HandleFunc("/led/controllers/{id}/restart", handlers.RestartLEDController).Methods("POST")
 	admin.HandleFunc("/led/controllers/{id}", handlers.DeleteLEDController).Methods("DELETE")
 	admin.HandleFunc("/users/{id}/roles", handlers.UpdateUserRoles).Methods("PUT")
+	admin.HandleFunc("/users/{id}", handlers.AdminUpdateUser).Methods("PUT")
+	admin.HandleFunc("/users/{id}/reset-password", handlers.AdminResetUserPassword).Methods("POST")
 	admin.HandleFunc("/categories", handlers.CreateCategory).Methods("POST")
 	admin.HandleFunc("/categories/{id}", handlers.UpdateCategory).Methods("PUT")
 	admin.HandleFunc("/categories/{id}", handlers.DeleteCategory).Methods("DELETE")
@@ -378,6 +397,8 @@ func main() {
 	admin.HandleFunc("/api-limits", handlers.UpdateAPILimits).Methods("PUT")
 	admin.HandleFunc("/currency", handlers.GetCurrencySettings).Methods("GET")
 	admin.HandleFunc("/currency", handlers.UpdateCurrencySettings).Methods("PUT")
+	admin.HandleFunc("/company-settings", handlers.GetCompanySettings).Methods("GET")
+	admin.HandleFunc("/company-settings", handlers.UpdateCompanySettings).Methods("PUT")
 
 	// Eventory integration endpoints (admin-only write + read)
 	admin.HandleFunc("/eventory/settings", handlers.GetEventorySettings).Methods("GET")
@@ -396,10 +417,12 @@ func main() {
 	protected.HandleFunc("/profile/me", handlers.UpdateMyProfile).Methods("PUT")
 	protected.HandleFunc("/product-packages/alias-map", handlers.GetProductPackageAliasMap).Methods("GET")
 
-	// Service API routes (service-to-service, any active API key)
+	// Service API routes (service-to-service, authenticated by SERVICE_API_KEY env var)
 	serviceAPI := api.PathPrefix("/service").Subrouter()
-	serviceAPI.Use(middleware.APIKeyMiddleware)
+	serviceAPI.Use(middleware.ServiceKeyMiddleware)
 	serviceAPI.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
+	serviceAPI.HandleFunc("/products", handlers.GetProducts).Methods("GET")
+	serviceAPI.HandleFunc("/products/{id}", handlers.GetProduct).Methods("GET")
 
 	// Apply middleware
 	api.Use(middleware.Logger)

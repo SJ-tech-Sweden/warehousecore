@@ -1,0 +1,22 @@
+-- warehousecore seed data (idempotent)
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.seed_marker (name text PRIMARY KEY, applied_at timestamptz DEFAULT now());
+INSERT INTO public.seed_marker (name) VALUES ('initial_seed') ON CONFLICT DO NOTHING;
+
+-- API key for inter-service calls
+INSERT INTO api_keys (apikeyid, name, hashed_key, created_at)
+VALUES (1, 'rentalcore-internal', md5('rentalcore-internal-key'), NOW()) ON CONFLICT DO NOTHING;
+
+-- Products
+INSERT INTO products (productid, name, sku, created_at)
+VALUES (1, 'Widget A', 'WIDGET-A', NOW()) ON CONFLICT DO NOTHING;
+INSERT INTO products (productid, name, sku, created_at)
+VALUES (2, 'Cable 1m', 'CABLE-1M', NOW()) ON CONFLICT DO NOTHING;
+
+-- Devices / Zones
+INSERT INTO zones (zoneid, name) VALUES (1, 'Main Warehouse') ON CONFLICT DO NOTHING;
+INSERT INTO devices (deviceid, serial, productid, zoneid, created_at)
+VALUES (1, 'DEV-0001', 1, 1, NOW()) ON CONFLICT DO NOTHING;
+
+COMMIT;

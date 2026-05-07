@@ -22,7 +22,12 @@ import (
 	"warehousecore/internal/services"
 )
 
-var productPictureService = services.NewProductPictureServiceFromEnv()
+var productPictureService services.ProductPictureServiceInterface = services.NewProductPictureServiceFromEnv()
+
+// SetProductPictureService allows tests to inject a mock ProductPictureService.
+func SetProductPictureService(s services.ProductPictureServiceInterface) {
+	productPictureService = s
+}
 var errPicturesUnavailable = errors.New("product pictures not available")
 var websiteRevalidator = services.NewRevalidatorFromEnv()
 

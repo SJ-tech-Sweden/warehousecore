@@ -10,13 +10,16 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
+
+	"warehousecore/config"
+	"warehousecore/internal/migrations"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"warehousecore/config"
 )
 
 // Common errors
@@ -56,6 +59,33 @@ func InitDatabase(cfg *config.Config) error {
 	log.Printf("PostgreSQL database connection established: %s@%s:%s/%s",
 		cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name)
 
+	// Optionally run SQL migrations and seeds on startup. Controlled by
+	// env var MIGRATE_ON_STARTUP (default: "true"). The migrations directory
+	// can be overridden with MIGRATIONS_DIR (default: "migrations").
+	if os.Getenv("MIGRATE_ON_STARTUP") != "false" {
+		// Determine migrations directory (allow override via MIGRATIONS_DIR env)
+		migrationsDir := os.Getenv("MIGRATIONS_DIR")
+		if migrationsDir == "" {
+			migrationsDir = "migrations"
+		}
+		// Use the repo-relative path; if running from project root this is fine.
+		absDir, _ := filepath.Abs(migrationsDir)
+		log.Printf("Running SQL migrations from %s", absDir)
+		if err := migrations.ApplyMigrations(sqlDB, migrationsDir); err != nil {
+			return fmt.Errorf("apply migrations: %w", err)
+		}
+		// Apply any SQL seed file placed alongside migrations. We prefer a
+		// single, idempotent seed file `064_default_seeds.sql` that uses
+		// ON CONFLICT to avoid overwriting later changes. If present, execute
+		// it unconditionally — the statements are safe to run on a populated
+		// database and will only insert missing defaults.
+		seedFile := filepath.Join(migrationsDir, "064_default_seeds.sql")
+		if err := applySQLFileIfExists(sqlDB, seedFile); err != nil {
+			return fmt.Errorf("apply default seeds: %w", err)
+		}
+		log.Println("Migrations and startup seeds applied")
+	}
+
 	// Initialize GORM with PostgreSQL driver
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		SkipDefaultTransaction: false,
@@ -87,17 +117,17 @@ func buildPostgresDSN(cfg *config.Config) string {
 
 	dbName := cfg.Database.Name
 	if dbName == "" {
-		dbName = "rentalcore"
+		dbName = "warehousecore"
 	}
 
 	user := cfg.Database.User
 	if user == "" {
-		user = "rentalcore"
+		user = "warehousecore"
 	}
 
 	password := cfg.Database.Password
 	if password == "" {
-		password = "rentalcore123"
+		password = "warehousecore123"
 	}
 
 	sslMode := cfg.Database.SSLMode
@@ -146,4 +176,25 @@ func HashAPIKey(key string) string {
 	mac := hmac.New(sha256.New, []byte(apiKeyPepper))
 	mac.Write([]byte(key))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// applySQLFileIfExists reads a SQL file and executes its contents as a single
+// Exec call if the file exists. The SQL should be idempotent (use ON CONFLICT
+// guards) so it is safe to run on partially populated databases.
+func applySQLFileIfExists(db *sql.DB, path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read seed file: %w", err)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	if _, err := db.Exec(string(data)); err != nil {
+		return fmt.Errorf("exec seed SQL: %w", err)
+	}
+	log.Printf("Applied seed SQL from %s", path)
+	return nil
 }

@@ -46,6 +46,8 @@ func serviceRouter() *mux.Router {
 	service := router.PathPrefix("/api/v1/service").Subrouter()
 	service.Use(middleware.APIKeyMiddleware)
 	service.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
+	service.HandleFunc("/products", handlers.GetProducts).Methods("GET")
+	service.HandleFunc("/products/{id}", handlers.GetProduct).Methods("GET")
 	return router
 }
 
@@ -56,6 +58,8 @@ func TestServiceAPI_MissingAPIKey(t *testing.T) {
 
 	paths := []string{
 		"/api/v1/service/devices/DEV001",
+		"/api/v1/service/products",
+		"/api/v1/service/products/42",
 	}
 
 	for _, path := range paths {
@@ -85,6 +89,8 @@ func TestServiceAPI_APIKey_DBUnavailable_Returns500(t *testing.T) {
 
 	paths := []string{
 		"/api/v1/service/devices/DEV001",
+		"/api/v1/service/products",
+		"/api/v1/service/products/42",
 	}
 
 	for _, path := range paths {

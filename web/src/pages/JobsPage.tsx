@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Package, CheckCircle, XCircle, Calendar, User, ArrowRight, Lightbulb, LightbulbOff, ClipboardList, Camera, Nfc, Keyboard } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { jobsApi, scansApi, ledApi } from '../lib/api';
@@ -12,6 +12,7 @@ import type { InputMethod } from '../types/scanTypes';
 const JOB_CODE_PATTERN = /^JOB\d+$/i;
 export function JobsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { id: urlJobId } = useParams<{ id: string }>();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobSummary | null>(null);
@@ -19,6 +20,7 @@ export function JobsPage() {
   const [scanCode, setScanCode] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [scanAction, setScanAction] = useState<'outtake' | 'intake'>('outtake');
 
   // Input method for the scan card: keyboard (default), camera, or nfc
   const [inputMethod, setInputMethod] = useState<InputMethod>('keyboard');
@@ -267,6 +269,7 @@ export function JobsPage() {
         }
 
         await loadJobDetails(numericPart, { highlight: true });
+        navigate(`/jobs/${numericPart}`);
         setScanResult({ success: true, message: t('jobsPage.jobLoaded', { code: normalizedCode }) });
       } catch (error: any) {
         console.error('Job scan failed:', error);
@@ -299,11 +302,11 @@ export function JobsPage() {
     setScanResult(null);
 
     try {
-      // Process outtake scan with job context
+      // Process scan with job context for outtake; intake returns devices from job.
       const { data } = await scansApi.process({
         scan_code: rawCode,
-        action: 'outtake',
-        job_id: selectedJob.job_id,
+        action: scanAction,
+        job_id: scanAction === 'outtake' ? selectedJob.job_id : undefined,
       });
 
       setScanResult({
@@ -329,7 +332,7 @@ export function JobsPage() {
       // Clear result after 3 seconds
       scheduleScanResultDismiss();
     }
-  }, [t, selectedJob, loadJobDetails, refreshJobDetails, scheduleScanResultDismiss]);
+  }, [t, navigate, scanAction, selectedJob, loadJobDetails, refreshJobDetails, scheduleScanResultDismiss]);
 
   // Keep submitCodeRef in sync with the latest processCode so scanner callbacks
   // (which are memoised on mount) can always reach the current state closure.
@@ -356,6 +359,8 @@ export function JobsPage() {
     setSelectedJob(null);
     setScanCode('');
     setScanResult(null);
+    setScanAction('outtake');
+    navigate('/jobs');
     loadJobs(); // Reload job list
   };
 
@@ -416,7 +421,7 @@ export function JobsPage() {
               {jobs.map((job) => (
                 <button
                   key={job.job_id}
-                  onClick={() => loadJobDetails(job.job_id, { highlight: false })}
+                  onClick={() => navigate(`/jobs/${job.job_id}`)}
                   className="glass-dark rounded-2xl p-6 border-2 border-white/10 hover:border-accent-red transition-all text-left group hover:scale-105"
                 >
                   <div className="flex items-start justify-between mb-4">
@@ -611,7 +616,32 @@ export function JobsPage() {
           {/* Scan Interface */}
           <div className="glass-dark rounded-2xl p-6 border-2 border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-white">{t('jobsPage.outtakeDevice')}</h2>
+              <h2 className="text-2xl font-bold text-white">
+                {scanAction === 'outtake'
+                  ? t('jobsPage.outtakeDevice')
+                  : `${t('scan.intake')} Device`}
+              </h2>
+            </div>
+
+            <div role="group" aria-label={t('scan.actions')} className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setScanAction('outtake')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  scanAction === 'outtake' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-300 hover:text-white'
+                }`}
+              >
+                {t('scan.outtake')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanAction('intake')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  scanAction === 'intake' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-gray-300 hover:text-white'
+                }`}
+              >
+                {t('scan.intake')}
+              </button>
             </div>
 
             {/* LED Highlight Toggle */}

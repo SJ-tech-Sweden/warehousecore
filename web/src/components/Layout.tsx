@@ -103,7 +103,7 @@ export function Layout({ children }: LayoutProps) {
   const hasAdminAccess = useMemo(() => {
     return userRoles.some((role) => {
       const name = (role?.name || role?.Name || '').toString().toLowerCase();
-      return name === 'admin' || name === 'manager' || name === 'warehouse_admin';
+      return name === 'admin' || name === 'manager' || name === 'warehouse_admin' || name === 'super_admin';
     });
   }, [userRoles]);
 
