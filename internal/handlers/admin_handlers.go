@@ -470,13 +470,13 @@ func UpdateRole(w http.ResponseWriter, r *http.Request) {
 // CreateUser creates a new user and optional role assignments
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Username        string `json:"username"`
-		Email           string `json:"email"`
-		Password        string `json:"password"`
-		FirstName       string `json:"first_name"`
-		LastName        string `json:"last_name"`
-		RoleIDs         []int  `json:"role_ids"`
-		ForcePasswordChange *bool `json:"force_password_change"`
+		Username            string `json:"username"`
+		Email               string `json:"email"`
+		Password            string `json:"password"`
+		FirstName           string `json:"first_name"`
+		LastName            string `json:"last_name"`
+		RoleIDs             []int  `json:"role_ids"`
+		ForcePasswordChange *bool  `json:"force_password_change"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})

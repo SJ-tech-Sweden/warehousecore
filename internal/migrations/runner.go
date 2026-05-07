@@ -122,7 +122,7 @@ func splitSQLStatements(sql string) []string {
 			for j < len(sql) {
 				rr, _ := utf8.DecodeRuneInString(sql[j:])
 				if rr == '$' {
-					tag := sql[i:j+1] // includes both $
+					tag := sql[i : j+1] // includes both $
 					// ensure tag matches pattern $[A-Za-z0-9_]*$
 					ok := true
 					for k := 1; k < len(tag)-1; k++ {
