@@ -18,13 +18,33 @@ export function Layout({ children }: LayoutProps) {
   const [isMobile, setIsMobile] = useState(false);
   const { t } = useTranslation();
   const [companyName, setCompanyName] = useState<string>(
-    (window as any).__APP_CONFIG__?.companyName || 'RentalCore'
+    (window as any).__APP_CONFIG__?.companyName || 'WarehouseCore'
   );
 
   useEffect(() => {
-    fetch('/api/v1/config')
-      .then(res => res.json())
-      .then(cfg => { if (cfg?.companyName) setCompanyName(cfg.companyName); })
+    const normalize = (value: unknown): string => {
+      if (typeof value !== 'string') return '';
+      return value.trim();
+    };
+
+    fetch('/api/v1/admin/company-settings', { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(cfg => {
+        const name = normalize(cfg?.name) || normalize(cfg?.company_name);
+        if (name) {
+          setCompanyName(name);
+          return;
+        }
+
+        return fetch('/api/v1/config', { credentials: 'include' })
+          .then(res => (res.ok ? res.json() : null))
+          .then(publicCfg => {
+            const fallbackName = normalize(publicCfg?.companyName) || normalize(publicCfg?.company_name);
+            if (fallbackName) {
+              setCompanyName(fallbackName);
+            }
+          });
+      })
       .catch(() => {});
   }, []);
 

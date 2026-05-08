@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -70,7 +71,33 @@ func ptrFloat64(n sql.NullFloat64) *float64 {
 }
 
 func rentalCoreBaseURL() string {
-	return strings.TrimRight(strings.TrimSpace(os.Getenv("RENTALCORE_BASE_URL")), "/")
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("RENTALCORE_BASE_URL")), "/")
+	if base == "" {
+		return "http://rentalcore:8080"
+	}
+
+	parsed, err := url.Parse(base)
+	if err == nil {
+		host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+		if host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" {
+			return "http://rentalcore:8080"
+		}
+	}
+
+	return base
+}
+
+func rentalCoreServiceAPIKey() (string, string) {
+	if key := strings.TrimSpace(os.Getenv("RENTALCORE_API_KEY")); key != "" {
+		return key, "RENTALCORE_API_KEY"
+	}
+	if key := strings.TrimSpace(os.Getenv("SERVICE_API_KEY")); key != "" {
+		return key, "SERVICE_API_KEY"
+	}
+	if key := strings.TrimSpace(os.Getenv("WAREHOUSECORE_API_KEY")); key != "" {
+		return key, "WAREHOUSECORE_API_KEY"
+	}
+	return "", ""
 }
 
 func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePath string) bool {
@@ -90,7 +117,8 @@ func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePa
 		return true
 	}
 	req.Header.Set("Accept", "application/json")
-	if apiKey := strings.TrimSpace(os.Getenv("RENTALCORE_API_KEY")); apiKey != "" {
+	apiKey, apiKeySource := rentalCoreServiceAPIKey()
+	if apiKey != "" {
 		req.Header.Set("X-API-Key", apiKey)
 	}
 
@@ -106,6 +134,243 @@ func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePa
 	if err != nil {
 		respondJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to read RentalCore response"})
 		return true
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		log.Printf("RentalCore service auth failed for %s (status=%d, baseURL=%s, apiKeySource=%s, apiKeyConfigured=%t, apiKeyLength=%d)", servicePath, resp.StatusCode, baseURL, apiKeySource, apiKey != "", len(apiKey))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = w.Write(body)
+	return true
+}
+
+func replaceRequirementNamesWithLocalProducts(body []byte) ([]byte, error) {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+
+	requirementsRaw, ok := payload["product_requirements"].([]interface{})
+	if !ok || len(requirementsRaw) == 0 {
+		return body, nil
+	}
+
+	productIDs := make([]int, 0, len(requirementsRaw))
+	seen := make(map[int]bool)
+	for _, item := range requirementsRaw {
+		reqMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		idFloat, ok := reqMap["product_id"].(float64)
+		if !ok {
+			continue
+		}
+		productID := int(idFloat)
+		if productID <= 0 || seen[productID] {
+			continue
+		}
+		seen[productID] = true
+		productIDs = append(productIDs, productID)
+	}
+
+	if len(productIDs) == 0 {
+		return body, nil
+	}
+
+	placeholders := make([]string, 0, len(productIDs))
+	args := make([]interface{}, 0, len(productIDs))
+	for i, id := range productIDs {
+		placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf("SELECT productID, name FROM products WHERE productID IN (%s)", strings.Join(placeholders, ","))
+	rows, err := repository.GetSQLDB().Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	localNames := make(map[int]string)
+	for rows.Next() {
+		var productID int
+		var name string
+		if err := rows.Scan(&productID, &name); err != nil {
+			continue
+		}
+		trimmed := strings.TrimSpace(name)
+		if trimmed != "" {
+			localNames[productID] = trimmed
+		}
+	}
+
+	for _, item := range requirementsRaw {
+		reqMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		idFloat, ok := reqMap["product_id"].(float64)
+		if !ok {
+			continue
+		}
+		if localName, exists := localNames[int(idFloat)]; exists {
+			reqMap["product_name"] = localName
+		}
+	}
+
+	result, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func mergeLocalJobDevicesIntoSummary(body []byte, jobID int) ([]byte, error) {
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+
+	rows, err := repository.GetSQLDB().Query(`
+		SELECT jd.deviceID,
+		       COALESCE(d.status, '') as status,
+		       COALESCE(p.productID, 0) as product_id,
+		       COALESCE(p.name, '') as product_name,
+		       COALESCE(z.name, '') as zone_name,
+		       d.barcode,
+		       d.qr_code,
+		       COALESCE(jd.pack_status, 'pending') as pack_status
+		FROM jobdevices jd
+		LEFT JOIN devices d ON jd.deviceID = d.deviceID
+		LEFT JOIN products p ON d.productID = p.productID
+		LEFT JOIN storage_zones z ON d.zone_id = z.zone_id
+		WHERE jd.jobID = $1
+		ORDER BY COALESCE(p.name, ''), jd.deviceID
+	`, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	devices := make([]map[string]interface{}, 0)
+	assignedByProduct := make(map[int]int)
+
+	for rows.Next() {
+		var (
+			deviceID    string
+			status      string
+			productID   int
+			productName string
+			zoneName    string
+			barcode     sql.NullString
+			qrCode      sql.NullString
+			packStatus  string
+		)
+
+		if err := rows.Scan(&deviceID, &status, &productID, &productName, &zoneName, &barcode, &qrCode, &packStatus); err != nil {
+			return nil, err
+		}
+
+		scanned := status == "on_job"
+		if scanned && productID > 0 {
+			assignedByProduct[productID]++
+		}
+
+		device := map[string]interface{}{
+			"device_id":    deviceID,
+			"status":       status,
+			"product_name": productName,
+			"pack_status":  packStatus,
+			"scanned":      scanned,
+		}
+		if strings.TrimSpace(zoneName) != "" {
+			device["zone_name"] = zoneName
+		}
+		if barcode.Valid && strings.TrimSpace(barcode.String) != "" {
+			device["barcode"] = barcode.String
+		}
+		if qrCode.Valid && strings.TrimSpace(qrCode.String) != "" {
+			device["qr_code"] = qrCode.String
+		}
+
+		devices = append(devices, device)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	payload["devices"] = devices
+
+	if requirementsRaw, ok := payload["product_requirements"].([]interface{}); ok {
+		for _, item := range requirementsRaw {
+			reqMap, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			idFloat, ok := reqMap["product_id"].(float64)
+			if !ok {
+				continue
+			}
+			reqMap["assigned"] = assignedByProduct[int(idFloat)]
+		}
+	}
+
+	result, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func proxyRentalCoreJobSummaryWithLocalNames(w http.ResponseWriter, r *http.Request, jobID int) bool {
+	baseURL := rentalCoreBaseURL()
+	if baseURL == "" {
+		return false
+	}
+
+	requestURL := fmt.Sprintf("%s/api/v1/service/jobs/%d/summary", baseURL, jobID)
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, requestURL, nil)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create RentalCore request"})
+		return true
+	}
+	req.Header.Set("Accept", "application/json")
+	apiKey, _ := rentalCoreServiceAPIKey()
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": "RentalCore unavailable"})
+		return true
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": "Failed to read RentalCore response"})
+		return true
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		rewritten, rewriteErr := replaceRequirementNamesWithLocalProducts(body)
+		if rewriteErr != nil {
+			log.Printf("Failed to rewrite product names for RentalCore summary job %d: %v", jobID, rewriteErr)
+		} else {
+			body = rewritten
+		}
+
+		merged, mergeErr := mergeLocalJobDevicesIntoSummary(body, jobID)
+		if mergeErr != nil {
+			log.Printf("Failed to merge local job devices into RentalCore summary job %d: %v", jobID, mergeErr)
+		} else {
+			body = merged
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1554,6 +1819,10 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 
 // GetJobs returns jobs filtered by status
 func GetJobs(w http.ResponseWriter, r *http.Request) {
+	if proxyTwentyJobs(w, r) {
+		return
+	}
+
 	if proxyRentalCoreServiceGET(w, r, "/api/v1/service/jobs") {
 		return
 	}
@@ -1654,7 +1923,11 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if proxyRentalCoreServiceGET(w, r, fmt.Sprintf("/api/v1/service/jobs/%d/summary", jobID)) {
+	if proxyTwentyJobSummaryWithLocalDevices(w, r, jobID) {
+		return
+	}
+
+	if proxyRentalCoreJobSummaryWithLocalNames(w, r, jobID) {
 		return
 	}
 

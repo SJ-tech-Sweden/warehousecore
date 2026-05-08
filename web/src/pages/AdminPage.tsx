@@ -14,9 +14,10 @@ import { BrandsManufacturersTab } from '../components/admin/BrandsManufacturersT
 import { ExportTab } from '../components/admin/ExportTab';
 import { CurrencySettingsTab } from '../components/admin/CurrencySettingsTab';
 import { EventoryTab } from '../components/admin/EventoryTab';
+import { TwentyTab } from '../components/admin/TwentyTab';
 import { ProductFieldDefinitionsTab } from '../components/admin/ProductFieldDefinitionsTab';
 
-type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'brands' | 'counttypes' | 'roles' | 'apisettings' | 'apikeys' | 'export' | 'currency' | 'eventory' | 'fieldDefinitions' | 'companySettings';
+type TabType = 'zonetypes' | 'led' | 'controllers' | 'categories' | 'brands' | 'counttypes' | 'roles' | 'apisettings' | 'apikeys' | 'export' | 'currency' | 'eventory' | 'twenty' | 'fieldDefinitions' | 'companySettings';
 
 export function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('zonetypes');
@@ -34,6 +35,7 @@ export function AdminPage() {
     { id: 'currency' as TabType, label: t('admin.tabs.currency'), icon: DollarSign },
     { id: 'companySettings' as TabType, label: t('admin.tabs.companySettings'), icon: Building },
     { id: 'eventory' as TabType, label: t('admin.tabs.eventory'), icon: Link2 },
+    { id: 'twenty' as TabType, label: t('admin.tabs.twenty'), icon: Link2 },
     { id: 'fieldDefinitions' as TabType, label: t('admin.tabs.fieldDefinitions'), icon: Sliders },
     { id: 'apikeys' as TabType, label: t('admin.tabs.apiKeys'), icon: KeyRound },
     { id: 'export' as TabType, label: t('admin.tabs.export'), icon: Download },
@@ -86,6 +88,7 @@ export function AdminPage() {
         {activeTab === 'apisettings' && <APISettingsTab />}
         {activeTab === 'currency' && <CurrencySettingsTab />}
         {activeTab === 'eventory' && <EventoryTab />}
+        {activeTab === 'twenty' && <TwentyTab />}
         {activeTab === 'fieldDefinitions' && <ProductFieldDefinitionsTab />}
         {activeTab === 'companySettings' && <CompanySettingsTab />}
         {activeTab === 'apikeys' && <APIKeysTab />}

@@ -741,6 +741,34 @@ export const eventoryApi = {
     api.post<{ key: string; saved: boolean }>('/admin/eventory/credential-key/generate', { save }),
 };
 
+// Twenty integration
+export interface TwentySettings {
+  base_url: string;
+  base_url_source?: 'none' | 'database' | 'env';
+  base_url_locked?: boolean;
+  api_key_configured: boolean;
+  api_key_source?: 'none' | 'database' | 'env';
+  api_key_locked?: boolean;
+  api_key_masked: string;
+  sync_interval_minutes: number;
+  enable_job_bootstrap: boolean;
+}
+
+export interface TwentySettingsPayload {
+  base_url: string;
+  api_key?: string;
+  clear_api_key?: boolean;
+  sync_interval_minutes: number;
+  enable_job_bootstrap: boolean;
+}
+
+export const twentyApi = {
+  getSettings: () => api.get<TwentySettings>('/admin/twenty/settings'),
+  updateSettings: (payload: TwentySettingsPayload) =>
+    api.put<TwentySettings & { message: string }>('/admin/twenty/settings', payload),
+  sync: () => api.post<{ ok: boolean; created: number; updated: number }>('/admin/twenty/sync', {}),
+};
+
 // API Keys
 export interface APIKeyItem {
   id: number;

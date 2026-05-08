@@ -149,9 +149,15 @@ func main() {
 
 	// Bootstrap Eventory config from environment variables (if any and not yet stored)
 	services.BootstrapEventoryFromEnv()
+	// Bootstrap Twenty config from environment variables (if any and not yet stored)
+	services.BootstrapTwentyFromEnv()
+	// Register Twenty scheduler sync hook (handlers -> services)
+	handlers.RegisterTwentySyncHook()
 
 	// Start Eventory background scheduler (no-op if sync_interval_minutes == 0)
 	services.GetEventoryScheduler().Reset()
+	// Start Twenty background scheduler (runs initial sync, then interval if enabled)
+	services.GetTwentyScheduler().Reset()
 
 	// Setup router
 	router := mux.NewRouter()
@@ -223,6 +229,9 @@ func main() {
 	api.HandleFunc("/jobs", handlers.GetJobs).Methods("GET")
 	api.HandleFunc("/jobs/{id}", handlers.GetJobSummary).Methods("GET")
 	api.HandleFunc("/jobs/{id}/complete", handlers.CompleteJob).Methods("POST")
+
+	// Twenty CRM integration
+	api.HandleFunc("/twenty/sync-products", handlers.TwentySyncProductsHandler).Methods("POST")
 
 	// Public rental equipment endpoint (for RentalCore integration)
 	api.HandleFunc("/rental-equipment", handlers.GetRentalEquipment).Methods("GET")
@@ -409,6 +418,11 @@ func main() {
 	admin.HandleFunc("/eventory/credential-key", handlers.UpdateEventoryCredentialKey).Methods("PUT")
 	admin.HandleFunc("/eventory/credential-key/generate", handlers.GenerateEventoryCredentialKey).Methods("POST")
 
+	// Twenty integration endpoints (admin-only)
+	admin.HandleFunc("/twenty/settings", handlers.GetTwentySettings).Methods("GET")
+	admin.HandleFunc("/twenty/settings", handlers.UpdateTwentySettings).Methods("PUT")
+	admin.HandleFunc("/twenty/sync", handlers.SyncTwentyProductsNow).Methods("POST")
+
 	// CSV Export endpoints (read-only, admin or manager)
 	adminRead.HandleFunc("/export/{type}", handlers.ExportCSV).Methods("GET")
 
@@ -423,6 +437,8 @@ func main() {
 	serviceAPI.HandleFunc("/devices/{id}", handlers.GetDevice).Methods("GET")
 	serviceAPI.HandleFunc("/products", handlers.GetProducts).Methods("GET")
 	serviceAPI.HandleFunc("/products/{id}", handlers.GetProduct).Methods("GET")
+	serviceAPI.HandleFunc("/product-packages", handlers.GetProductPackages).Methods("GET")
+	serviceAPI.HandleFunc("/product-packages/{id}", handlers.GetProductPackage).Methods("GET")
 
 	// Apply middleware
 	api.Use(middleware.Logger)
@@ -473,6 +489,7 @@ func main() {
 		controllerListener.Close()
 	}
 	services.GetEventoryScheduler().Stop()
+	services.GetTwentyScheduler().Stop()
 	repository.CloseDatabase()
 	log.Println("Server stopped")
 }

@@ -73,15 +73,6 @@ export function JobsPage() {
     }
   }, []);
 
-  const refreshJobDetails = useCallback(async (jobId: number) => {
-    try {
-      const { data } = await jobsApi.getById(jobId);
-      setSelectedJob(data);
-    } catch (error) {
-      console.error('Failed to refresh job:', error);
-    }
-  }, []);
-
   // Load open jobs and LED status on mount
   useEffect(() => {
     loadJobs();
@@ -107,16 +98,80 @@ export function JobsPage() {
     }
   };
 
-  // Auto-refresh job details when selected
-  useEffect(() => {
-    if (selectedJob) {
-      const interval = setInterval(() => {
-        refreshJobDetails(selectedJob.job_id);
-      }, 2000); // Refresh every 2 seconds for live updates
-
-      return () => clearInterval(interval);
+  const applyLocalScanResult = useCallback((action: 'outtake' | 'intake', device?: Record<string, any> | null) => {
+    const deviceId = String(device?.device_id ?? device?.deviceID ?? '').trim();
+    if (!deviceId) {
+      return;
     }
-  }, [selectedJob, refreshJobDetails]);
+
+    const resolvedProductID = Number(device?.product_id ?? device?.productID ?? 0) || 0;
+    const resolvedProductName = String(device?.product_name ?? device?.productName ?? '').trim();
+    const resolvedZoneName = String(device?.zone_name ?? device?.zoneName ?? '').trim();
+    const resolvedBarcode = typeof device?.barcode === 'string' ? device.barcode : undefined;
+    const resolvedQRCode = typeof device?.qr_code === 'string'
+      ? device.qr_code
+      : (typeof device?.qrCode === 'string' ? device.qrCode : undefined);
+
+    setSelectedJob(prev => {
+      if (!prev) return prev;
+
+      const deviceExists = prev.devices.some(d => d.device_id === deviceId);
+
+      let nextDevices = prev.devices.map(d => {
+        if (d.device_id !== deviceId) {
+          return d;
+        }
+
+        return {
+          ...d,
+          status: action === 'outtake' ? 'on_job' : 'in_storage',
+          scanned: action === 'outtake',
+          pack_status: action === 'outtake' ? 'issued' : 'pending',
+          zone_name: action === 'outtake' ? '' : (resolvedZoneName || d.zone_name),
+          product_name: resolvedProductName || d.product_name,
+          barcode: resolvedBarcode || d.barcode,
+          qr_code: resolvedQRCode || d.qr_code,
+        };
+      });
+
+      if (!deviceExists && action === 'outtake') {
+        nextDevices = [
+          {
+            device_id: deviceId,
+            status: 'on_job',
+            product_name: resolvedProductName || `Product ${resolvedProductID || '?'}`,
+            zone_name: '',
+            barcode: resolvedBarcode,
+            qr_code: resolvedQRCode,
+            pack_status: 'issued',
+            scanned: true,
+          },
+          ...nextDevices,
+        ];
+      }
+
+      const nextRequirements = (prev.product_requirements || []).map(req => {
+        if (!resolvedProductID || req.product_id !== resolvedProductID) {
+          return req;
+        }
+
+        const nextAssigned = action === 'outtake'
+          ? Math.min(req.required, req.assigned + 1)
+          : Math.max(0, req.assigned - 1);
+
+        return {
+          ...req,
+          assigned: nextAssigned,
+        };
+      });
+
+      return {
+        ...prev,
+        devices: nextDevices,
+        product_requirements: nextRequirements,
+      };
+    });
+  }, []);
 
   // Cleanup LEDs when leaving the page or unmounting
   useEffect(() => {
@@ -316,9 +371,8 @@ export function JobsPage() {
 
       setScanCode('');
 
-      // Refresh job details immediately after scan
       if (data.success) {
-        await refreshJobDetails(selectedJob.job_id);
+        applyLocalScanResult(scanAction, data.device || null);
       }
     } catch (error: any) {
       console.error('Scan failed:', error);
@@ -332,7 +386,7 @@ export function JobsPage() {
       // Clear result after 3 seconds
       scheduleScanResultDismiss();
     }
-  }, [t, navigate, scanAction, selectedJob, loadJobDetails, refreshJobDetails, scheduleScanResultDismiss]);
+  }, [t, navigate, scanAction, selectedJob, loadJobDetails, applyLocalScanResult, scheduleScanResultDismiss]);
 
   // Keep submitCodeRef in sync with the latest processCode so scanner callbacks
   // (which are memoised on mount) can always reach the current state closure.
@@ -619,7 +673,7 @@ export function JobsPage() {
               <h2 className="text-2xl font-bold text-white">
                 {scanAction === 'outtake'
                   ? t('jobsPage.outtakeDevice')
-                  : `${t('scan.intake')} Device`}
+                  : t('jobsPage.intakeDevice')}
               </h2>
             </div>
 
@@ -631,7 +685,7 @@ export function JobsPage() {
                   scanAction === 'outtake' ? 'bg-accent-red text-white' : 'bg-white/5 text-gray-300 hover:text-white'
                 }`}
               >
-                {t('scan.outtake')}
+                {t('scan.actions.outtake')}
               </button>
               <button
                 type="button"
@@ -640,7 +694,7 @@ export function JobsPage() {
                   scanAction === 'intake' ? 'bg-emerald-600 text-white' : 'bg-white/5 text-gray-300 hover:text-white'
                 }`}
               >
-                {t('scan.intake')}
+                {t('scan.actions.intake')}
               </button>
             </div>
 
@@ -799,7 +853,9 @@ export function JobsPage() {
                 disabled={scanLoading || !scanCode.trim()}
                 className="w-full py-4 bg-gradient-to-r from-accent-red to-red-700 text-white font-bold text-lg rounded-xl hover:shadow-lg hover:shadow-accent-red/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
               >
-                {scanLoading ? t('jobsPage.scanning') : t('jobsPage.outtakeDevice')}
+                {scanLoading
+                  ? t('jobsPage.scanning')
+                  : (scanAction === 'outtake' ? t('jobsPage.outtakeDevice') : t('jobsPage.intakeDevice'))}
               </button>
             </form>
 

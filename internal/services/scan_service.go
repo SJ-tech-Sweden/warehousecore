@@ -130,24 +130,19 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 		fromJobID = &device.CurrentJobID.Int64
 	}
 
-	// Update device status to in_storage
-	// Note: This section appears to be incomplete or incorrect in the original logic.
-	// Since this is intake (returning to warehouse), we should not be inserting into jobdevices.
-	// Commenting out this section as it conflicts with the reset logic below.
-	/*
-		_, err = tx.Exec(`
-			INSERT INTO public.job_devices (deviceid, jobid, pack_status)
-			VALUES ($1, $2, 'issued')
-			ON CONFLICT (deviceid, jobid) DO UPDATE SET pack_status = 'issued'
-		`, device.DeviceID, *jobID)
-		if err != nil {
-			return nil, nil, err
-		}
-	*/
+	_, err := tx.Exec(`
+		UPDATE devices
+		SET status = 'in_storage',
+		    zone_id = $2::bigint,
+		    current_location = CASE WHEN $2::bigint IS NULL THEN 'warehouse' ELSE 'storage' END
+		WHERE deviceID = $1
+	`, device.DeviceID, zoneID)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Reset pack status instead of removing from job
 	// This makes it appear as "not scanned" again in the job
-	var err error
 	if fromJobID != nil {
 		_, err = tx.Exec(`
 			UPDATE jobdevices
@@ -171,10 +166,10 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, movement_type, from_job_id, to_zone_id, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO device_movements (device_id, action, movement_type, from_job_id, to_zone_id, timestamp, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.FromJobID, movement.ToZoneID, movement.Timestamp).Scan(&movement.MovementID)
+	`, movement.DeviceID, movement.Action, movement.Action, movement.FromJobID, movement.ToZoneID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -246,10 +241,10 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, movement_type, from_zone_id, to_job_id, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO device_movements (device_id, action, movement_type, from_zone_id, to_job_id, timestamp, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToJobID, movement.Timestamp).Scan(&movement.MovementID)
+	`, movement.DeviceID, movement.Action, movement.Action, movement.FromZoneID, movement.ToJobID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -356,10 +351,10 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 	}
 
 	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, movement_type, from_zone_id, to_zone_id, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO device_movements (device_id, action, movement_type, from_zone_id, to_zone_id, timestamp, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.FromZoneID, movement.ToZoneID, movement.Timestamp).Scan(&movement.MovementID)
+	`, movement.DeviceID, movement.Action, movement.Action, movement.FromZoneID, movement.ToZoneID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
 	if err != nil {
 		return nil, nil, err
 	}
