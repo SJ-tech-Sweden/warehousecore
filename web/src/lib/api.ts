@@ -303,6 +303,25 @@ export interface JobSummary {
   product_requirements: ProductRequirement[];
 }
 
+export interface JobRequirementProductOption {
+  product_id: number;
+  name: string;
+  category_name?: string;
+}
+
+export interface JobRequirementUpsertPayload {
+  product_id: number;
+  quantity: number;
+}
+
+export interface JobRequirementUpsertResponse {
+  ok: boolean;
+  action: 'created' | 'updated';
+  job_id: number;
+  product_id: number;
+  quantity: number;
+}
+
 // API Functions
 export const dashboardApi = {
   getStats: () => api.get<DashboardStats>('/dashboard/stats'),
@@ -434,6 +453,10 @@ export const scansApi = {
 export const jobsApi = {
   getAll: (params?: { status?: string }) => api.get<Job[]>('/jobs', { params }),
   getById: (id: number) => api.get<JobSummary>(`/jobs/${id}`),
+  getRequirementProductOptions: (params?: { q?: string; limit?: number }) =>
+    api.get<{ products: JobRequirementProductOption[]; count: number }>('/jobs/products/options', { params }),
+  upsertRequirement: (jobId: number, payload: JobRequirementUpsertPayload) =>
+    api.post<JobRequirementUpsertResponse>(`/jobs/${jobId}/requirements`, payload),
 };
 
 export interface Defect {
@@ -762,11 +785,21 @@ export interface TwentySettingsPayload {
   enable_job_bootstrap: boolean;
 }
 
+export interface TwentySyncResult {
+  ok: boolean;
+  created: number;
+  updated: number;
+  productCreated: number;
+  productUpdated: number;
+  packageCreated: number;
+  packageUpdated: number;
+}
+
 export const twentyApi = {
   getSettings: () => api.get<TwentySettings>('/admin/twenty/settings'),
   updateSettings: (payload: TwentySettingsPayload) =>
     api.put<TwentySettings & { message: string }>('/admin/twenty/settings', payload),
-  sync: () => api.post<{ ok: boolean; created: number; updated: number }>('/admin/twenty/sync', {}),
+  sync: () => api.post<TwentySyncResult>('/admin/twenty/sync', {}),
 };
 
 // API Keys

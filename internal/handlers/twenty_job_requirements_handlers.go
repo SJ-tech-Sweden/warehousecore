@@ -1,0 +1,520 @@
+package handlers
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/gorilla/mux"
+
+	"warehousecore/internal/repository"
+)
+
+type twentyRequirementNode struct {
+	ID                   string   `json:"id"`
+	Name                 string   `json:"name"`
+	Quantity             *float64 `json:"quantity"`
+	UnitPrice            *float64 `json:"unitPrice"`
+	LineTotal            *float64 `json:"lineTotal"`
+	WarehouseCoreProduct *float64 `json:"warehouseCoreProductId"`
+	WarehouseProduct     *struct {
+		ID          string   `json:"id"`
+		WarehouseID *float64 `json:"warehouseId"`
+	} `json:"warehouseProduct"`
+}
+
+type twentyOpportunityRequirementNode struct {
+	ID                 string                  `json:"id"`
+	WarehouseCoreJobID *float64                `json:"warehouseCoreJobId"`
+	JobRequirements    []twentyRequirementNode `json:"jobProductRequirements"`
+}
+
+type twentyOpportunityRequirementEdge struct {
+	Node twentyOpportunityRequirementNode `json:"node"`
+}
+
+type twentyOpportunityRequirementConnection struct {
+	Edges []twentyOpportunityRequirementEdge `json:"edges"`
+}
+
+type jobProductOption struct {
+	ProductID    int    `json:"product_id"`
+	Name         string `json:"name"`
+	CategoryName string `json:"category_name"`
+}
+
+// GetJobRequirementProductOptions returns products for the guided
+// "add requirement" picker in the Jobs page.
+func GetJobRequirementProductOptions(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(q) > 120 {
+		q = q[:120]
+	}
+
+	limit := 100
+	if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
+		if parsed, err := strconv.Atoi(rawLimit); err == nil {
+			if parsed < 1 {
+				parsed = 1
+			}
+			if parsed > 300 {
+				parsed = 300
+			}
+			limit = parsed
+		}
+	}
+
+	db := repository.GetSQLDB()
+	query := `
+		SELECT p.productID, p.name, COALESCE(c.name, '') AS category_name
+		FROM products p
+		LEFT JOIN categories c ON c.categoryID = p.categoryID
+		WHERE ($1 = '' OR p.name ILIKE $2)
+		ORDER BY p.name
+		LIMIT $3
+	`
+	pattern := "%" + q + "%"
+	rows, err := db.Query(query, q, pattern, limit)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch product options"})
+		return
+	}
+	defer rows.Close()
+
+	items := make([]jobProductOption, 0)
+	for rows.Next() {
+		var item jobProductOption
+		if scanErr := rows.Scan(&item.ProductID, &item.Name, &item.CategoryName); scanErr != nil {
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read product options"})
+			return
+		}
+		items = append(items, item)
+	}
+	if rowErr := rows.Err(); rowErr != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read product options"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"products": items,
+		"count":    len(items),
+	})
+}
+
+// UpsertJobRequirement writes a product requirement to the linked Twenty
+// Opportunity for this WarehouseCore job.
+func UpsertJobRequirement(w http.ResponseWriter, r *http.Request) {
+	if !twentyConfigured() {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Twenty is not configured"})
+		return
+	}
+
+	jobID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil || jobID <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid job id"})
+		return
+	}
+
+	var req struct {
+		ProductID int `json:"product_id"`
+		Quantity  int `json:"quantity"`
+	}
+	if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if req.ProductID <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "product_id must be > 0"})
+		return
+	}
+	if req.Quantity <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "quantity must be > 0"})
+		return
+	}
+
+	productName, unitPrice, nameErr := loadLocalProductPricing(req.ProductID)
+	if nameErr != nil {
+		if nameErr == sql.ErrNoRows {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "product not found"})
+			return
+		}
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to load product: %v", nameErr)})
+		return
+	}
+	lineTotal := unitPrice * float64(req.Quantity)
+
+	opp, oppErr := loadTwentyOpportunityForJob(r.Context(), jobID)
+	if oppErr != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("failed to load linked opportunity: %v", oppErr)})
+		return
+	}
+	if opp == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "no Twenty opportunity linked to this job"})
+		return
+	}
+
+	productTwentyID, prodMapErr := resolveTwentyProductRecordID(r.Context(), req.ProductID)
+	if prodMapErr != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("failed to resolve Twenty product mapping: %v", prodMapErr)})
+		return
+	}
+	if productTwentyID == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "product is not synced to Twenty yet; run Twenty product sync first"})
+		return
+	}
+
+	existingRequirementID := ""
+	for _, line := range opp.JobRequirements {
+		lineProductID := 0
+		if line.WarehouseCoreProduct != nil {
+			lineProductID = int(*line.WarehouseCoreProduct)
+		}
+		if lineProductID <= 0 && line.WarehouseProduct != nil && line.WarehouseProduct.WarehouseID != nil {
+			lineProductID = int(*line.WarehouseProduct.WarehouseID)
+		}
+		if lineProductID == req.ProductID {
+			existingRequirementID = strings.TrimSpace(line.ID)
+			break
+		}
+	}
+
+	quantity := float64(req.Quantity)
+	if existingRequirementID != "" {
+		if err := updateTwentyRequirement(r.Context(), existingRequirementID, productName, quantity, req.ProductID, productTwentyID, unitPrice, lineTotal); err != nil {
+			respondJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("failed to update requirement: %v", err)})
+			return
+		}
+		_ = updateOpportunityEstimatedTotal(r.Context(), opp)
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"ok":         true,
+			"action":     "updated",
+			"job_id":     jobID,
+			"product_id": req.ProductID,
+			"quantity":   req.Quantity,
+		})
+		return
+	}
+
+	if err := createTwentyRequirement(r.Context(), opp.ID, productName, quantity, req.ProductID, productTwentyID, unitPrice, lineTotal); err != nil {
+		respondJSON(w, http.StatusBadGateway, map[string]string{"error": fmt.Sprintf("failed to create requirement: %v", err)})
+		return
+	}
+	_ = updateOpportunityEstimatedTotal(r.Context(), opp)
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":         true,
+		"action":     "created",
+		"job_id":     jobID,
+		"product_id": req.ProductID,
+		"quantity":   req.Quantity,
+	})
+}
+
+func loadLocalProductPricing(productID int) (name string, unitPrice float64, err error) {
+	db := repository.GetSQLDB()
+	err = db.QueryRow(`SELECT name, COALESCE(itemcostperday, 0) FROM products WHERE productID = $1`, productID).Scan(&name, &unitPrice)
+	if err != nil {
+		return "", 0, err
+	}
+	return strings.TrimSpace(name), unitPrice, nil
+}
+
+func resolveTwentyProductRecordID(ctx context.Context, localProductID int) (string, error) {
+	nodes, err := loadExistingWarehouseCoreProducts(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, edge := range nodes {
+		if int(edge.Node.WarehouseID) == localProductID {
+			return strings.TrimSpace(edge.Node.ID), nil
+		}
+	}
+	return "", nil
+}
+
+func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportunityRequirementNode, error) {
+	const findManyWithRelationQ = `query {
+		findManyOpportunities {
+			id
+			warehouseCoreJobId
+			jobProductRequirements {
+				id
+				name
+				quantity
+				unitPrice
+				lineTotal
+				warehouseCoreProductId
+				warehouseProduct { id warehouseId }
+			}
+		}
+	}`
+	const findManyLegacyQ = `query {
+		findManyOpportunities {
+			id
+			warehouseCoreJobId
+			jobProductRequirements {
+				id
+				name
+				quantity
+				unitPrice
+				lineTotal
+				warehouseCoreProductId
+			}
+		}
+	}`
+	const connectionWithRelationQ = `query {
+		opportunities {
+			edges {
+				node {
+					id
+					warehouseCoreJobId
+					jobProductRequirements {
+						id
+						name
+						quantity
+						unitPrice
+						lineTotal
+						warehouseCoreProductId
+						warehouseProduct { id warehouseId }
+					}
+				}
+			}
+		}
+	}`
+	const connectionLegacyQ = `query {
+		opportunities {
+			edges {
+				node {
+					id
+					warehouseCoreJobId
+					jobProductRequirements {
+						id
+						name
+						quantity
+						unitPrice
+						lineTotal
+						warehouseCoreProductId
+					}
+				}
+			}
+		}
+	}`
+
+	var list []twentyOpportunityRequirementNode
+	if err := doTwentyGraphQLRoot(ctx, findManyWithRelationQ, nil, "findManyOpportunities", &list); err != nil {
+		if err2 := doTwentyGraphQLRoot(ctx, findManyLegacyQ, nil, "findManyOpportunities", &list); err2 != nil {
+			var conn twentyOpportunityRequirementConnection
+			if err3 := doTwentyGraphQLRoot(ctx, connectionWithRelationQ, nil, "opportunities", &conn); err3 != nil {
+				if err4 := doTwentyGraphQLRoot(ctx, connectionLegacyQ, nil, "opportunities", &conn); err4 != nil {
+					return nil, err4
+				}
+			}
+			list = make([]twentyOpportunityRequirementNode, 0, len(conn.Edges))
+			for _, e := range conn.Edges {
+				list = append(list, e.Node)
+			}
+		}
+	}
+
+	for _, opp := range list {
+		if opp.WarehouseCoreJobID == nil {
+			continue
+		}
+		if int(*opp.WarehouseCoreJobID) == jobID {
+			copyOpp := opp
+			return &copyOpp, nil
+		}
+	}
+	return nil, nil
+}
+
+func updateTwentyRequirement(ctx context.Context, requirementID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
+	const updateOneRelQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		updateOneJobProductRequirement(id: $id, data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			warehouseProduct: { connect: { id: $warehouseProductId } }
+		}) { id }
+	}`
+	const updateRelQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		updateJobProductRequirement(id: $id, data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			warehouseProduct: { connect: { id: $warehouseProductId } }
+		}) { id }
+	}`
+	const updateOneFkQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		updateOneJobProductRequirement(id: $id, data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+	const updateFkQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		updateJobProductRequirement(id: $id, data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+
+	vars := map[string]interface{}{
+		"id":                     requirementID,
+		"name":                   name,
+		"quantity":               quantity,
+		"warehouseCoreProductId": float64(localProductID),
+		"warehouseProductId":     twentyProductID,
+		"unitPrice":              unitPrice,
+		"lineTotal":              lineTotal,
+	}
+
+	err := doTwentyGraphQLRoot(ctx, updateOneRelQ, vars, "updateOneJobProductRequirement", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, updateRelQ, vars, "updateJobProductRequirement", nil)
+	}
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, updateOneFkQ, vars, "updateOneJobProductRequirement", nil)
+	}
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, updateFkQ, vars, "updateJobProductRequirement", nil)
+	}
+	return err
+}
+
+func createTwentyRequirement(ctx context.Context, opportunityID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
+	const createOneRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		createOneJobProductRequirement(data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			opportunity: { connect: { id: $opportunityId } }
+			warehouseProduct: { connect: { id: $warehouseProductId } }
+		}) { id }
+	}`
+	const createRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		createJobProductRequirement(data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			opportunity: { connect: { id: $opportunityId } }
+			warehouseProduct: { connect: { id: $warehouseProductId } }
+		}) { id }
+	}`
+	const createOneFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		createOneJobProductRequirement(data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			opportunityId: $opportunityId
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+	const createFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+		createJobProductRequirement(data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			opportunityId: $opportunityId
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+
+	vars := map[string]interface{}{
+		"name":                   name,
+		"quantity":               quantity,
+		"warehouseCoreProductId": float64(localProductID),
+		"opportunityId":          opportunityID,
+		"warehouseProductId":     twentyProductID,
+		"unitPrice":              unitPrice,
+		"lineTotal":              lineTotal,
+	}
+
+	err := doTwentyGraphQLRoot(ctx, createOneRelQ, vars, "createOneJobProductRequirement", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, createRelQ, vars, "createJobProductRequirement", nil)
+	}
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, createOneFkQ, vars, "createOneJobProductRequirement", nil)
+	}
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, createFkQ, vars, "createJobProductRequirement", nil)
+	}
+	return err
+}
+
+func updateOpportunityEstimatedTotal(ctx context.Context, opp *twentyOpportunityRequirementNode) error {
+	if opp == nil || strings.TrimSpace(opp.ID) == "" {
+		return nil
+	}
+
+	const byIDQ = `query OpportunityByID($id: ID!) {
+		opportunity(id: $id) {
+			id
+			jobProductRequirements {
+				quantity
+				unitPrice
+				lineTotal
+			}
+		}
+	}`
+
+	var fresh twentyOpportunityRequirementNode
+	if err := doTwentyGraphQLRoot(ctx, byIDQ, map[string]interface{}{"id": opp.ID}, "opportunity", &fresh); err == nil {
+		opp = &fresh
+	}
+
+	total := 0.0
+	for _, line := range opp.JobRequirements {
+		if line.LineTotal != nil {
+			total += *line.LineTotal
+			continue
+		}
+		if line.UnitPrice != nil && line.Quantity != nil {
+			total += (*line.UnitPrice) * (*line.Quantity)
+		}
+	}
+
+	const updateOneQ = `mutation UpdateOppTotal($id: ID!, $total: Float!) {
+		updateOneOpportunity(id: $id, data: { warehouseCoreEstimatedEquipmentTotal: $total }) {
+			id
+		}
+	}`
+	const updateQ = `mutation UpdateOppTotal($id: ID!, $total: Float!) {
+		updateOpportunity(id: $id, data: { warehouseCoreEstimatedEquipmentTotal: $total }) {
+			id
+		}
+	}`
+	vars := map[string]interface{}{
+		"id":    opp.ID,
+		"total": total,
+	}
+	err := doTwentyGraphQLRoot(ctx, updateOneQ, vars, "updateOneOpportunity", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, updateQ, vars, "updateOpportunity", nil)
+	}
+	return err
+}

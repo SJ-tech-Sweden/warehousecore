@@ -120,9 +120,13 @@ export function TwentyTab() {
       const resp = await twentyApi.sync();
       setMessage({
         type: 'success',
-        text: t('admin.twenty.syncResult', {
+        text: t('admin.twenty.syncResultDetailed', {
           created: resp.data.created,
           updated: resp.data.updated,
+          productCreated: resp.data.productCreated,
+          productUpdated: resp.data.productUpdated,
+          packageCreated: resp.data.packageCreated,
+          packageUpdated: resp.data.packageUpdated,
         }),
       });
     } catch (err: any) {
@@ -189,13 +193,13 @@ export function TwentyTab() {
             onChange={(e) => setApiKey(e.target.value)}
             disabled={apiKeyLocked}
           />
-          <div className="mt-2 flex items-center justify-between text-xs">
-            <span className="text-gray-600 dark:text-gray-300">
+          <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs min-w-0">
+            <span className="text-gray-600 dark:text-gray-300 break-all min-w-0">
               {apiKeyConfigured
                 ? `${t('admin.twenty.keyConfigured')}${apiKeyMasked ? ` (${apiKeyMasked})` : ''}`
                 : t('admin.twenty.keyNotConfigured')}
             </span>
-            <label className="inline-flex items-center gap-2">
+            <label className="inline-flex items-center gap-2 shrink-0">
               <input type="checkbox" checked={clearApiKey} onChange={(e) => setClearApiKey(e.target.checked)} disabled={apiKeyLocked} />
               {t('admin.twenty.clearKey')}
             </label>
@@ -215,6 +219,7 @@ export function TwentyTab() {
               className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 text-sm"
               value={syncInterval}
               onChange={(e) => setSyncInterval(Number(e.target.value))}
+              title={t('admin.twenty.syncInterval')}
             >
               {SYNC_INTERVAL_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value} className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Package, CheckCircle, XCircle, Calendar, User, ArrowRight, Lightbulb, LightbulbOff, ClipboardList, Camera, Nfc, Keyboard } from 'lucide-react';
+import { Package, CheckCircle, XCircle, Calendar, User, ArrowRight, Lightbulb, LightbulbOff, ClipboardList, Camera, Nfc, Keyboard, PlusCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { jobsApi, scansApi, ledApi } from '../lib/api';
 import type { Job, JobSummary, JobDevice, LEDStatus, ProductRequirement } from '../lib/api';
@@ -21,6 +21,11 @@ export function JobsPage() {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string } | null>(null);
   const [scanAction, setScanAction] = useState<'outtake' | 'intake'>('outtake');
+  const [requirementProducts, setRequirementProducts] = useState<Array<{ product_id: number; name: string; category_name?: string }>>([]);
+  const [selectedRequirementProductID, setSelectedRequirementProductID] = useState<number>(0);
+  const [requirementQuantity, setRequirementQuantity] = useState<number>(1);
+  const [savingRequirement, setSavingRequirement] = useState(false);
+  const [requirementMessage, setRequirementMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Input method for the scan card: keyboard (default), camera, or nfc
   const [inputMethod, setInputMethod] = useState<InputMethod>('keyboard');
@@ -217,6 +222,64 @@ export function JobsPage() {
       console.error('Failed to load jobs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRequirementProducts = useCallback(async () => {
+    try {
+      const { data } = await jobsApi.getRequirementProductOptions({ limit: 200 });
+      setRequirementProducts(data.products || []);
+    } catch (error) {
+      console.error('Failed to load requirement product options:', error);
+      setRequirementProducts([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedJob) {
+      loadRequirementProducts();
+    }
+  }, [selectedJob, loadRequirementProducts]);
+
+  const handleAddRequirement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedJob) return;
+    if (selectedRequirementProductID <= 0) {
+      setRequirementMessage({ type: 'error', text: t('jobsPage.requirementSelectProduct') });
+      return;
+    }
+    if (requirementQuantity <= 0) {
+      setRequirementMessage({ type: 'error', text: t('jobsPage.requirementQuantityPositive') });
+      return;
+    }
+
+    setSavingRequirement(true);
+    setRequirementMessage(null);
+    try {
+      const { data } = await jobsApi.upsertRequirement(selectedJob.job_id, {
+        product_id: selectedRequirementProductID,
+        quantity: requirementQuantity,
+      });
+
+      const product = requirementProducts.find(p => p.product_id === selectedRequirementProductID);
+      setRequirementMessage({
+        type: 'success',
+        text: t('jobsPage.requirementSaved', {
+          action: data.action,
+          product: product?.name || String(selectedRequirementProductID),
+          qty: requirementQuantity,
+        }),
+      });
+
+      await loadJobDetails(selectedJob.job_id, { highlight: false });
+      setRequirementQuantity(1);
+    } catch (error: any) {
+      setRequirementMessage({
+        type: 'error',
+        text: error?.response?.data?.error || t('jobsPage.requirementSaveError'),
+      });
+    } finally {
+      setSavingRequirement(false);
     }
   };
 
@@ -635,12 +698,58 @@ export function JobsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Product Requirements */}
-          {selectedJob.product_requirements && selectedJob.product_requirements.length > 0 && (
+          {selectedJob.product_requirements && (
             <div className="lg:col-span-2 glass-dark rounded-2xl p-6 border-2 border-white/10">
               <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
                 <ClipboardList className="w-6 h-6" />
                 {t('jobsPage.productRequirements')}
               </h2>
+
+              <form onSubmit={handleAddRequirement} className="mb-4 p-4 rounded-xl border border-white/10 bg-white/5">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                  <div className="md:col-span-7">
+                    <label className="block text-xs text-gray-400 mb-1">{t('jobsPage.requirementProductLabel')}</label>
+                    <select
+                      className="w-full rounded-lg border border-white/15 bg-black/30 text-white px-3 py-2"
+                      value={selectedRequirementProductID}
+                      onChange={(ev) => setSelectedRequirementProductID(Number(ev.target.value))}
+                    >
+                      <option value={0}>{t('jobsPage.requirementProductPlaceholder')}</option>
+                      {requirementProducts.map((p) => (
+                        <option key={p.product_id} value={p.product_id}>
+                          {p.name}{p.category_name ? ` (${p.category_name})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-400 mb-1">{t('jobsPage.requirementQtyLabel')}</label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-full rounded-lg border border-white/15 bg-black/30 text-white px-3 py-2"
+                      value={requirementQuantity}
+                      onChange={(ev) => setRequirementQuantity(Math.max(1, Number(ev.target.value) || 1))}
+                    />
+                  </div>
+                  <div className="md:col-span-3 flex items-end">
+                    <button
+                      type="submit"
+                      disabled={savingRequirement}
+                      className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-lg bg-accent-red text-white font-semibold disabled:opacity-60"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      {savingRequirement ? t('jobsPage.requirementSaving') : t('jobsPage.requirementAddButton')}
+                    </button>
+                  </div>
+                </div>
+                {requirementMessage && (
+                  <p className={`mt-3 text-sm ${requirementMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                    {requirementMessage.text}
+                  </p>
+                )}
+              </form>
+
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {selectedJob.product_requirements.map((req: ProductRequirement) => {
                   const fulfilled = req.assigned >= req.required;
@@ -663,6 +772,9 @@ export function JobsPage() {
                     </div>
                   );
                 })}
+                {selectedJob.product_requirements.length === 0 && (
+                  <div className="col-span-full text-gray-400 text-sm">{t('jobsPage.noRequirementsYet')}</div>
+                )}
               </div>
             </div>
           )}

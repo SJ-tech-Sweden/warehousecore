@@ -137,15 +137,19 @@ func UpdateTwentySettings(w http.ResponseWriter, r *http.Request) {
 // SyncTwentyProductsNow triggers an immediate sync from WarehouseCore products
 // to Twenty and returns counters.
 func SyncTwentyProductsNow(w http.ResponseWriter, r *http.Request) {
-	created, updated, err := syncProductsToTwenty(r.Context())
+	counts, err := syncProductsToTwenty(r.Context())
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("sync failed: %v", err)})
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"ok":      true,
-		"created": created,
-		"updated": updated,
+		"ok":             true,
+		"created":        counts.TotalCreated(),
+		"updated":        counts.TotalUpdated(),
+		"productCreated": counts.ProductCreated,
+		"productUpdated": counts.ProductUpdated,
+		"packageCreated": counts.PackageCreated,
+		"packageUpdated": counts.PackageUpdated,
 	})
 }
 

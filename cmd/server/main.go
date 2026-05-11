@@ -229,6 +229,8 @@ func main() {
 	api.HandleFunc("/jobs", handlers.GetJobs).Methods("GET")
 	api.HandleFunc("/jobs/{id}", handlers.GetJobSummary).Methods("GET")
 	api.HandleFunc("/jobs/{id}/complete", handlers.CompleteJob).Methods("POST")
+	protected.HandleFunc("/jobs/products/options", handlers.GetJobRequirementProductOptions).Methods("GET")
+	protected.HandleFunc("/jobs/{id}/requirements", handlers.UpsertJobRequirement).Methods("POST")
 
 	// Twenty CRM integration
 	api.HandleFunc("/twenty/sync-products", handlers.TwentySyncProductsHandler).Methods("POST")

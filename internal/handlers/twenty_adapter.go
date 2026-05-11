@@ -44,6 +44,52 @@ type twentyJobRequirementLine struct {
 	Name                   string   `json:"name"`
 	Quantity               *float64 `json:"quantity"`
 	WarehouseCoreProductID *float64 `json:"warehouseCoreProductId"`
+	WarehouseProduct       *struct {
+		WarehouseID *float64 `json:"warehouseId"`
+		ProductName string   `json:"productName"`
+	} `json:"warehouseProduct"`
+}
+
+func requirementProductID(req twentyJobRequirementLine) int {
+	if req.WarehouseCoreProductID != nil {
+		id := int(*req.WarehouseCoreProductID)
+		if id > 0 {
+			return id
+		}
+	}
+	if req.WarehouseProduct != nil && req.WarehouseProduct.WarehouseID != nil {
+		id := int(*req.WarehouseProduct.WarehouseID)
+		if id > 0 {
+			return id
+		}
+	}
+	return 0
+}
+
+func requirementName(req twentyJobRequirementLine) string {
+	if name := strings.TrimSpace(req.Name); name != "" {
+		return name
+	}
+	if req.WarehouseProduct != nil {
+		if name := strings.TrimSpace(req.WarehouseProduct.ProductName); name != "" {
+			return name
+		}
+	}
+	return ""
+}
+
+func requirementQty(req twentyJobRequirementLine) int {
+	if req.Quantity != nil {
+		qty := int(*req.Quantity)
+		if qty > 0 {
+			return qty
+		}
+	}
+	if requirementProductID(req) > 0 {
+		// If a product is linked but quantity is omitted, treat it as 1 by default.
+		return 1
+	}
+	return 0
 }
 
 func twentyBaseURL() string {
@@ -317,7 +363,33 @@ func loadTwentyOpportunities(ctx context.Context) ([]twentyOpportunity, error) {
 		return custom, nil
 	}
 
-	const findManyQ = `
+	const findManyQWithRelation = `
+	query WarehousecoreJobs {
+	  findManyOpportunities {
+	    id
+	    name
+	    jobCode
+	    warehouseCoreJobId
+	    jobStartDate
+	    jobEndDate
+	    closeDate
+	    stage
+	    company {
+	      name
+	    }
+	    jobProductRequirements {
+	      name
+	      quantity
+	      warehouseCoreProductId
+	      warehouseProduct {
+	        warehouseId
+	        productName
+	      }
+	    }
+	  }
+	}
+	`
+	const findManyQLegacy = `
 	query WarehousecoreJobs {
 	  findManyOpportunities {
 	    id
@@ -341,8 +413,9 @@ func loadTwentyOpportunities(ctx context.Context) ([]twentyOpportunity, error) {
 	`
 
 	var opportunities []twentyOpportunity
-	if err := doTwentyGraphQLRoot(ctx, findManyQ, nil, "findManyOpportunities", &opportunities); err != nil {
-		const connectionQ = `
+	if err := doTwentyGraphQLRoot(ctx, findManyQWithRelation, nil, "findManyOpportunities", &opportunities); err != nil {
+		if errLegacy := doTwentyGraphQLRoot(ctx, findManyQLegacy, nil, "findManyOpportunities", &opportunities); errLegacy != nil {
+			const connectionQWithRelation = `
 		query WarehousecoreJobs {
 		  opportunities {
 		    edges {
@@ -362,25 +435,58 @@ func loadTwentyOpportunities(ctx context.Context) ([]twentyOpportunity, error) {
 		          name
 		          quantity
 		          warehouseCoreProductId
+		          warehouseProduct {
+		            warehouseId
+		            productName
+		          }
 		        }
 		      }
 		    }
 		  }
 		}
 		`
-		type oppEdge struct {
-			Node twentyOpportunity `json:"node"`
-		}
-		type oppConnection struct {
-			Edges []oppEdge `json:"edges"`
-		}
-		var conn oppConnection
-		if err2 := doTwentyGraphQLRoot(ctx, connectionQ, nil, "opportunities", &conn); err2 != nil {
-			return nil, err2
-		}
-		opportunities = make([]twentyOpportunity, 0, len(conn.Edges))
-		for _, e := range conn.Edges {
-			opportunities = append(opportunities, e.Node)
+			const connectionQLegacy = `
+			query WarehousecoreJobs {
+			  opportunities {
+			    edges {
+			      node {
+			        id
+			        name
+			        jobCode
+			        warehouseCoreJobId
+			        jobStartDate
+			        jobEndDate
+			        closeDate
+			        stage
+			        company {
+			          name
+			        }
+			        jobProductRequirements {
+			          name
+			          quantity
+			          warehouseCoreProductId
+			        }
+			      }
+			    }
+			  }
+			}
+			`
+			type oppEdge struct {
+				Node twentyOpportunity `json:"node"`
+			}
+			type oppConnection struct {
+				Edges []oppEdge `json:"edges"`
+			}
+			var conn oppConnection
+			if err2 := doTwentyGraphQLRoot(ctx, connectionQWithRelation, nil, "opportunities", &conn); err2 != nil {
+				if err2Legacy := doTwentyGraphQLRoot(ctx, connectionQLegacy, nil, "opportunities", &conn); err2Legacy != nil {
+					return nil, err2Legacy
+				}
+			}
+			opportunities = make([]twentyOpportunity, 0, len(conn.Edges))
+			for _, e := range conn.Edges {
+				opportunities = append(opportunities, e.Node)
+			}
 		}
 	}
 
@@ -408,10 +514,18 @@ func twentyJobsResponse(statusFilter string, opportunities []twentyOpportunity) 
 		}
 
 		requirementsCount := 0
+		hasLinkedRequirement := false
 		for _, req := range opp.JobRequirements {
-			if req.Quantity != nil {
-				requirementsCount += int(*req.Quantity)
+			if requirementProductID(req) > 0 {
+				hasLinkedRequirement = true
+				requirementsCount += requirementQty(req)
 			}
+		}
+
+		// Only expose opportunities that are actually linked to at least one
+		// WarehouseCore product requirement.
+		if !hasLinkedRequirement {
+			continue
 		}
 
 		jobCode := strings.TrimSpace(opp.JobCode)
@@ -485,19 +599,13 @@ func twentyJobSummaryResponse(jobID int, opportunities []twentyOpportunity) (map
 
 		productReqs := make([]map[string]interface{}, 0, len(opp.JobRequirements))
 		for _, req := range opp.JobRequirements {
-			requiredQty := 0
-			if req.Quantity != nil {
-				requiredQty = int(*req.Quantity)
-			}
-
-			productID := 0
-			if req.WarehouseCoreProductID != nil {
-				productID = int(*req.WarehouseCoreProductID)
-			}
+			requiredQty := requirementQty(req)
+			productID := requirementProductID(req)
+			name := requirementName(req)
 
 			productReqs = append(productReqs, map[string]interface{}{
 				"product_id":   productID,
-				"product_name": strings.TrimSpace(req.Name),
+				"product_name": name,
 				"required":     requiredQty,
 				"assigned":     0,
 			})

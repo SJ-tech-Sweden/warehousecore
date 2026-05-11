@@ -23,6 +23,13 @@ type whProductRow struct {
 	ProductID    int
 	Name         string
 	CategoryName string
+	DailyRate    float64
+}
+
+type whPackageRow struct {
+	PackageID       int
+	PackageName     string
+	SourceProductID int
 }
 
 type whpNode struct {
@@ -38,52 +45,86 @@ type whpListEdges struct {
 	Edges []whpEdge `json:"edges"`
 }
 
+type whpkgNode struct {
+	ID                 string  `json:"id"`
+	WarehousePackageID float64 `json:"warehousePackageId"`
+}
+
+type whpkgEdge struct {
+	Node whpkgNode `json:"node"`
+}
+
+type whpkgListEdges struct {
+	Edges []whpkgEdge `json:"edges"`
+}
+
+type twentySyncCounters struct {
+	ProductCreated int `json:"productCreated"`
+	ProductUpdated int `json:"productUpdated"`
+	PackageCreated int `json:"packageCreated"`
+	PackageUpdated int `json:"packageUpdated"`
+}
+
+func (c twentySyncCounters) TotalCreated() int {
+	return c.ProductCreated + c.PackageCreated
+}
+
+func (c twentySyncCounters) TotalUpdated() int {
+	return c.ProductUpdated + c.PackageUpdated
+}
+
 // RegisterTwentySyncHook wires the scheduler hook to the product sync logic.
 // Call once during startup after DB init.
 func RegisterTwentySyncHook() {
 	services.TwentyProductSyncHook = func() (int, int, error) {
-		return syncProductsToTwenty(context.Background())
+		counts, err := syncProductsToTwenty(context.Background())
+		if err != nil {
+			return 0, 0, err
+		}
+		return counts.TotalCreated(), counts.TotalUpdated(), nil
 	}
 }
 
 // syncProductsToTwenty reads all products from the local database and
 // creates or updates corresponding WarehouseCoreProduct records in Twenty.
 // Existing records are matched by the warehouseId field.
-func syncProductsToTwenty(ctx context.Context) (created, updated int, err error) {
+func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 	if !twentyConfigured() {
-		return 0, 0, fmt.Errorf("Twenty not configured")
+		return twentySyncCounters{}, fmt.Errorf("Twenty not configured")
 	}
+
+	counts := twentySyncCounters{}
 
 	db := repository.GetSQLDB()
 	rows, qErr := db.QueryContext(ctx, `
-		SELECT p.productid, p.name, COALESCE(c.name, '') AS category_name
+		SELECT p.productid, p.name, COALESCE(c.name, '') AS category_name, COALESCE(p.itemcostperday, 0)
 		FROM products p
 		LEFT JOIN categories c ON c.categoryid = p.categoryid
 		ORDER BY p.productid
 	`)
 	if qErr != nil {
-		return 0, 0, fmt.Errorf("query products: %w", qErr)
+		return counts, fmt.Errorf("query products: %w", qErr)
 	}
 	defer rows.Close()
 
 	var products []whProductRow
 	for rows.Next() {
 		var pr whProductRow
-		if scanErr := rows.Scan(&pr.ProductID, &pr.Name, &pr.CategoryName); scanErr != nil {
-			return 0, 0, fmt.Errorf("scan product row: %w", scanErr)
+		if scanErr := rows.Scan(&pr.ProductID, &pr.Name, &pr.CategoryName, &pr.DailyRate); scanErr != nil {
+			return counts, fmt.Errorf("scan product row: %w", scanErr)
 		}
 		products = append(products, pr)
 	}
 	if rowErr := rows.Err(); rowErr != nil {
-		return 0, 0, fmt.Errorf("iterate products: %w", rowErr)
+		return counts, fmt.Errorf("iterate products: %w", rowErr)
 	}
 	if len(products) == 0 {
-		return 0, 0, nil
+		return counts, nil
 	}
 
 	nodes, fErr := loadExistingWarehouseCoreProducts(ctx)
 	if fErr != nil {
-		return 0, 0, fmt.Errorf("fetch existing warehouseCoreProducts: %w", fErr)
+		return counts, fmt.Errorf("fetch existing warehouseCoreProducts: %w", fErr)
 	}
 
 	byWarehouseID := make(map[int]string, len(nodes))
@@ -95,43 +136,258 @@ func syncProductsToTwenty(ctx context.Context) (created, updated int, err error)
 	for _, p := range products {
 		twentyID, exists := byWarehouseID[p.ProductID]
 		if exists {
-			const updateQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $lastSyncAt: DateTime!) {
+			const updateOneQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
 				updateOneWarehouseCoreProduct(id: $id, data: {
 					productName: $productName
 					categoryName: $categoryName
+					dailyRate: $dailyRate
 					lastSyncAt: $lastSyncAt
 				}) { id }
 			}`
-			if uErr := doTwentyGraphQLRoot(ctx, updateQ, map[string]interface{}{
+			const updateQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+				updateWarehouseCoreProduct(id: $id, data: {
+					productName: $productName
+					categoryName: $categoryName
+					dailyRate: $dailyRate
+					lastSyncAt: $lastSyncAt
+				}) { id }
+			}`
+
+			vars := map[string]interface{}{
 				"id":           twentyID,
 				"productName":  p.Name,
 				"categoryName": p.CategoryName,
+				"dailyRate":    p.DailyRate,
 				"lastSyncAt":   syncedAt,
-			}, "updateOneWarehouseCoreProduct", nil); uErr != nil {
+			}
+
+			uErr := doTwentyGraphQLRoot(ctx, updateOneQ, vars, "updateOneWarehouseCoreProduct", nil)
+			if uErr != nil {
+				uErr = doTwentyGraphQLRoot(ctx, updateQ, vars, "updateWarehouseCoreProduct", nil)
+			}
+			if uErr != nil {
 				log.Printf("[TWENTY SYNC] update product %d: %v", p.ProductID, uErr)
 				continue
 			}
-			updated++
+			counts.ProductUpdated++
 		} else {
-			const createQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $lastSyncAt: DateTime!) {
+			const createOneQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
 				createOneWarehouseCoreProduct(data: {
 					warehouseId: $warehouseId
 					productName: $productName
 					categoryName: $categoryName
+					dailyRate: $dailyRate
 					lastSyncAt: $lastSyncAt
 				}) { id warehouseId }
 			}`
-			if cErr := doTwentyGraphQLRoot(ctx, createQ, map[string]interface{}{
+			const createQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+				createWarehouseCoreProduct(data: {
+					warehouseId: $warehouseId
+					productName: $productName
+					categoryName: $categoryName
+					dailyRate: $dailyRate
+					lastSyncAt: $lastSyncAt
+				}) { id warehouseId }
+			}`
+
+			vars := map[string]interface{}{
 				"warehouseId":  float64(p.ProductID),
 				"productName":  p.Name,
 				"categoryName": p.CategoryName,
+				"dailyRate":    p.DailyRate,
 				"lastSyncAt":   syncedAt,
-			}, "createOneWarehouseCoreProduct", nil); cErr != nil {
+			}
+
+			cErr := doTwentyGraphQLRoot(ctx, createOneQ, vars, "createOneWarehouseCoreProduct", nil)
+			if cErr != nil {
+				cErr = doTwentyGraphQLRoot(ctx, createQ, vars, "createWarehouseCoreProduct", nil)
+			}
+			if cErr != nil {
 				log.Printf("[TWENTY SYNC] create product %d: %v", p.ProductID, cErr)
 				continue
 			}
-			created++
+			counts.ProductCreated++
 		}
+	}
+
+	pkgCreated, pkgUpdated, pkgErr := syncProductPackagesToTwenty(ctx, byWarehouseID, syncedAt)
+	if pkgErr != nil {
+		return counts, pkgErr
+	}
+	counts.PackageCreated = pkgCreated
+	counts.PackageUpdated = pkgUpdated
+
+	return counts, nil
+}
+
+func syncProductPackagesToTwenty(ctx context.Context, productByWarehouseID map[int]string, syncedAt string) (created, updated int, err error) {
+	db := repository.GetSQLDB()
+	rows, qErr := db.QueryContext(ctx, `
+		SELECT
+			COALESCE(pp.package_id, pp.id) AS package_id,
+			pp.name,
+			COALESCE(pp.product_id, 0) AS source_product_id
+		FROM product_packages pp
+		ORDER BY COALESCE(pp.package_id, pp.id)
+	`)
+	if qErr != nil {
+		return 0, 0, fmt.Errorf("query product_packages: %w", qErr)
+	}
+	defer rows.Close()
+
+	var packages []whPackageRow
+	for rows.Next() {
+		var pr whPackageRow
+		if scanErr := rows.Scan(&pr.PackageID, &pr.PackageName, &pr.SourceProductID); scanErr != nil {
+			return 0, 0, fmt.Errorf("scan product package row: %w", scanErr)
+		}
+		packages = append(packages, pr)
+	}
+	if rowErr := rows.Err(); rowErr != nil {
+		return 0, 0, fmt.Errorf("iterate product packages: %w", rowErr)
+	}
+	if len(packages) == 0 {
+		return 0, 0, nil
+	}
+
+	existing, loadErr := loadExistingWarehouseCorePackages(ctx)
+	if loadErr != nil {
+		return 0, 0, fmt.Errorf("fetch existing warehouseCorePackages: %w", loadErr)
+	}
+
+	byWarehousePackageID := make(map[int]string, len(existing))
+	for _, e := range existing {
+		byWarehousePackageID[int(e.Node.WarehousePackageID)] = e.Node.ID
+	}
+
+	for _, pkg := range packages {
+		productTwentyID := productByWarehouseID[pkg.SourceProductID]
+		if productTwentyID == "" {
+			log.Printf("[TWENTY SYNC] skip package %d: source product %d was not synced", pkg.PackageID, pkg.SourceProductID)
+			continue
+		}
+
+		twentyID := byWarehousePackageID[pkg.PackageID]
+		if twentyID == "" {
+			const createOneWithRelQ = `mutation CreateWHPackage($warehousePackageId: Float!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+				createOneWarehouseCorePackage(data: {
+					warehousePackageId: $warehousePackageId
+					packageName: $packageName
+					sourceProductId: $sourceProductId
+					lastSyncAt: $lastSyncAt
+					warehouseProduct: { connect: { id: $warehouseProductId } }
+				}) { id }
+			}`
+			const createWithRelQ = `mutation CreateWHPackage($warehousePackageId: Float!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+				createWarehouseCorePackage(data: {
+					warehousePackageId: $warehousePackageId
+					packageName: $packageName
+					sourceProductId: $sourceProductId
+					lastSyncAt: $lastSyncAt
+					warehouseProduct: { connect: { id: $warehouseProductId } }
+				}) { id }
+			}`
+			const createOneWithFKQ = `mutation CreateWHPackage($warehousePackageId: Float!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+				createOneWarehouseCorePackage(data: {
+					warehousePackageId: $warehousePackageId
+					packageName: $packageName
+					sourceProductId: $sourceProductId
+					lastSyncAt: $lastSyncAt
+					warehouseProductId: $warehouseProductId
+				}) { id }
+			}`
+			const createWithFKQ = `mutation CreateWHPackage($warehousePackageId: Float!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+				createWarehouseCorePackage(data: {
+					warehousePackageId: $warehousePackageId
+					packageName: $packageName
+					sourceProductId: $sourceProductId
+					lastSyncAt: $lastSyncAt
+					warehouseProductId: $warehouseProductId
+				}) { id }
+			}`
+
+			vars := map[string]interface{}{
+				"warehousePackageId": float64(pkg.PackageID),
+				"packageName":        pkg.PackageName,
+				"sourceProductId":    float64(pkg.SourceProductID),
+				"lastSyncAt":         syncedAt,
+				"warehouseProductId": productTwentyID,
+			}
+
+			cErr := doTwentyGraphQLRoot(ctx, createOneWithRelQ, vars, "createOneWarehouseCorePackage", nil)
+			if cErr != nil {
+				cErr = doTwentyGraphQLRoot(ctx, createWithRelQ, vars, "createWarehouseCorePackage", nil)
+			}
+			if cErr != nil {
+				cErr = doTwentyGraphQLRoot(ctx, createOneWithFKQ, vars, "createOneWarehouseCorePackage", nil)
+			}
+			if cErr != nil {
+				cErr = doTwentyGraphQLRoot(ctx, createWithFKQ, vars, "createWarehouseCorePackage", nil)
+			}
+			if cErr != nil {
+				log.Printf("[TWENTY SYNC] create package %d: %v", pkg.PackageID, cErr)
+				continue
+			}
+			created++
+			continue
+		}
+
+		const updateOneWithRelQ = `mutation UpdateWHPackage($id: ID!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+			updateOneWarehouseCorePackage(id: $id, data: {
+				packageName: $packageName
+				sourceProductId: $sourceProductId
+				lastSyncAt: $lastSyncAt
+				warehouseProduct: { connect: { id: $warehouseProductId } }
+			}) { id }
+		}`
+		const updateWithRelQ = `mutation UpdateWHPackage($id: ID!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+			updateWarehouseCorePackage(id: $id, data: {
+				packageName: $packageName
+				sourceProductId: $sourceProductId
+				lastSyncAt: $lastSyncAt
+				warehouseProduct: { connect: { id: $warehouseProductId } }
+			}) { id }
+		}`
+		const updateOneWithFKQ = `mutation UpdateWHPackage($id: ID!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+			updateOneWarehouseCorePackage(id: $id, data: {
+				packageName: $packageName
+				sourceProductId: $sourceProductId
+				lastSyncAt: $lastSyncAt
+				warehouseProductId: $warehouseProductId
+			}) { id }
+		}`
+		const updateWithFKQ = `mutation UpdateWHPackage($id: ID!, $packageName: String!, $sourceProductId: Float!, $lastSyncAt: DateTime!, $warehouseProductId: ID!) {
+			updateWarehouseCorePackage(id: $id, data: {
+				packageName: $packageName
+				sourceProductId: $sourceProductId
+				lastSyncAt: $lastSyncAt
+				warehouseProductId: $warehouseProductId
+			}) { id }
+		}`
+
+		vars := map[string]interface{}{
+			"id":                 twentyID,
+			"packageName":        pkg.PackageName,
+			"sourceProductId":    float64(pkg.SourceProductID),
+			"lastSyncAt":         syncedAt,
+			"warehouseProductId": productTwentyID,
+		}
+
+		uErr := doTwentyGraphQLRoot(ctx, updateOneWithRelQ, vars, "updateOneWarehouseCorePackage", nil)
+		if uErr != nil {
+			uErr = doTwentyGraphQLRoot(ctx, updateWithRelQ, vars, "updateWarehouseCorePackage", nil)
+		}
+		if uErr != nil {
+			uErr = doTwentyGraphQLRoot(ctx, updateOneWithFKQ, vars, "updateOneWarehouseCorePackage", nil)
+		}
+		if uErr != nil {
+			uErr = doTwentyGraphQLRoot(ctx, updateWithFKQ, vars, "updateWarehouseCorePackage", nil)
+		}
+		if uErr != nil {
+			log.Printf("[TWENTY SYNC] update package %d: %v", pkg.PackageID, uErr)
+			continue
+		}
+		updated++
 	}
 
 	return created, updated, nil
@@ -139,7 +395,7 @@ func syncProductsToTwenty(ctx context.Context) (created, updated int, err error)
 
 // TwentySyncProductsHandler triggers a full product sync and returns a summary.
 func TwentySyncProductsHandler(w http.ResponseWriter, r *http.Request) {
-	created, updated, err := syncProductsToTwenty(r.Context())
+	counts, err := syncProductsToTwenty(r.Context())
 	if err != nil {
 		log.Printf("[TWENTY SYNC] product sync failed: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]interface{}{
@@ -150,9 +406,13 @@ func TwentySyncProductsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"ok":      true,
-		"created": created,
-		"updated": updated,
+		"ok":             true,
+		"created":        counts.TotalCreated(),
+		"updated":        counts.TotalUpdated(),
+		"productCreated": counts.ProductCreated,
+		"productUpdated": counts.ProductUpdated,
+		"packageCreated": counts.PackageCreated,
+		"packageUpdated": counts.PackageUpdated,
 	})
 }
 
@@ -208,6 +468,56 @@ func loadExistingWarehouseCoreProducts(ctx context.Context) ([]whpEdge, error) {
 	}
 
 	return nil, fmt.Errorf("unable to parse findManyWarehouseCoreProducts response")
+}
+
+func loadExistingWarehouseCorePackages(ctx context.Context) ([]whpkgEdge, error) {
+	const directFindManyQ = `query {
+		findManyWarehouseCorePackages {
+			id
+			warehousePackageId
+		}
+	}`
+	var direct []whpkgNode
+	if err := doTwentyGraphQLRoot(ctx, directFindManyQ, nil, "findManyWarehouseCorePackages", &direct); err == nil {
+		edges := make([]whpkgEdge, 0, len(direct))
+		for _, n := range direct {
+			edges = append(edges, whpkgEdge{Node: n})
+		}
+		return edges, nil
+	}
+
+	const connectionQ = `query {
+		warehouseCorePackages {
+			edges { node { id warehousePackageId } }
+		}
+	}`
+	var connection whpkgListEdges
+	if err := doTwentyGraphQLRoot(ctx, connectionQ, nil, "warehouseCorePackages", &connection); err == nil {
+		return connection.Edges, nil
+	}
+
+	const edgesFindManyQ = `query {
+		findManyWarehouseCorePackages {
+			edges { node { id warehousePackageId } }
+		}
+	}`
+	var edgeList whpkgListEdges
+	if err := doTwentyGraphQLRoot(ctx, edgesFindManyQ, nil, "findManyWarehouseCorePackages", &edgeList); err == nil {
+		return edgeList.Edges, nil
+	}
+
+	errFindMany := doTwentyGraphQLRoot(ctx, directFindManyQ, nil, "findManyWarehouseCorePackages", &direct)
+	errConnection := doTwentyGraphQLRoot(ctx, connectionQ, nil, "warehouseCorePackages", &connection)
+	if errFindMany != nil && errConnection != nil {
+		errMsg := errFindMany.Error() + " | " + errConnection.Error()
+		if strings.Contains(errMsg, "Cannot query field \"findManyWarehouseCorePackages\" on type \"Query\"") &&
+			strings.Contains(errMsg, "Cannot query field \"warehouseCorePackages\" on type \"Query\"") {
+			return nil, fmt.Errorf("Twenty object WarehouseCorePackage is not deployed yet; run 'yarn twenty dev --once' in your Twenty app and verify object sync")
+		}
+		return nil, errFindMany
+	}
+
+	return nil, fmt.Errorf("unable to parse findManyWarehouseCorePackages response")
 }
 
 // bootstrapTwentyJobIDs finds Twenty Opportunities that have no
