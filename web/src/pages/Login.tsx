@@ -23,23 +23,13 @@ export function Login() {
       return value.trim();
     };
 
-    fetch('/api/v1/admin/company-settings', { credentials: 'include' })
+    fetch('/api/v1/config', { credentials: 'include' })
       .then(res => (res.ok ? res.json() : null))
-      .then(cfg => {
-        const name = normalize(cfg?.name) || normalize(cfg?.company_name);
+      .then(publicCfg => {
+        const name = normalize(publicCfg?.companyName) || normalize(publicCfg?.company_name);
         if (name) {
           setCompanyName(name);
-          return;
         }
-
-        return fetch('/api/v1/config', { credentials: 'include' })
-          .then(res => (res.ok ? res.json() : null))
-          .then(publicCfg => {
-            const fallbackName = normalize(publicCfg?.companyName) || normalize(publicCfg?.company_name);
-            if (fallbackName) {
-              setCompanyName(fallbackName);
-            }
-          });
       })
       .catch(() => {});
   }, []);
