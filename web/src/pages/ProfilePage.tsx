@@ -222,8 +222,8 @@ export function ProfilePage() {
                 try {
                   if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
                   if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
-                  if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
                   if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
+                  if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
                   await authService.changePassword(pwCurrent, pwNew);
                   setPwMessage(t('profilePage.passwordChangeSuccess'));
                   setPwMessageIsSuccess(true);
