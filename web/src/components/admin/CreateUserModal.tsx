@@ -56,11 +56,11 @@ export function CreateUserModal({ isOpen, onClose, onCreated, roles }: Props) {
           <p className="text-gray-400 text-sm mb-4">{t('admin.rolesTab.createUserSubtitle')}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input placeholder={t('admin.rolesTab.username')} value={username} onChange={e=>setUsername(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
-            <input placeholder={t('admin.rolesTab.email')} value={email} onChange={e=>setEmail(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
+            <input placeholder={t('admin.rolesTab.username')} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
+            <input placeholder={t('admin.rolesTab.email')} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
             <input placeholder={t('admin.rolesTab.firstName')} value={firstName} onChange={e=>setFirstName(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
             <input placeholder={t('admin.rolesTab.lastName')} value={lastName} onChange={e=>setLastName(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
-            <input placeholder={t('admin.rolesTab.password')} value={password} onChange={e=>setPassword(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
+            <input type="password" placeholder={t('admin.rolesTab.password')} autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} className="px-3 py-2 rounded-lg glass text-white" />
           </div>
 
           <div className="mt-4">

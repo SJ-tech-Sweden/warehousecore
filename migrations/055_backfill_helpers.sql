@@ -10,7 +10,14 @@ CREATE TABLE IF NOT EXISTS backfill_queue (
 
 CREATE OR REPLACE FUNCTION enqueue_entity_backfill(entity text, id integer) RETURNS void AS $$
 BEGIN
-  INSERT INTO backfill_queue (entity_type, entity_id) VALUES (entity, id) ON CONFLICT DO NOTHING;
+  INSERT INTO backfill_queue (entity_type, entity_id)
+  SELECT $1, $2
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM backfill_queue
+    WHERE entity_type = $1
+      AND entity_id = $2
+  );
 END;
 $$ LANGUAGE plpgsql;
 

@@ -24,6 +24,10 @@ type ssoClaims struct {
 	Iat      int64  `json:"iat,omitempty"`
 }
 
+type ssoHeader struct {
+	Alg string `json:"alg"`
+}
+
 func ssoSigningKey() []byte {
 	if k := os.Getenv("SSO_JWT_SECRET"); k != "" {
 		return []byte(k)
@@ -44,7 +48,13 @@ func parseAndVerifyJWT(tokenStr string, key []byte) (*ssoClaims, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = hdrB // header not used beyond alg check
+	var hdr ssoHeader
+	if err := json.Unmarshal(hdrB, &hdr); err != nil {
+		return nil, fmt.Errorf("invalid token header")
+	}
+	if !strings.EqualFold(hdr.Alg, "HS256") {
+		return nil, fmt.Errorf("unsupported token alg")
+	}
 	payloadB, err := base64RawURLDecode(parts[1])
 	if err != nil {
 		return nil, err
@@ -110,7 +120,13 @@ func SSOMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Parse and verify token (HS256)
-		claims, err := parseAndVerifyJWT(tokenStr, ssoSigningKey())
+		signingKey := ssoSigningKey()
+		if len(signingKey) == 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		claims, err := parseAndVerifyJWT(tokenStr, signingKey)
 		if err != nil {
 			// Invalid token — treat as unauthenticated
 			next.ServeHTTP(w, r)

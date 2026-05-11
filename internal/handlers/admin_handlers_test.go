@@ -9,6 +9,8 @@ import (
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/gorilla/mux"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"warehousecore/internal/handlers"
 	"warehousecore/internal/repository"
@@ -22,13 +24,23 @@ func adminRouter() *mux.Router {
 }
 
 // reuse withMockDB helper pattern from other handler tests
-func withMockDB(t *testing.T) sqlmock.Sqlmock {
+func withAdminMockDB(t *testing.T) sqlmock.Sqlmock {
 	t.Helper()
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	restore := repository.WithTestSQLDB(db)
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
+		DriverName:           "sqlmock",
+		Conn:                 db,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{})
+	if err != nil {
+		db.Close()
+		t.Fatalf("failed to create gorm db: %v", err)
+	}
+
+	restore := repository.WithTestDatabases(db, gormDB)
 	t.Cleanup(func() {
 		restore()
 		if err := mock.ExpectationsWereMet(); err != nil {
@@ -40,12 +52,14 @@ func withMockDB(t *testing.T) sqlmock.Sqlmock {
 }
 
 func TestCreateRole_Success(t *testing.T) {
-	mock := withMockDB(t)
+	mock := withAdminMockDB(t)
 	router := adminRouter()
 
-	// Expect an INSERT into roles returning roleid
-	rows := sqlmock.NewRows([]string{"roleid", "name", "description"}).AddRow(10, "custom_role", "desc")
-	mock.ExpectQuery(`INSERT INTO roles`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnRows(rows)
+	// Expect gorm create wrapped in a transaction.
+	mock.ExpectBegin()
+	rows := sqlmock.NewRows([]string{"roleid"}).AddRow(10)
+	mock.ExpectQuery(`INSERT INTO "roles"`).WillReturnRows(rows)
+	mock.ExpectCommit()
 
 	body := `{"name":"custom_role","description":"desc"}`
 	req := httptest.NewRequest(http.MethodPost, "/admin/roles", bytes.NewBufferString(body))
@@ -66,20 +80,22 @@ func TestCreateRole_Success(t *testing.T) {
 }
 
 func TestCreateUser_Success(t *testing.T) {
-	mock := withMockDB(t)
+	mock := withAdminMockDB(t)
 	router := adminRouter()
 
+	// Uniqueness checks for username and email.
+	mock.ExpectQuery(`SELECT 1 FROM users WHERE username`).WillReturnRows(sqlmock.NewRows([]string{"?column?"}))
+	mock.ExpectQuery(`SELECT 1 FROM users WHERE email`).WillReturnRows(sqlmock.NewRows([]string{"?column?"}))
+
 	// Expect INSERT INTO users ... RETURNING userid
-	mock.ExpectQuery(`INSERT INTO users`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"userid"}).AddRow(42))
+	mock.ExpectExec(`INSERT INTO users`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	// Then Select user by username
 	userRow := sqlmock.NewRows([]string{"userid", "username", "email", "password_hash", "first_name", "last_name", "is_active"}).AddRow(42, "jdoe", "jdoe@example.com", "hash", "John", "Doe", true)
-	mock.ExpectQuery(`SELECT`).WithArgs("jdoe").WillReturnRows(userRow)
+	mock.ExpectQuery(`SELECT \* FROM "users" WHERE username =`).WithArgs("jdoe", sqlmock.AnyArg()).WillReturnRows(userRow)
 
 	// User profile check - return no rows so insert happens
-	mock.ExpectQuery(`SELECT`).WithArgs(42).WillReturnRows(sqlmock.NewRows([]string{"id"}))
-	// Expect INSERT into user_profiles
-	mock.ExpectExec(`INSERT INTO user_profiles`).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery(`SELECT \* FROM "user_profiles" WHERE user_id =`).WithArgs(42, sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	body := `{"username":"jdoe","email":"jdoe@example.com","password":"secretpw","first_name":"John","last_name":"Doe"}`
 	req := httptest.NewRequest(http.MethodPost, "/admin/users", bytes.NewBufferString(body))

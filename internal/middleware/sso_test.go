@@ -79,3 +79,37 @@ func TestSSOMiddleware_InvalidTokenDoesNotPanic(t *testing.T) {
 		t.Fatalf("expected 200 OK, got %d", rr.Code)
 	}
 }
+
+func TestSSOMiddleware_DoesNotAuthenticateWithoutSigningKey(t *testing.T) {
+	_ = os.Unsetenv("SSO_JWT_SECRET")
+	_ = os.Unsetenv("ENCRYPTION_KEY")
+
+	claims := ssoClaims{
+		UserID:   123,
+		Username: "forged",
+		Exp:      time.Now().Add(1 * time.Hour).Unix(),
+		Iat:      time.Now().Unix(),
+	}
+	s, err := signHS256(claims, []byte(""))
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_token", Value: s})
+	rr := httptest.NewRecorder()
+
+	handler := SSOMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := GetUserFromContext(r)
+		if ok && user != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+}

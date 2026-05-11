@@ -13,51 +13,56 @@ import (
 )
 
 func TestSyncProductStockFromLocations_executesUpdate(t *testing.T) {
-    db, mock, err := sqlmock.New()
-    require.NoError(t, err)
-    defer db.Close()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
 
-    // inject mock DB into repository package
-    repository.DB = db
+	restore := repository.WithTestSQLDB(db)
+	t.Cleanup(func() {
+		restore()
+		db.Close()
+	})
 
-    s := NewScanService()
+	s := NewScanService()
 
-    // Expect the UPDATE ... FROM product_locations query with product id twice
-    mock.ExpectExec(regexp.QuoteMeta("UPDATE products")).
-        WithArgs(int64(42), int64(42)).
-        WillReturnResult(sqlmock.NewResult(0, 1))
+	// Expect the UPDATE ... FROM product_locations query with product id twice
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE products")).
+		WithArgs(int64(42), int64(42)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
-    err = s.syncProductStockFromLocations(42)
-    require.NoError(t, err)
+	err = s.syncProductStockFromLocations(42)
+	require.NoError(t, err)
 
-    require.NoError(t, mock.ExpectationsWereMet())
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestFindDeviceByScan_returnsDevice(t *testing.T) {
-    db, mock, err := sqlmock.New()
-    require.NoError(t, err)
-    defer db.Close()
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
 
-    repository.DB = db
-    s := NewScanService()
+	restore := repository.WithTestSQLDB(db)
+	t.Cleanup(func() {
+		restore()
+		db.Close()
+	})
+	s := NewScanService()
 
-    // build rows matching the SELECT in findDeviceByScan
-    rows := sqlmock.NewRows([]string{
-        "deviceID", "productID", "serialnumber", "barcode", "qr_code", "status", "current_location", "zone_id", "condition_rating", "usage_hours",
-    }).AddRow(
-        "LED-TEST", 2, sql.NullString{String: "SN123", Valid: true}, sql.NullString{String: "BC123", Valid: true}, sql.NullString{String: "QR123", Valid: true}, "free", sql.NullString{String: "shelf-1", Valid: true}, sql.NullInt64{Int64: 10, Valid: true}, 5.0, 12.0,
-    )
+	// build rows matching the SELECT in findDeviceByScan
+	rows := sqlmock.NewRows([]string{
+		"deviceID", "productID", "serialnumber", "barcode", "qr_code", "status", "current_location", "zone_id", "condition_rating", "usage_hours",
+	}).AddRow(
+		"LED-TEST", 2, sql.NullString{String: "SN123", Valid: true}, sql.NullString{String: "BC123", Valid: true}, sql.NullString{String: "QR123", Valid: true}, "free", sql.NullString{String: "shelf-1", Valid: true}, sql.NullInt64{Int64: 10, Valid: true}, 5.0, 12.0,
+	)
 
-    mock.ExpectQuery(regexp.QuoteMeta("SELECT deviceID, productID, serialnumber, barcode, qr_code, status,")).
-        WithArgs("LED-TEST", "LED-TEST", "LED-TEST", "LED-TEST", "LED-TEST").
-        WillReturnRows(rows)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT deviceID, productID, serialnumber, barcode, qr_code, status,")).
+		WithArgs("LED-TEST", "LED-TEST", "LED-TEST", "LED-TEST", "LED-TEST").
+		WillReturnRows(rows)
 
-    device, err := s.findDeviceByScan("LED-TEST")
-    require.NoError(t, err)
-    require.NotNil(t, device)
-    require.Equal(t, "LED-TEST", device.DeviceID)
+	device, err := s.findDeviceByScan("LED-TEST")
+	require.NoError(t, err)
+	require.NotNil(t, device)
+	require.Equal(t, "LED-TEST", device.DeviceID)
 
-    require.NoError(t, mock.ExpectationsWereMet())
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 // ---------------------------------------------------------------------------

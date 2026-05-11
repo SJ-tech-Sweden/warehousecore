@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"warehousecore/config"
@@ -60,9 +61,9 @@ func InitDatabase(cfg *config.Config) error {
 		cfg.Database.User, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name)
 
 	// Optionally run SQL migrations and seeds on startup. Controlled by
-	// env var MIGRATE_ON_STARTUP (default: "true"). The migrations directory
+	// env var MIGRATE_ON_STARTUP (default: "false"). The migrations directory
 	// can be overridden with MIGRATIONS_DIR (default: "migrations").
-	if os.Getenv("MIGRATE_ON_STARTUP") != "false" {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("MIGRATE_ON_STARTUP")), "true") {
 		// Determine migrations directory (allow override via MIGRATIONS_DIR env)
 		migrationsDir := os.Getenv("MIGRATIONS_DIR")
 		if migrationsDir == "" {

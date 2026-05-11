@@ -362,7 +362,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	}
 
 	if generated {
-		log.Printf("[RBAC] Seeded admin user '%s' with generated password: %s", username, pw)
+		log.Printf("[RBAC] Seeded admin user '%s' with generated password from secure random source", username)
 		log.Printf("[RBAC] Please change the password on first login or set ADMIN_PASSWORD in environment for deterministic password")
 	} else {
 		log.Printf("[RBAC] Seeded admin user '%s'", username)

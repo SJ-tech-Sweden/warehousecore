@@ -25,8 +25,13 @@ func ServiceKeyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// If SERVICE_API_KEY is not configured, fall through to the DB-backed middleware.
-		if expected == "" || incoming == expected {
+		if expected == "" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]string{"error": "service API key not configured"}) //nolint:errcheck
+			return
+		}
+
+		if incoming == expected {
 			next.ServeHTTP(w, r)
 			return
 		}

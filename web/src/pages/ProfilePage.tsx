@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Mail, Shield, Save, Key } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
@@ -39,9 +39,18 @@ export function ProfilePage() {
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
+  const pwMessageTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     loadProfile();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (pwMessageTimeoutRef.current !== null) {
+        window.clearTimeout(pwMessageTimeoutRef.current);
+      }
+    };
   }, []);
 
   const loadProfile = async () => {
@@ -209,17 +218,23 @@ export function ProfilePage() {
                 setPwSaving(true);
                 setPwMessage('');
                 try {
-                  if (pwNew !== pwConfirm) throw new Error('Passwords do not match');
-                  if (pwNew.length < 6) throw new Error('Password must be at least 6 characters');
+                  if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
+                  if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
                   await authService.changePassword(pwCurrent, pwNew);
                   setPwMessage(t('profilePage.passwordChangeSuccess'));
                   setPwCurrent(''); setPwNew(''); setPwConfirm('');
                 } catch (err) {
-                  const msg = err instanceof Error ? err.message : 'Failed to change password';
+                  const msg = err instanceof Error ? err.message : t('profilePage.passwordChangeFailedError');
                   setPwMessage(msg);
                 } finally {
                   setPwSaving(false);
-                  setTimeout(()=>setPwMessage(''),3000);
+                  if (pwMessageTimeoutRef.current !== null) {
+                    window.clearTimeout(pwMessageTimeoutRef.current);
+                  }
+                  pwMessageTimeoutRef.current = window.setTimeout(() => {
+                    setPwMessage('');
+                    pwMessageTimeoutRef.current = null;
+                  }, 3000);
                 }
               }} disabled={pwSaving} className={`w-full py-3 px-6 rounded-xl font-semibold text-white ${pwSaving ? 'bg-gray-600' : 'bg-gradient-to-r from-accent-red to-red-700'}`}>
                 {pwSaving ? t('common.saving') : t('profilePage.changePasswordButton')}

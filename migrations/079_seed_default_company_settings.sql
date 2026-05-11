@@ -4,7 +4,7 @@
 BEGIN;
 
 INSERT INTO company_settings (company_name)
-SELECT 'RentalCore'
+SELECT 'WarehouseCore'
 WHERE NOT EXISTS (
     SELECT 1
     FROM company_settings

@@ -174,12 +174,12 @@ func authenticateSession(cookieValue string) (*models.User, error) {
 		authDebugLog("DEBUG [WarehouseCore]: Failed to load roles for user %d: %v", session.User.UserID, err)
 	}
 
-	// Log loaded roles at info level for diagnostics
+	// Log loaded roles only in AUTH_DEBUG mode for diagnostics.
 	var roleNames []string
 	for _, rr := range session.User.Roles {
 		roleNames = append(roleNames, rr.Name)
 	}
-	log.Printf("[AUTH] Session user %s (id=%d) roles: %v", session.User.Username, session.User.UserID, roleNames)
+	authDebugLog("DEBUG [WarehouseCore]: Session user %s (id=%d) roles: %v", session.User.Username, session.User.UserID, roleNames)
 
 	return &session.User, nil
 }

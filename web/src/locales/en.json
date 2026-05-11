@@ -1676,6 +1676,9 @@
     "confirmPassword": "Confirm new password",
     "changePasswordButton": "Change password",
     "passwordChangeSuccess": "Password changed successfully",
+    "passwordMismatchError": "Passwords do not match",
+    "passwordMinLengthError": "Password must be at least 6 characters",
+    "passwordChangeFailedError": "Failed to change password",
     "openProfile": "Open Profile"
   },
   "zonesPage": {

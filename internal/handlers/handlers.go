@@ -117,7 +117,7 @@ func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePa
 		return true
 	}
 	req.Header.Set("Accept", "application/json")
-	apiKey, apiKeySource := rentalCoreServiceAPIKey()
+	apiKey, _ := rentalCoreServiceAPIKey()
 	if apiKey != "" {
 		req.Header.Set("X-API-Key", apiKey)
 	}

@@ -28,6 +28,7 @@ var productPictureService services.ProductPictureServiceInterface = services.New
 func SetProductPictureService(s services.ProductPictureServiceInterface) {
 	productPictureService = s
 }
+
 var errPicturesUnavailable = errors.New("product pictures not available")
 var websiteRevalidator = services.NewRevalidatorFromEnv()
 
