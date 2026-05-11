@@ -379,6 +379,17 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 }
 
 func updateTwentyRequirement(ctx context.Context, requirementID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
+	const updateOppLineQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
+		updateOpportunityRequirementLine(id: $id, data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+
 	const updateOneRelQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		updateOneJobProductRequirement(id: $id, data: {
 			name: $name
@@ -430,7 +441,10 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 		"lineTotal":              lineTotal,
 	}
 
-	err := doTwentyGraphQLRoot(ctx, updateOneRelQ, vars, "updateOneJobProductRequirement", nil)
+	err := doTwentyGraphQLRoot(ctx, updateOppLineQ, vars, "updateOpportunityRequirementLine", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, updateOneRelQ, vars, "updateOneJobProductRequirement", nil)
+	}
 	if err != nil {
 		err = doTwentyGraphQLRoot(ctx, updateRelQ, vars, "updateJobProductRequirement", nil)
 	}
@@ -444,6 +458,18 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 }
 
 func createTwentyRequirement(ctx context.Context, opportunityID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
+	const createOppLineQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
+		createOpportunityRequirementLine(data: {
+			name: $name
+			quantity: $quantity
+			warehouseCoreProductId: $warehouseCoreProductId
+			unitPrice: $unitPrice
+			lineTotal: $lineTotal
+			opportunityId: $opportunityId
+			warehouseProductId: $warehouseProductId
+		}) { id }
+	}`
+
 	const createOneRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		createOneJobProductRequirement(data: {
 			name: $name
@@ -499,7 +525,10 @@ func createTwentyRequirement(ctx context.Context, opportunityID, name string, qu
 		"lineTotal":              lineTotal,
 	}
 
-	err := doTwentyGraphQLRoot(ctx, createOneRelQ, vars, "createOneJobProductRequirement", nil)
+	err := doTwentyGraphQLRoot(ctx, createOppLineQ, vars, "createOpportunityRequirementLine", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, createOneRelQ, vars, "createOneJobProductRequirement", nil)
+	}
 	if err != nil {
 		err = doTwentyGraphQLRoot(ctx, createRelQ, vars, "createJobProductRequirement", nil)
 	}
