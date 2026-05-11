@@ -110,11 +110,7 @@ func main() {
 	}
 	defer repository.CloseDatabase()
 
-	log.Println("DEBUG: reached post-InitDatabase")
-
-	log.Println("DEBUG: creating CompanyBrandingService")
 	brandingService = services.NewCompanyBrandingService(repository.GetDB())
-	log.Println("DEBUG: created CompanyBrandingService")
 
 	// Initialize LED service
 	log.Println("[LED] Initializing LED service...")
@@ -232,8 +228,11 @@ func main() {
 	protected.HandleFunc("/jobs/products/options", handlers.GetJobRequirementProductOptions).Methods("GET")
 	protected.HandleFunc("/jobs/{id}/requirements", handlers.UpsertJobRequirement).Methods("POST")
 
-	// Twenty CRM integration
-	api.HandleFunc("/twenty/sync-products", handlers.TwentySyncProductsHandler).Methods("POST")
+	// Twenty CRM integration (admin-only write operation)
+	twenty := api.PathPrefix("/twenty").Subrouter()
+	twenty.Use(middleware.AuthMiddleware)
+	twenty.Use(middleware.RequireAdmin)
+	twenty.HandleFunc("/sync-products", handlers.TwentySyncProductsHandler).Methods("POST")
 
 	// Public rental equipment endpoint (for RentalCore integration)
 	api.HandleFunc("/rental-equipment", handlers.GetRentalEquipment).Methods("GET")

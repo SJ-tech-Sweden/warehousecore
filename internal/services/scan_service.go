@@ -129,6 +129,10 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 	if device.CurrentJobID.Valid {
 		fromJobID = &device.CurrentJobID.Int64
 	}
+	var zoneValue interface{}
+	if zoneID != nil {
+		zoneValue = *zoneID
+	}
 
 	_, err := tx.Exec(`
 		UPDATE devices
@@ -136,7 +140,7 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 		    zone_id = $2::bigint,
 		    current_location = CASE WHEN $2::bigint IS NULL THEN 'warehouse' ELSE 'storage' END
 		WHERE deviceID = $1
-	`, device.DeviceID, zoneID)
+	`, device.DeviceID, zoneValue)
 	if err != nil {
 		return nil, nil, err
 	}

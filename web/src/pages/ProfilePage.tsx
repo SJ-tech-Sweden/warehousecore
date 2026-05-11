@@ -39,6 +39,7 @@ export function ProfilePage() {
   const [pwConfirm, setPwConfirm] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState('');
+  const [pwMessageIsSuccess, setPwMessageIsSuccess] = useState<boolean | null>(null);
   const pwMessageTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -217,15 +218,18 @@ export function ProfilePage() {
               <button onClick={async ()=>{
                 setPwSaving(true);
                 setPwMessage('');
+                setPwMessageIsSuccess(null);
                 try {
                   if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
                   if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
                   await authService.changePassword(pwCurrent, pwNew);
                   setPwMessage(t('profilePage.passwordChangeSuccess'));
+                  setPwMessageIsSuccess(true);
                   setPwCurrent(''); setPwNew(''); setPwConfirm('');
                 } catch (err) {
                   const msg = err instanceof Error ? err.message : t('profilePage.passwordChangeFailedError');
                   setPwMessage(msg);
+                  setPwMessageIsSuccess(false);
                 } finally {
                   setPwSaving(false);
                   if (pwMessageTimeoutRef.current !== null) {
@@ -233,6 +237,7 @@ export function ProfilePage() {
                   }
                   pwMessageTimeoutRef.current = window.setTimeout(() => {
                     setPwMessage('');
+                    setPwMessageIsSuccess(null);
                     pwMessageTimeoutRef.current = null;
                   }, 3000);
                 }
@@ -241,7 +246,7 @@ export function ProfilePage() {
               </button>
 
               {pwMessage && (
-                <div className={`mt-3 p-3 rounded-lg text-center text-sm font-semibold ${pwMessage === t('profilePage.passwordChangeSuccess') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                <div className={`mt-3 p-3 rounded-lg text-center text-sm font-semibold ${pwMessageIsSuccess ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                   {pwMessage}
                 </div>
               )}
