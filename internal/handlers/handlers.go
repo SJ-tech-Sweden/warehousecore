@@ -137,7 +137,7 @@ func proxyRentalCoreServiceGET(w http.ResponseWriter, r *http.Request, servicePa
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		log.Printf("RentalCore service auth failed for %s (status=%d, baseURL=%s, apiKeySource=%s, apiKeyConfigured=%t, apiKeyLength=%d)", servicePath, resp.StatusCode, baseURL, apiKeySource, apiKey != "", len(apiKey))
+		log.Printf("RentalCore service auth failed for %s (status=%d)", servicePath, resp.StatusCode)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
