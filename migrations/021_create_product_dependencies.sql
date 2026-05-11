@@ -13,10 +13,24 @@ CREATE TABLE IF NOT EXISTS product_dependencies (
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-ALTER TABLE product_dependencies
-    ADD CONSTRAINT fk_pd_product FOREIGN KEY (product_id) REFERENCES products(productID) ON DELETE CASCADE;
-ALTER TABLE product_dependencies
-    ADD CONSTRAINT fk_pd_dependency FOREIGN KEY (dependency_product_id) REFERENCES products(productID) ON DELETE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'fk_pd_product' AND t.relname = 'product_dependencies'
+    ) THEN
+        EXECUTE 'ALTER TABLE product_dependencies ADD CONSTRAINT fk_pd_product FOREIGN KEY (product_id) REFERENCES products(productID) ON DELETE CASCADE';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        WHERE c.conname = 'fk_pd_dependency' AND t.relname = 'product_dependencies'
+    ) THEN
+        EXECUTE 'ALTER TABLE product_dependencies ADD CONSTRAINT fk_pd_dependency FOREIGN KEY (dependency_product_id) REFERENCES products(productID) ON DELETE CASCADE';
+    END IF;
+END$$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS unique_dependency ON product_dependencies(product_id, dependency_product_id);
 CREATE INDEX IF NOT EXISTS idx_product_id ON product_dependencies(product_id);

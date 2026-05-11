@@ -1,8 +1,6 @@
 package services
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -246,10 +244,9 @@ func (s *RBACService) EnsureAutoAdminFromEnv() error {
 }
 
 // EnsureDefaultAdminFromEnv will create a default admin user if no users exist.
-// It reads ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD (optional), ADMIN_FIRSTNAME, ADMIN_LASTNAME
-// from the environment. If ADMIN_PASSWORD is not set a random password is generated
-// and logged once. The created user is assigned the `super_admin` role if present,
-// otherwise `admin` role.
+// It reads ADMIN_USERNAME, ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_FIRSTNAME, ADMIN_LASTNAME
+// from the environment. ADMIN_PASSWORD must be explicitly provided. The created user
+// is assigned the `super_admin` role if present, otherwise `admin` role.
 func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	// Only seed if no users exist
 	var count int64
@@ -269,15 +266,8 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 		email = "admin@example.local"
 	}
 	pw := os.Getenv("ADMIN_PASSWORD")
-	generated := false
 	if pw == "" {
-		// generate a random 16-byte hex password (32 chars)
-		b := make([]byte, 16)
-		if _, err := rand.Read(b); err != nil {
-			return fmt.Errorf("failed to generate password: %w", err)
-		}
-		pw = hex.EncodeToString(b)
-		generated = true
+		return fmt.Errorf("ADMIN_PASSWORD is required to seed default admin user")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
@@ -320,7 +310,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	if exists == 1 {
 		cols = append(cols, "force_password_change")
 		placeholders = append(placeholders, "?")
-		args = append(args, generated)
+		args = append(args, false)
 	}
 
 	// created_at / updated_at may exist, but DB has defaults; skip unless needed
@@ -361,12 +351,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 		}
 	}
 
-	if generated {
-		log.Printf("[RBAC] Seeded admin user '%s' with generated password from secure random source", username)
-		log.Printf("[RBAC] Please change the password on first login or set ADMIN_PASSWORD in environment for deterministic password")
-	} else {
-		log.Printf("[RBAC] Seeded admin user '%s'", username)
-	}
+	log.Printf("[RBAC] Seeded admin user '%s'", username)
 
 	return nil
 }

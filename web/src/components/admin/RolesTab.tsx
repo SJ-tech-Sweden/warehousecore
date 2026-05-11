@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Users, Shield, Save } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +35,7 @@ export function RolesTab() {
   const [displayNameEdit, setDisplayNameEdit] = useState('');
   const [resetPwMsg, setResetPwMsg] = useState('');
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const resetPwTimerRef = useRef<number | null>(null);
 
   const currentRoles = useMemo(
     () => (user?.Roles ?? user?.roles ?? []) as Role[],
@@ -52,6 +53,14 @@ export function RolesTab() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resetPwTimerRef.current !== null) {
+        window.clearTimeout(resetPwTimerRef.current);
+      }
+    };
   }, []);
 
   const loadData = async () => {
@@ -256,7 +265,13 @@ export function RolesTab() {
                     } catch (err:any) {
                       alert(`${t('common.error')}: ` + (err.response?.data?.error || err.message));
                     }
-                    setTimeout(()=>setResetPwMsg(''),10000);
+                    if (resetPwTimerRef.current !== null) {
+                      window.clearTimeout(resetPwTimerRef.current);
+                    }
+                    resetPwTimerRef.current = window.setTimeout(() => {
+                      setResetPwMsg('');
+                      resetPwTimerRef.current = null;
+                    }, 10000);
                   }} className="px-4 py-2 rounded-lg font-semibold text-white bg-red-600">{t('admin.rolesTab.resetPassword')}</button>
                 </div>
                 {resetPwMsg && <p className="text-sm text-green-400 mt-2">{resetPwMsg}</p>}

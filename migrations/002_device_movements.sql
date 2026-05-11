@@ -21,9 +21,32 @@ CREATE INDEX IF NOT EXISTS idx_movement_from_zone ON device_movements(from_zone_
 CREATE INDEX IF NOT EXISTS idx_movement_to_zone ON device_movements(to_zone_id);
 CREATE INDEX IF NOT EXISTS idx_movement_job ON device_movements(to_job_id);
 
-ALTER TABLE device_movements ADD CONSTRAINT fk_dm_device FOREIGN KEY (device_id) REFERENCES devices(deviceID) ON DELETE CASCADE;
-ALTER TABLE device_movements ADD CONSTRAINT fk_dm_from_zone FOREIGN KEY (from_zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL;
-ALTER TABLE device_movements ADD CONSTRAINT fk_dm_to_zone FOREIGN KEY (to_zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE c.conname = 'fk_dm_device' AND t.relname = 'device_movements'
+  ) THEN
+    EXECUTE 'ALTER TABLE device_movements ADD CONSTRAINT fk_dm_device FOREIGN KEY (device_id) REFERENCES devices(deviceID) ON DELETE CASCADE';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE c.conname = 'fk_dm_from_zone' AND t.relname = 'device_movements'
+  ) THEN
+    EXECUTE 'ALTER TABLE device_movements ADD CONSTRAINT fk_dm_from_zone FOREIGN KEY (from_zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE c.conname = 'fk_dm_to_zone' AND t.relname = 'device_movements'
+  ) THEN
+    EXECUTE 'ALTER TABLE device_movements ADD CONSTRAINT fk_dm_to_zone FOREIGN KEY (to_zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL';
+  END IF;
+END$$;
 -- Conditionally add FK to jobs only if jobs table exists and constraint missing
 DO $$
 BEGIN

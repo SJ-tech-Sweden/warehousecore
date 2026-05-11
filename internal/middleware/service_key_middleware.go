@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -31,7 +32,7 @@ func ServiceKeyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if incoming == expected {
+		if len(incoming) == len(expected) && subtle.ConstantTimeCompare([]byte(incoming), []byte(expected)) == 1 {
 			next.ServeHTTP(w, r)
 			return
 		}

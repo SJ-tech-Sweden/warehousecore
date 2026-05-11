@@ -68,7 +68,7 @@ func GetTwentyConfig() (*TwentyConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.APIKey, err = decryptCredential(cfg.APIKey, key); err != nil {
+	if cfg.APIKey, err = decryptCredentialWithKeyName(cfg.APIKey, key, "TWENTY_CREDENTIAL_KEY"); err != nil {
 		return nil, fmt.Errorf("failed to decrypt twenty api_key: %w", err)
 	}
 
