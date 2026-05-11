@@ -24,16 +24,16 @@ type twentyGraphQLResponse struct {
 }
 
 type twentyOpportunity struct {
-	ID                 string                     `json:"id"`
-	Name               string                     `json:"name"`
-	JobCode            string                     `json:"jobCode"`
-	WarehouseCoreJobID *float64                   `json:"warehouseCoreJobId"`
-	JobStartDate       *string                    `json:"jobStartDate"`
-	JobEndDate         *string                    `json:"jobEndDate"`
-	CloseDate          *string                    `json:"closeDate"`
-	Stage              interface{}                `json:"stage"`
-	Company            *twentyCompany             `json:"company"`
-	JobRequirements    []twentyJobRequirementLine `json:"jobProductRequirements"`
+	ID                 string                   `json:"id"`
+	Name               string                   `json:"name"`
+	JobCode            string                   `json:"jobCode"`
+	WarehouseCoreJobID *float64                 `json:"warehouseCoreJobId"`
+	JobStartDate       *string                  `json:"jobStartDate"`
+	JobEndDate         *string                  `json:"jobEndDate"`
+	CloseDate          *string                  `json:"closeDate"`
+	Stage              interface{}              `json:"stage"`
+	Company            *twentyCompany           `json:"company"`
+	JobRequirements    twentyJobRequirementList `json:"jobProductRequirements"`
 }
 
 type twentyCompany struct {
@@ -48,6 +48,52 @@ type twentyJobRequirementLine struct {
 		WarehouseID *float64 `json:"warehouseId"`
 		ProductName string   `json:"productName"`
 	} `json:"warehouseProduct"`
+}
+
+// twentyJobRequirementList supports both legacy array responses and
+// connection-style payloads returned by newer Twenty schemas.
+type twentyJobRequirementList []twentyJobRequirementLine
+
+func (l *twentyJobRequirementList) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*l = nil
+		return nil
+	}
+
+	if strings.HasPrefix(trimmed, "[") {
+		var arr []twentyJobRequirementLine
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+		*l = arr
+		return nil
+	}
+
+	type edge struct {
+		Node twentyJobRequirementLine `json:"node"`
+	}
+	type connection struct {
+		Edges []edge                     `json:"edges"`
+		Nodes []twentyJobRequirementLine `json:"nodes"`
+	}
+
+	var conn connection
+	if err := json.Unmarshal(data, &conn); err != nil {
+		return err
+	}
+
+	if len(conn.Nodes) > 0 {
+		*l = conn.Nodes
+		return nil
+	}
+
+	rows := make([]twentyJobRequirementLine, 0, len(conn.Edges))
+	for _, e := range conn.Edges {
+		rows = append(rows, e.Node)
+	}
+	*l = rows
+	return nil
 }
 
 func requirementProductID(req twentyJobRequirementLine) int {

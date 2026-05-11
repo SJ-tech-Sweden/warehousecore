@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -76,6 +77,7 @@ func (l *twentyRequirementList) UnmarshalJSON(data []byte) error {
 type twentyOpportunityRequirementNode struct {
 	ID                 string                `json:"id"`
 	WarehouseCoreJobID *float64              `json:"warehouseCoreJobId"`
+	UpdatedAt          *string               `json:"updatedAt"`
 	JobRequirements    twentyRequirementList `json:"jobProductRequirements"`
 }
 
@@ -287,6 +289,7 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 		findManyOpportunities {
 			id
 			warehouseCoreJobId
+			updatedAt
 			jobProductRequirements {
 				id
 				name
@@ -302,6 +305,7 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 		findManyOpportunities {
 			id
 			warehouseCoreJobId
+			updatedAt
 			jobProductRequirements {
 				id
 				name
@@ -318,6 +322,7 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 				node {
 					id
 					warehouseCoreJobId
+					updatedAt
 					jobProductRequirements {
 						id
 						name
@@ -337,6 +342,7 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 				node {
 					id
 					warehouseCoreJobId
+					updatedAt
 					jobProductRequirements {
 						id
 						name
@@ -366,16 +372,40 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 		}
 	}
 
+	var chosen *twentyOpportunityRequirementNode
+	var chosenTS time.Time
+
 	for _, opp := range list {
-		if opp.WarehouseCoreJobID == nil {
+		if opp.WarehouseCoreJobID == nil || int(*opp.WarehouseCoreJobID) != jobID {
 			continue
 		}
-		if int(*opp.WarehouseCoreJobID) == jobID {
+
+		if chosen == nil {
 			copyOpp := opp
-			return &copyOpp, nil
+			chosen = &copyOpp
+			if opp.UpdatedAt != nil {
+				if ts, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(*opp.UpdatedAt)); err == nil {
+					chosenTS = ts
+				}
+			}
+			continue
+		}
+
+		if opp.UpdatedAt == nil {
+			continue
+		}
+		candidateTS, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(*opp.UpdatedAt))
+		if err != nil {
+			continue
+		}
+		if chosenTS.IsZero() || candidateTS.After(chosenTS) {
+			copyOpp := opp
+			chosen = &copyOpp
+			chosenTS = candidateTS
 		}
 	}
-	return nil, nil
+
+	return chosen, nil
 }
 
 func updateTwentyRequirement(ctx context.Context, requirementID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
