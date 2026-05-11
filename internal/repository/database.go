@@ -79,6 +79,8 @@ func InitDatabase(cfg *config.Config) error {
 		if err := migrations.ApplyMigrations(sqlDB, migrationsDir); err != nil {
 			return fmt.Errorf("apply migrations: %w", err)
 		}
+		// Apply all seeds in migrations/seeds. Seed files are expected to be
+		// idempotent so they are safe to execute on populated databases.
 		seedsDir := filepath.Join(migrationsDir, "seeds")
 		if err := migrations.ApplySeeds(sqlDB, seedsDir); err != nil {
 			return fmt.Errorf("apply seeds: %w", err)

@@ -42,7 +42,7 @@ func ssoSigningKey() []byte {
 		})
 		return []byte(k)
 	}
-	return nil
+	return []byte("")
 }
 
 // parseAndVerifyJWT verifies an HS256 JWT and returns the claims.
