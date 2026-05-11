@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
@@ -92,10 +93,14 @@ func TestCreateUser_Success(t *testing.T) {
 
 	// Then Select user by username
 	userRow := sqlmock.NewRows([]string{"userid", "username", "email", "password_hash", "first_name", "last_name", "is_active"}).AddRow(42, "jdoe", "jdoe@example.com", "hash", "John", "Doe", true)
-	mock.ExpectQuery(`SELECT \* FROM "users" WHERE username =`).WithArgs("jdoe", sqlmock.AnyArg()).WillReturnRows(userRow)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE username = $1 ORDER BY "users"."userid" LIMIT $2`)).
+		WithArgs("jdoe", sqlmock.AnyArg()).
+		WillReturnRows(userRow)
 
 	// User profile check - return no rows so insert happens
-	mock.ExpectQuery(`SELECT \* FROM "user_profiles" WHERE user_id =`).WithArgs(42, sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "user_profiles" WHERE user_id = $1 ORDER BY "user_profiles"."id" LIMIT $2`)).
+		WithArgs(42, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
 	body := `{"username":"jdoe","email":"jdoe@example.com","password":"secretpw","first_name":"John","last_name":"Doe"}`
 	req := httptest.NewRequest(http.MethodPost, "/admin/users", bytes.NewBufferString(body))
