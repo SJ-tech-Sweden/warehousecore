@@ -79,14 +79,9 @@ func InitDatabase(cfg *config.Config) error {
 		if err := migrations.ApplyMigrations(sqlDB, migrationsDir); err != nil {
 			return fmt.Errorf("apply migrations: %w", err)
 		}
-		// Apply any SQL seed file placed alongside migrations. We prefer a
-		// single, idempotent seed file `064_default_seeds.sql` that uses
-		// ON CONFLICT to avoid overwriting later changes. If present, execute
-		// it unconditionally — the statements are safe to run on a populated
-		// database and will only insert missing defaults.
-		seedFile := filepath.Join(migrationsDir, "064_default_seeds.sql")
-		if err := applySQLFileIfExists(sqlDB, seedFile); err != nil {
-			return fmt.Errorf("apply default seeds: %w", err)
+		seedsDir := filepath.Join(migrationsDir, "seeds")
+		if err := migrations.ApplySeeds(sqlDB, seedsDir); err != nil {
+			return fmt.Errorf("apply seeds: %w", err)
 		}
 		log.Println("Migrations and startup seeds applied")
 	}

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -24,6 +25,8 @@ import (
 
 //go:embed config/led_mapping.json
 var defaultMappingData []byte
+
+var rentalCoreHTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 // Service handles LED-related business logic
 type Service struct {
@@ -842,7 +845,7 @@ func (s *Service) fetchRentalCoreRequiredProductIDs(jobID string) (map[int]struc
 		req.Header.Set("X-API-Key", apiKey)
 	}
 
-	resp, err := (&http.Client{}).Do(req)
+	resp, err := rentalCoreHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

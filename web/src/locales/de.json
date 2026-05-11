@@ -374,6 +374,7 @@
       "currency": "Währung",
       "eventory": "Eventory",
       "twenty": "Twenty CRM",
+      "companySettings": "Firma",
       "export": "CSV-Export",
       "devices": "Geräte",
       "fieldDefinitions": "Benutzerdefinierte Felder"
@@ -1626,6 +1627,9 @@
     "confirmPassword": "Passwort bestätigen",
     "changePasswordButton": "Passwort ändern",
     "passwordChangeSuccess": "Passwort erfolgreich geändert",
+    "passwordMismatchError": "Passwörter stimmen nicht überein",
+    "passwordMinLengthError": "Passwort muss mindestens 6 Zeichen lang sein",
+    "passwordChangeFailedError": "Passwortänderung fehlgeschlagen",
     "openProfile": "Profil öffnen"
   },
   "zonesPage": {

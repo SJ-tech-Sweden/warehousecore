@@ -39,6 +39,13 @@ func authDebugLog(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
+func redactCookieHeader(cookieHeader string) string {
+	if strings.TrimSpace(cookieHeader) == "" {
+		return "<none>"
+	}
+	return fmt.Sprintf("<redacted:%d-bytes>", len(cookieHeader))
+}
+
 // errDBUnavailable is returned by authenticate helpers when the database
 // connection is nil or unreachable so the middleware can map it to HTTP 500.
 var errDBUnavailable = errors.New("database unavailable")
@@ -51,8 +58,9 @@ var errDBUnavailable = errors.New("database unavailable")
 // admin keys.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Debug: Log all cookies
-		authDebugLog("DEBUG [WarehouseCore]: AuthMiddleware - Path: %s, Cookies: %+v", r.URL.Path, r.Cookies())
+		// Debug: Log cookie metadata only (never cookie values).
+		authDebugLog("DEBUG [WarehouseCore]: AuthMiddleware - Path: %s, CookieCount: %d, CookieHeader: %s",
+			r.URL.Path, len(r.Cookies()), redactCookieHeader(r.Header.Get("Cookie")))
 
 		// --- Try session cookie first ---
 		hadSessionCookie := false
@@ -102,14 +110,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// No valid credentials
 		if hadSessionCookie {
 			// If we had a cookie but authentication failed, log cookie and headers for diagnostics
-			authDebugLog("DEBUG [WarehouseCore]: Had session cookie but invalid. Cookie value: %v; Path: %s; Host: %s; Origin: %s; Referer: %s",
-				r.Header.Get("Cookie"), r.URL.Path, r.Host, r.Header.Get("Origin"), r.Header.Get("Referer"))
+			authDebugLog("DEBUG [WarehouseCore]: Had session cookie but invalid. CookieHeader: %v; Path: %s; Host: %s; Origin: %s; Referer: %s",
+				redactCookieHeader(r.Header.Get("Cookie")), r.URL.Path, r.Host, r.Header.Get("Origin"), r.Header.Get("Referer"))
 			http.Error(w, `{"error":"Unauthorized - Invalid session"}`, http.StatusUnauthorized)
 			return
 		}
 		authDebugLog("DEBUG [WarehouseCore]: No %s cookie or API key found for %s; Cookies: %v; Origin: %s; Referer: %s",
 			SessionCookieName(),
-			r.URL.Path, r.Header.Get("Cookie"), r.Header.Get("Origin"), r.Header.Get("Referer"))
+			r.URL.Path, redactCookieHeader(r.Header.Get("Cookie")), r.Header.Get("Origin"), r.Header.Get("Referer"))
 		http.Error(w, `{"error":"Unauthorized - No session"}`, http.StatusUnauthorized)
 	})
 }

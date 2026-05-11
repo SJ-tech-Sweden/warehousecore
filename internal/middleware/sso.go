@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"warehousecore/internal/models"
@@ -28,14 +30,19 @@ type ssoHeader struct {
 	Alg string `json:"alg"`
 }
 
+var ssoFallbackSecretWarning sync.Once
+
 func ssoSigningKey() []byte {
-	if k := os.Getenv("SSO_JWT_SECRET"); k != "" {
+	if k := strings.TrimSpace(os.Getenv("SSO_JWT_SECRET")); k != "" {
 		return []byte(k)
 	}
-	if k := os.Getenv("ENCRYPTION_KEY"); k != "" {
+	if k := strings.TrimSpace(os.Getenv("ENCRYPTION_KEY")); k != "" {
+		ssoFallbackSecretWarning.Do(func() {
+			log.Printf("[SSO] WARNING: SSO_JWT_SECRET is unset; falling back to ENCRYPTION_KEY for SSO token verification")
+		})
 		return []byte(k)
 	}
-	return []byte("")
+	return nil
 }
 
 // parseAndVerifyJWT verifies an HS256 JWT and returns the claims.
