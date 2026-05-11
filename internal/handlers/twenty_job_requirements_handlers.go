@@ -27,10 +27,56 @@ type twentyRequirementNode struct {
 	} `json:"warehouseProduct"`
 }
 
+// twentyRequirementList accepts both legacy array responses and connection-style
+// objects (edges/nodes) returned by different Twenty versions.
+type twentyRequirementList []twentyRequirementNode
+
+func (l *twentyRequirementList) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*l = nil
+		return nil
+	}
+
+	if strings.HasPrefix(trimmed, "[") {
+		var arr []twentyRequirementNode
+		if err := json.Unmarshal(data, &arr); err != nil {
+			return err
+		}
+		*l = arr
+		return nil
+	}
+
+	type edge struct {
+		Node twentyRequirementNode `json:"node"`
+	}
+	type connection struct {
+		Edges []edge                  `json:"edges"`
+		Nodes []twentyRequirementNode `json:"nodes"`
+	}
+
+	var conn connection
+	if err := json.Unmarshal(data, &conn); err != nil {
+		return err
+	}
+
+	if len(conn.Nodes) > 0 {
+		*l = conn.Nodes
+		return nil
+	}
+
+	rows := make([]twentyRequirementNode, 0, len(conn.Edges))
+	for _, e := range conn.Edges {
+		rows = append(rows, e.Node)
+	}
+	*l = rows
+	return nil
+}
+
 type twentyOpportunityRequirementNode struct {
-	ID                 string                  `json:"id"`
-	WarehouseCoreJobID *float64                `json:"warehouseCoreJobId"`
-	JobRequirements    []twentyRequirementNode `json:"jobProductRequirements"`
+	ID                 string                `json:"id"`
+	WarehouseCoreJobID *float64              `json:"warehouseCoreJobId"`
+	JobRequirements    twentyRequirementList `json:"jobProductRequirements"`
 }
 
 type twentyOpportunityRequirementEdge struct {
@@ -333,7 +379,7 @@ func loadTwentyOpportunityForJob(ctx context.Context, jobID int) (*twentyOpportu
 }
 
 func updateTwentyRequirement(ctx context.Context, requirementID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
-	const updateOneRelQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const updateOneRelQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		updateOneJobProductRequirement(id: $id, data: {
 			name: $name
 			quantity: $quantity
@@ -343,7 +389,7 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 			warehouseProduct: { connect: { id: $warehouseProductId } }
 		}) { id }
 	}`
-	const updateRelQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const updateRelQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		updateJobProductRequirement(id: $id, data: {
 			name: $name
 			quantity: $quantity
@@ -353,7 +399,7 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 			warehouseProduct: { connect: { id: $warehouseProductId } }
 		}) { id }
 	}`
-	const updateOneFkQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const updateOneFkQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		updateOneJobProductRequirement(id: $id, data: {
 			name: $name
 			quantity: $quantity
@@ -363,7 +409,7 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 			warehouseProductId: $warehouseProductId
 		}) { id }
 	}`
-	const updateFkQ = `mutation UpdateReq($id: ID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const updateFkQ = `mutation UpdateReq($id: UUID!, $name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		updateJobProductRequirement(id: $id, data: {
 			name: $name
 			quantity: $quantity
@@ -398,7 +444,7 @@ func updateTwentyRequirement(ctx context.Context, requirementID, name string, qu
 }
 
 func createTwentyRequirement(ctx context.Context, opportunityID, name string, quantity float64, localProductID int, twentyProductID string, unitPrice float64, lineTotal float64) error {
-	const createOneRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const createOneRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		createOneJobProductRequirement(data: {
 			name: $name
 			quantity: $quantity
@@ -409,7 +455,7 @@ func createTwentyRequirement(ctx context.Context, opportunityID, name string, qu
 			warehouseProduct: { connect: { id: $warehouseProductId } }
 		}) { id }
 	}`
-	const createRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const createRelQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		createJobProductRequirement(data: {
 			name: $name
 			quantity: $quantity
@@ -420,7 +466,7 @@ func createTwentyRequirement(ctx context.Context, opportunityID, name string, qu
 			warehouseProduct: { connect: { id: $warehouseProductId } }
 		}) { id }
 	}`
-	const createOneFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const createOneFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		createOneJobProductRequirement(data: {
 			name: $name
 			quantity: $quantity
@@ -431,7 +477,7 @@ func createTwentyRequirement(ctx context.Context, opportunityID, name string, qu
 			warehouseProductId: $warehouseProductId
 		}) { id }
 	}`
-	const createFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: ID!, $warehouseProductId: ID!, $unitPrice: Float!, $lineTotal: Float!) {
+	const createFkQ = `mutation CreateReq($name: String!, $quantity: Float!, $warehouseCoreProductId: Float!, $opportunityId: UUID!, $warehouseProductId: UUID!, $unitPrice: Float!, $lineTotal: Float!) {
 		createJobProductRequirement(data: {
 			name: $name
 			quantity: $quantity
@@ -471,7 +517,7 @@ func updateOpportunityEstimatedTotal(ctx context.Context, opp *twentyOpportunity
 		return nil
 	}
 
-	const byIDQ = `query OpportunityByID($id: ID!) {
+	const byIDQ = `query OpportunityByID($id: UUID!) {
 		opportunity(id: $id) {
 			id
 			jobProductRequirements {
@@ -498,12 +544,12 @@ func updateOpportunityEstimatedTotal(ctx context.Context, opp *twentyOpportunity
 		}
 	}
 
-	const updateOneQ = `mutation UpdateOppTotal($id: ID!, $total: Float!) {
+	const updateOneQ = `mutation UpdateOppTotal($id: UUID!, $total: Float!) {
 		updateOneOpportunity(id: $id, data: { warehouseCoreEstimatedEquipmentTotal: $total }) {
 			id
 		}
 	}`
-	const updateQ = `mutation UpdateOppTotal($id: ID!, $total: Float!) {
+	const updateQ = `mutation UpdateOppTotal($id: UUID!, $total: Float!) {
 		updateOpportunity(id: $id, data: { warehouseCoreEstimatedEquipmentTotal: $total }) {
 			id
 		}
