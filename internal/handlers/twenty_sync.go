@@ -20,10 +20,11 @@ import (
 )
 
 type whProductRow struct {
-	ProductID    int
-	Name         string
-	CategoryName string
-	DailyRate    float64
+	ProductID     int
+	Name          string
+	CategoryName  string
+	DailyRate     float64
+	StockQuantity float64
 }
 
 type whPackageRow struct {
@@ -97,7 +98,7 @@ func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 
 	db := repository.GetSQLDB()
 	rows, qErr := db.QueryContext(ctx, `
-		SELECT p.productid, p.name, COALESCE(c.name, '') AS category_name, COALESCE(p.itemcostperday, 0)
+		SELECT p.productid, p.name, COALESCE(c.name, '') AS category_name, COALESCE(p.itemcostperday, 0), COALESCE(p.stock_quantity, 0)
 		FROM products p
 		LEFT JOIN categories c ON c.categoryid = p.categoryid
 		ORDER BY p.productid
@@ -110,7 +111,7 @@ func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 	var products []whProductRow
 	for rows.Next() {
 		var pr whProductRow
-		if scanErr := rows.Scan(&pr.ProductID, &pr.Name, &pr.CategoryName, &pr.DailyRate); scanErr != nil {
+		if scanErr := rows.Scan(&pr.ProductID, &pr.Name, &pr.CategoryName, &pr.DailyRate, &pr.StockQuantity); scanErr != nil {
 			return counts, fmt.Errorf("scan product row: %w", scanErr)
 		}
 		products = append(products, pr)
@@ -136,29 +137,32 @@ func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 	for _, p := range products {
 		twentyID, exists := byWarehouseID[p.ProductID]
 		if exists {
-			const updateOneQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+			const updateOneQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $stockQuantity: Float!, $lastSyncAt: DateTime!) {
 				updateOneWarehouseCoreProduct(id: $id, data: {
 					productName: $productName
 					categoryName: $categoryName
 					dailyRate: $dailyRate
+					stockQuantity: $stockQuantity
 					lastSyncAt: $lastSyncAt
 				}) { id }
 			}`
-			const updateQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+			const updateQ = `mutation UpdateWHProduct($id: ID!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $stockQuantity: Float!, $lastSyncAt: DateTime!) {
 				updateWarehouseCoreProduct(id: $id, data: {
 					productName: $productName
 					categoryName: $categoryName
 					dailyRate: $dailyRate
+					stockQuantity: $stockQuantity
 					lastSyncAt: $lastSyncAt
 				}) { id }
 			}`
 
 			vars := map[string]interface{}{
-				"id":           twentyID,
-				"productName":  p.Name,
-				"categoryName": p.CategoryName,
-				"dailyRate":    p.DailyRate,
-				"lastSyncAt":   syncedAt,
+				"id":            twentyID,
+				"productName":   p.Name,
+				"categoryName":  p.CategoryName,
+				"dailyRate":     p.DailyRate,
+				"stockQuantity": p.StockQuantity,
+				"lastSyncAt":    syncedAt,
 			}
 
 			uErr := doTwentyGraphQLRoot(ctx, updateOneQ, vars, "updateOneWarehouseCoreProduct", nil)
@@ -171,31 +175,34 @@ func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 			}
 			counts.ProductUpdated++
 		} else {
-			const createOneQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+			const createOneQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $stockQuantity: Float!, $lastSyncAt: DateTime!) {
 				createOneWarehouseCoreProduct(data: {
 					warehouseId: $warehouseId
 					productName: $productName
 					categoryName: $categoryName
 					dailyRate: $dailyRate
+					stockQuantity: $stockQuantity
 					lastSyncAt: $lastSyncAt
 				}) { id warehouseId }
 			}`
-			const createQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $lastSyncAt: DateTime!) {
+			const createQ = `mutation CreateWHProduct($warehouseId: Float!, $productName: String!, $categoryName: String!, $dailyRate: Float!, $stockQuantity: Float!, $lastSyncAt: DateTime!) {
 				createWarehouseCoreProduct(data: {
 					warehouseId: $warehouseId
 					productName: $productName
 					categoryName: $categoryName
 					dailyRate: $dailyRate
+					stockQuantity: $stockQuantity
 					lastSyncAt: $lastSyncAt
 				}) { id warehouseId }
 			}`
 
 			vars := map[string]interface{}{
-				"warehouseId":  float64(p.ProductID),
-				"productName":  p.Name,
-				"categoryName": p.CategoryName,
-				"dailyRate":    p.DailyRate,
-				"lastSyncAt":   syncedAt,
+				"warehouseId":   float64(p.ProductID),
+				"productName":   p.Name,
+				"categoryName":  p.CategoryName,
+				"dailyRate":     p.DailyRate,
+				"stockQuantity": p.StockQuantity,
+				"lastSyncAt":    syncedAt,
 			}
 
 			cErr := doTwentyGraphQLRoot(ctx, createOneQ, vars, "createOneWarehouseCoreProduct", nil)
