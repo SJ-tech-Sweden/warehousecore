@@ -80,10 +80,10 @@ func (s *ScanService) insertDeviceMovement(tx *sql.Tx, movement *models.DeviceMo
 	}
 
 	if !available["action"] && !available["movement_type"] {
-		return fmt.Errorf("device_movements schema missing action/movement_type columns")
+		return fmt.Errorf("device_movements schema missing both action and movement_type columns")
 	}
 	if !available["timestamp"] && !available["created_at"] {
-		return fmt.Errorf("device_movements schema missing timestamp/created_at columns")
+		return fmt.Errorf("device_movements schema missing both timestamp and created_at columns")
 	}
 
 	columns := []string{"device_id"}

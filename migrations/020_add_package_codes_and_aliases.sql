@@ -29,6 +29,9 @@ BEGIN
        AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_packages' AND column_name = 'package_code')
        AND NOT EXISTS (SELECT 1 FROM product_packages WHERE package_code IS NULL OR package_code = '') THEN
         EXECUTE 'ALTER TABLE product_packages ALTER COLUMN package_code SET NOT NULL';
+    ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'product_packages')
+       AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'product_packages' AND column_name = 'package_code') THEN
+        RAISE WARNING 'Migration 020: package_code contains NULL/empty values; NOT NULL constraint was not applied';
     END IF;
 END$$;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_product_package_code ON product_packages(package_code);

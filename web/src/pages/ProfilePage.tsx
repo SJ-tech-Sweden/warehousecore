@@ -220,10 +220,10 @@ export function ProfilePage() {
                 setPwMessage('');
                 setPwMessageIsSuccess(null);
                 try {
-                  if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
                   if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
                   if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
                   if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
+                  if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
                   await authService.changePassword(pwCurrent, pwNew);
                   setPwMessage(t('profilePage.passwordChangeSuccess'));
                   setPwMessageIsSuccess(true);
