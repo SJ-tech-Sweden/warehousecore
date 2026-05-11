@@ -44,19 +44,22 @@ func GetTwentySettings(w http.ResponseWriter, r *http.Request) {
 // Empty api_key keeps the existing key unless clear_api_key=true.
 func UpdateTwentySettings(w http.ResponseWriter, r *http.Request) {
 	var raw struct {
-		BaseURL             string `json:"base_url"`
-		APIKey              string `json:"api_key"`
-		ClearAPIKey         bool   `json:"clear_api_key"`
-		SyncIntervalMinutes int    `json:"sync_interval_minutes"`
-		EnableJobBootstrap  *bool  `json:"enable_job_bootstrap"`
+		BaseURL             *string `json:"base_url"`
+		APIKey              string  `json:"api_key"`
+		ClearAPIKey         bool    `json:"clear_api_key"`
+		SyncIntervalMinutes *int    `json:"sync_interval_minutes"`
+		EnableJobBootstrap  *bool   `json:"enable_job_bootstrap"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
 		return
 	}
 
-	raw.BaseURL = strings.TrimSpace(raw.BaseURL)
 	raw.APIKey = strings.TrimSpace(raw.APIKey)
+	if raw.BaseURL != nil {
+		trimmed := strings.TrimSpace(*raw.BaseURL)
+		raw.BaseURL = &trimmed
+	}
 
 	existing, err := services.GetTwentyConfig()
 	if err != nil {
@@ -67,21 +70,21 @@ func UpdateTwentySettings(w http.ResponseWriter, r *http.Request) {
 	_, _, baseURLLocked := effectiveTwentyBaseURL(existing)
 	_, _, apiKeyLocked := effectiveTwentyAPIKey(existing)
 
-	if raw.BaseURL != "" && !baseURLLocked {
-		if err := validateTwentyBaseURL(raw.BaseURL); err != nil {
+	if raw.BaseURL != nil && *raw.BaseURL != "" && !baseURLLocked {
+		if err := validateTwentyBaseURL(*raw.BaseURL); err != nil {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 	}
 
-	if raw.SyncIntervalMinutes != 0 && !services.IsAllowedTwentySyncInterval(raw.SyncIntervalMinutes) {
+	if raw.SyncIntervalMinutes != nil && *raw.SyncIntervalMinutes != 0 && !services.IsAllowedTwentySyncInterval(*raw.SyncIntervalMinutes) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "sync_interval_minutes must be 0 or one of: 15, 30, 60, 120, 240, 480, 1440"})
 		return
 	}
 
-	baseURL := strings.TrimSpace(raw.BaseURL)
-	if baseURLLocked {
-		baseURL = existing.BaseURL
+	baseURL := existing.BaseURL
+	if !baseURLLocked && raw.BaseURL != nil {
+		baseURL = *raw.BaseURL
 	}
 
 	apiKey := existing.APIKey
@@ -98,10 +101,15 @@ func UpdateTwentySettings(w http.ResponseWriter, r *http.Request) {
 		enableBootstrap = *raw.EnableJobBootstrap
 	}
 
+	syncInterval := existing.SyncIntervalMinutes
+	if raw.SyncIntervalMinutes != nil {
+		syncInterval = *raw.SyncIntervalMinutes
+	}
+
 	cfg := &services.TwentyConfig{
 		BaseURL:             baseURL,
 		APIKey:              apiKey,
-		SyncIntervalMinutes: raw.SyncIntervalMinutes,
+		SyncIntervalMinutes: syncInterval,
 		EnableJobBootstrap:  enableBootstrap,
 	}
 	if err := services.SaveTwentyConfig(cfg); err != nil {

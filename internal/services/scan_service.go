@@ -29,11 +29,101 @@ type ScanService struct {
 	db *sql.DB
 }
 
+type movementInsertColumn struct {
+	name  string
+	value interface{}
+}
+
 // NewScanService creates a new scan service
 func NewScanService() *ScanService {
 	return &ScanService{
 		db: repository.GetSQLDB(),
 	}
+}
+
+func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
+	rows, err := tx.Query(`
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_name = 'device_movements'
+		  AND column_name IN ('action', 'movement_type', 'timestamp', 'created_at')
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	available := map[string]bool{
+		"action":        false,
+		"movement_type": false,
+		"timestamp":     false,
+		"created_at":    false,
+	}
+	for rows.Next() {
+		var columnName string
+		if err := rows.Scan(&columnName); err != nil {
+			return nil, err
+		}
+		available[columnName] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return available, nil
+}
+
+func (s *ScanService) insertDeviceMovement(tx *sql.Tx, movement *models.DeviceMovement, extraColumns []movementInsertColumn) error {
+	available, err := deviceMovementColumnAvailability(tx)
+	if err != nil {
+		return err
+	}
+
+	if !available["action"] && !available["movement_type"] {
+		return fmt.Errorf("device_movements schema missing action/movement_type columns")
+	}
+	if !available["timestamp"] && !available["created_at"] {
+		return fmt.Errorf("device_movements schema missing timestamp/created_at columns")
+	}
+
+	columns := []string{"device_id"}
+	args := []interface{}{movement.DeviceID}
+
+	if available["action"] {
+		columns = append(columns, "action")
+		args = append(args, movement.Action)
+	}
+	if available["movement_type"] {
+		columns = append(columns, "movement_type")
+		args = append(args, movement.Action)
+	}
+
+	for _, col := range extraColumns {
+		columns = append(columns, col.name)
+		args = append(args, col.value)
+	}
+
+	if available["timestamp"] {
+		columns = append(columns, "timestamp")
+		args = append(args, movement.Timestamp)
+	}
+	if available["created_at"] {
+		columns = append(columns, "created_at")
+		args = append(args, movement.Timestamp)
+	}
+
+	placeholders := make([]string, len(columns))
+	for i := range columns {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO device_movements (%s)
+		VALUES (%s)
+		RETURNING movement_id
+	`, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+
+	return tx.QueryRow(query, args...).Scan(&movement.MovementID)
 }
 
 // ProcessScan handles a barcode/QR scan and performs the appropriate action
@@ -169,11 +259,10 @@ func (s *ScanService) processIntake(tx *sql.Tx, device *models.Device, zoneID *i
 		Timestamp: time.Now(),
 	}
 
-	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, movement_type, from_job_id, to_zone_id, timestamp, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.Action, movement.FromJobID, movement.ToZoneID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
+	err = s.insertDeviceMovement(tx, movement, []movementInsertColumn{
+		{name: "from_job_id", value: movement.FromJobID},
+		{name: "to_zone_id", value: movement.ToZoneID},
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -244,11 +333,10 @@ func (s *ScanService) processOuttake(tx *sql.Tx, device *models.Device, jobID *i
 		Timestamp:  time.Now(),
 	}
 
-	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, movement_type, from_zone_id, to_job_id, timestamp, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.Action, movement.FromZoneID, movement.ToJobID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
+	err = s.insertDeviceMovement(tx, movement, []movementInsertColumn{
+		{name: "from_zone_id", value: movement.FromZoneID},
+		{name: "to_job_id", value: movement.ToJobID},
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,11 +442,10 @@ func (s *ScanService) processTransfer(tx *sql.Tx, device *models.Device, toZoneI
 		Timestamp:  time.Now(),
 	}
 
-	err = tx.QueryRow(`
-		INSERT INTO device_movements (device_id, action, movement_type, from_zone_id, to_zone_id, timestamp, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING movement_id
-	`, movement.DeviceID, movement.Action, movement.Action, movement.FromZoneID, movement.ToZoneID, movement.Timestamp, movement.Timestamp).Scan(&movement.MovementID)
+	err = s.insertDeviceMovement(tx, movement, []movementInsertColumn{
+		{name: "from_zone_id", value: movement.FromZoneID},
+		{name: "to_zone_id", value: movement.ToZoneID},
+	})
 	if err != nil {
 		return nil, nil, err
 	}

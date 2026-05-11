@@ -1676,8 +1676,10 @@
     "confirmPassword": "Confirm new password",
     "changePasswordButton": "Change password",
     "passwordChangeSuccess": "Password changed successfully",
+    "currentPasswordRequiredError": "Current password is required",
     "passwordMismatchError": "Passwords do not match",
     "passwordMinLengthError": "Password must be at least 6 characters",
+    "passwordSameAsCurrentError": "The new password must differ from the current one",
     "passwordChangeFailedError": "Failed to change password",
     "openProfile": "Open Profile"
   },

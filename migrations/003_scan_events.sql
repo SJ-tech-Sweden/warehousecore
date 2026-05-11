@@ -24,7 +24,16 @@ CREATE INDEX IF NOT EXISTS idx_scan_timestamp ON scan_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_scan_success ON scan_events(success);
 
 -- Foreign keys
-ALTER TABLE scan_events ADD CONSTRAINT fk_scan_device FOREIGN KEY (device_id) REFERENCES devices(deviceID) ON DELETE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE c.conname = 'fk_scan_device' AND t.relname = 'scan_events'
+  ) THEN
+    EXECUTE 'ALTER TABLE scan_events ADD CONSTRAINT fk_scan_device FOREIGN KEY (device_id) REFERENCES devices(deviceID) ON DELETE CASCADE';
+  END IF;
+END$$;
 -- Conditionally add FK to jobs only if jobs table exists and constraint missing
 DO $$
 BEGIN
@@ -38,4 +47,13 @@ BEGIN
     END IF;
   END IF;
 END$$;
-ALTER TABLE scan_events ADD CONSTRAINT fk_scan_zone FOREIGN KEY (zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_class t ON c.conrelid = t.oid
+    WHERE c.conname = 'fk_scan_zone' AND t.relname = 'scan_events'
+  ) THEN
+    EXECUTE 'ALTER TABLE scan_events ADD CONSTRAINT fk_scan_zone FOREIGN KEY (zone_id) REFERENCES storage_zones(zone_id) ON DELETE SET NULL';
+  END IF;
+END$$;
