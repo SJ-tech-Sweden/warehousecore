@@ -31,6 +31,7 @@ type ssoHeader struct {
 }
 
 var ssoFallbackSecretWarning sync.Once
+var rentalCoreSSOHTTPClient = &http.Client{Timeout: 5 * time.Second}
 
 func ssoSigningKey() []byte {
 	if k := strings.TrimSpace(os.Getenv("SSO_JWT_SECRET")); k != "" {
@@ -148,17 +149,19 @@ func SSOMiddleware(next http.Handler) http.Handler {
 
 		// Try to load richer user info from local DB if available
 		db := repository.GetDB()
+		localUserLoaded := false
 		if db != nil {
 			var dbUser models.User
 			result := db.Where("userid = ? AND is_active = ?", claims.UserID, true).Limit(1).Find(&dbUser)
 			if result.Error == nil && result.RowsAffected > 0 {
 				dbUser.PasswordHash = ""
 				user = dbUser
+				localUserLoaded = true
 			}
 		}
 
-		// Optionally, fetch authoritative user data from RentalCore API
-		if os.Getenv("RENTALCORE_BASE_URL") != "" {
+		// Optionally fetch authoritative user data from RentalCore API when local lookup misses.
+		if !localUserLoaded && os.Getenv("RENTALCORE_BASE_URL") != "" {
 			rcBase := strings.TrimSuffix(os.Getenv("RENTALCORE_BASE_URL"), "/")
 			url := fmt.Sprintf("%s/api/v1/security/auth/users/%d", rcBase, claims.UserID)
 			req, reqErr := http.NewRequest(http.MethodGet, url, nil)
@@ -169,8 +172,7 @@ func SSOMiddleware(next http.Handler) http.Handler {
 				if k := os.Getenv("RENTALCORE_API_KEY"); k != "" {
 					req.Header.Set("X-API-Key", k)
 				}
-				client := &http.Client{Timeout: 5 * time.Second}
-				resp, err := client.Do(req)
+				resp, err := rentalCoreSSOHTTPClient.Do(req)
 				if err == nil && resp != nil {
 					defer resp.Body.Close()
 					if resp.StatusCode == http.StatusOK {

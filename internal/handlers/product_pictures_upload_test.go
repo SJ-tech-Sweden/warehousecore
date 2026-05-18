@@ -24,7 +24,7 @@ func TestUploadProductPictures_Success(t *testing.T) {
 	mock.ExpectExec(`UPDATE products`).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	// inject fake service
-	handlers.SetProductPictureService(&fakePictureService{enabled: true})
+	t.Cleanup(handlers.SetProductPictureService(&fakePictureService{enabled: true}))
 
 	// build multipart request
 	var buf bytes.Buffer
@@ -52,7 +52,7 @@ func TestUploadProductPictures_Success(t *testing.T) {
 // TestDeleteProductPicture_NotConfigured returns 503 when pictures disabled.
 func TestDeleteProductPicture_NotConfigured(t *testing.T) {
 	// inject disabled service
-	handlers.SetProductPictureService(&fakePictureService{enabled: false})
+	t.Cleanup(handlers.SetProductPictureService(&fakePictureService{enabled: false}))
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/v1/admin/products/{id}/pictures/{filename}", handlers.DeleteProductPicture).Methods("DELETE")
@@ -71,7 +71,7 @@ func TestDeleteProductPicture_Success(t *testing.T) {
 	mock := withMockDB(t)
 	mock.ExpectQuery(`SELECT name FROM products`).WithArgs(2).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("P2"))
 
-	handlers.SetProductPictureService(&fakePictureService{enabled: true})
+	t.Cleanup(handlers.SetProductPictureService(&fakePictureService{enabled: true}))
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/v1/admin/products/{id}/pictures/{filename}", handlers.DeleteProductPicture).Methods("DELETE")

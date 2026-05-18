@@ -43,7 +43,7 @@ func TestGetProductPictures_Empty(t *testing.T) {
 	mock.ExpectQuery(`SELECT name FROM products`).WithArgs(1).WillReturnRows(sqlmock.NewRows([]string{"name"}).AddRow("TestProduct"))
 
 	// inject fake service
-	handlers.SetProductPictureService(&fakePictureService{enabled: true})
+	t.Cleanup(handlers.SetProductPictureService(&fakePictureService{enabled: true}))
 
 	router := mux.NewRouter()
 	router.HandleFunc("/api/v1/admin/products/{id}/pictures", handlers.GetProductPictures).Methods("GET")

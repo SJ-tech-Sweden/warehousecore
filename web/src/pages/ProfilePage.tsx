@@ -90,6 +90,36 @@ export function ProfilePage() {
     }
   };
 
+  const handleChangePassword = async () => {
+    setPwSaving(true);
+    setPwMessage('');
+    setPwMessageIsSuccess(null);
+    try {
+      if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
+      if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
+      if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
+      if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
+      await changePassword(pwCurrent, pwNew);
+      setPwMessage(t('profilePage.passwordChangeSuccess'));
+      setPwMessageIsSuccess(true);
+      setPwCurrent(''); setPwNew(''); setPwConfirm('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('profilePage.passwordChangeFailedError');
+      setPwMessage(msg);
+      setPwMessageIsSuccess(false);
+    } finally {
+      setPwSaving(false);
+      if (pwMessageTimeoutRef.current !== null) {
+        window.clearTimeout(pwMessageTimeoutRef.current);
+      }
+      pwMessageTimeoutRef.current = window.setTimeout(() => {
+        setPwMessage('');
+        setPwMessageIsSuccess(null);
+        pwMessageTimeoutRef.current = null;
+      }, 3000);
+    }
+  };
+
   if (loading) {
     return <div className="text-white">{t('common.loading')}</div>;
   }
@@ -202,49 +232,21 @@ export function ProfilePage() {
 
             <div>
               <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.currentPassword')}</label>
-              <input type="password" value={pwCurrent} onChange={(e)=>setPwCurrent(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <input type="password" autoComplete="current-password" value={pwCurrent} onChange={(e)=>setPwCurrent(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.newPassword')}</label>
-              <input type="password" value={pwNew} onChange={(e)=>setPwNew(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <input type="password" autoComplete="new-password" value={pwNew} onChange={(e)=>setPwNew(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.confirmPassword')}</label>
-              <input type="password" value={pwConfirm} onChange={(e)=>setPwConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <input type="password" autoComplete="new-password" value={pwConfirm} onChange={(e)=>setPwConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div className="pt-2">
-              <button onClick={async ()=>{
-                setPwSaving(true);
-                setPwMessage('');
-                setPwMessageIsSuccess(null);
-                try {
-                  if (pwNew !== pwConfirm) throw new Error(t('profilePage.passwordMismatchError'));
-                  if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
-                  if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
-                  if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
-                  await changePassword(pwCurrent, pwNew);
-                  setPwMessage(t('profilePage.passwordChangeSuccess'));
-                  setPwMessageIsSuccess(true);
-                  setPwCurrent(''); setPwNew(''); setPwConfirm('');
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : t('profilePage.passwordChangeFailedError');
-                  setPwMessage(msg);
-                  setPwMessageIsSuccess(false);
-                } finally {
-                  setPwSaving(false);
-                  if (pwMessageTimeoutRef.current !== null) {
-                    window.clearTimeout(pwMessageTimeoutRef.current);
-                  }
-                  pwMessageTimeoutRef.current = window.setTimeout(() => {
-                    setPwMessage('');
-                    setPwMessageIsSuccess(null);
-                    pwMessageTimeoutRef.current = null;
-                  }, 3000);
-                }
-              }} disabled={pwSaving} className={`w-full py-3 px-6 rounded-xl font-semibold text-white ${pwSaving ? 'bg-gray-600' : 'bg-gradient-to-r from-accent-red to-red-700'}`}>
+              <button onClick={handleChangePassword} disabled={pwSaving} className={`w-full py-3 px-6 rounded-xl font-semibold text-white ${pwSaving ? 'bg-gray-600' : 'bg-gradient-to-r from-accent-red to-red-700'}`}>
                 {pwSaving ? t('common.saving') : t('profilePage.changePasswordButton')}
               </button>
 

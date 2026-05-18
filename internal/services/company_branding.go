@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"log"
 	"strings"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"warehousecore/internal/models"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -65,7 +67,7 @@ func (s *CompanyBrandingService) CompanyName() string {
 		// Try fallback to app_settings (new company.info stored as JSON)
 		var appSetting models.AppSetting
 		appSettingsQuery := s.db.Table("app_settings").Where("scope = ? AND key = ?", "warehousecore", "company.info").Limit(1).Find(&appSetting)
-		if appSettingsQuery.Error != nil {
+		if appSettingsQuery.Error != nil && !isMissingAppSettingsTableErr(appSettingsQuery.Error) {
 			log.Printf("[BRANDING] app_settings lookup failed: %v", appSettingsQuery.Error)
 		}
 		if appSettingsQuery.Error == nil && appSettingsQuery.RowsAffected > 0 {
@@ -79,6 +81,19 @@ func (s *CompanyBrandingService) CompanyName() string {
 	}
 	s.lastFetch = time.Now()
 	return s.name
+}
+
+func isMissingAppSettingsTableErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Code == "42P01" {
+		return true
+	}
+	// Fallback for wrapped/non-pq errors where SQLSTATE is not exposed.
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, `relation "app_settings" does not exist`)
 }
 
 func (s *CompanyBrandingService) Update(name string) {

@@ -51,8 +51,7 @@ func (t *testLabelService) SaveZoneLabelImage(zoneID int64, imageData string) (s
 }
 
 func TestGenerateQRCode_Success(t *testing.T) {
-	// inject stub
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 
 	body := `{"content":"hello","size":128}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/labels/qrcode", strings.NewReader(body))
@@ -72,7 +71,7 @@ func TestGenerateQRCode_Success(t *testing.T) {
 }
 
 func TestGenerateQRCode_BadRequest(t *testing.T) {
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/labels/qrcode", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()
 	GenerateQRCode(rr, req)
@@ -82,7 +81,7 @@ func TestGenerateQRCode_BadRequest(t *testing.T) {
 }
 
 func TestGenerateBarcode_BadRequest(t *testing.T) {
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/labels/barcode", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()
 	GenerateBarcode(rr, req)
@@ -92,7 +91,7 @@ func TestGenerateBarcode_BadRequest(t *testing.T) {
 }
 
 func TestGetLabelTemplates_EmptyArray(t *testing.T) {
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/labels/templates", nil)
 	rr := httptest.NewRecorder()
 	GetLabelTemplates(rr, req)
@@ -109,7 +108,7 @@ func TestGetLabelTemplates_EmptyArray(t *testing.T) {
 }
 
 func TestGenerateDeviceLabel_MissingTemplateID(t *testing.T) {
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/labels/device/DEV1", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()
 	// need to set mux vars for device_id
@@ -121,7 +120,7 @@ func TestGenerateDeviceLabel_MissingTemplateID(t *testing.T) {
 }
 
 func TestSaveDeviceLabel_Success(t *testing.T) {
-	labelService = &testLabelService{}
+	t.Cleanup(SetLabelService(&testLabelService{}))
 	body := `{"device_id":"DEV1","image_data":"data:image/png;base64,AAA"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/labels/save", strings.NewReader(body))
 	rr := httptest.NewRecorder()

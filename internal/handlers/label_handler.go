@@ -14,6 +14,15 @@ import (
 
 var labelService services.LabelServiceInterface = services.NewLabelService()
 
+// SetLabelService allows tests to inject a mock LabelService implementation.
+func SetLabelService(s services.LabelServiceInterface) func() {
+	prev := labelService
+	labelService = s
+	return func() {
+		labelService = prev
+	}
+}
+
 // GenerateQRCode generates a QR code
 // POST /api/v1/labels/qrcode
 // Body: {"content": "text", "size": 256}

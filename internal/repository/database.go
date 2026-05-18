@@ -144,9 +144,6 @@ func buildPostgresDSN(cfg *config.Config) string {
 	}
 
 	password := cfg.Database.Password
-	if password == "" {
-		password = "warehousecore123"
-	}
 
 	sslMode := cfg.Database.SSLMode
 	if sslMode == "" {
