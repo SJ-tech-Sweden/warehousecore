@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -100,6 +102,86 @@ type localJobRequirementInput struct {
 	Quantity  int `json:"quantity"`
 }
 
+var errJobProductRequirementsTableUnavailable = errors.New("job_product_requirements table is unavailable")
+
+func normalizeLocalJobRequirements(requirements []localJobRequirementInput) []localJobRequirementInput {
+	filtered := make([]localJobRequirementInput, 0, len(requirements))
+	seen := make(map[int]bool)
+	for _, req := range requirements {
+		if req.ProductID <= 0 || req.Quantity <= 0 || seen[req.ProductID] {
+			continue
+		}
+		seen[req.ProductID] = true
+		filtered = append(filtered, req)
+	}
+	return filtered
+}
+
+func saveJobRequirementsFallback(jobID int, requirements []localJobRequirementInput) error {
+	db := repository.GetSQLDB()
+	appSettingCols, err := getTableColumnsForDB(db, "app_settings")
+	if err != nil {
+		return err
+	}
+	if !appSettingCols["scope"] || !appSettingCols["key"] || !appSettingCols["value"] {
+		return fmt.Errorf("app_settings table is unavailable")
+	}
+
+	payload := map[string]interface{}{
+		"job_id":       jobID,
+		"requirements": normalizeLocalJobRequirements(requirements),
+		"updated_at":   time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	settingKey := fmt.Sprintf("job.requirements.%d", jobID)
+	_, err = db.Exec(`
+		INSERT INTO app_settings (scope, key, value, created_at, updated_at)
+		VALUES ('warehousecore', $1, $2::jsonb, NOW(), NOW())
+		ON CONFLICT (scope, key)
+		DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+	`, settingKey, string(payloadBytes))
+	return err
+}
+
+func loadJobRequirementsFallback(jobID int) ([]localJobRequirementInput, error) {
+	db := repository.GetSQLDB()
+	appSettingCols, err := getTableColumnsForDB(db, "app_settings")
+	if err != nil {
+		return nil, err
+	}
+	if !appSettingCols["scope"] || !appSettingCols["key"] || !appSettingCols["value"] {
+		return nil, nil
+	}
+
+	settingKey := fmt.Sprintf("job.requirements.%d", jobID)
+	var raw json.RawMessage
+	err = db.QueryRow(`
+		SELECT value
+		FROM app_settings
+		WHERE scope = 'warehousecore' AND key = $1
+		LIMIT 1
+	`, settingKey).Scan(&raw)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var payload struct {
+		Requirements []localJobRequirementInput `json:"requirements"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+
+	return normalizeLocalJobRequirements(payload.Requirements), nil
+}
+
 func replaceLocalJobRequirements(jobID int, requirements []localJobRequirementInput) error {
 	db := repository.GetSQLDB()
 	jobReqCols, err := getTableColumnsForDB(db, "job_product_requirements")
@@ -107,7 +189,7 @@ func replaceLocalJobRequirements(jobID int, requirements []localJobRequirementIn
 		return err
 	}
 	if !jobReqCols["job_id"] || !jobReqCols["product_id"] || !jobReqCols["quantity"] {
-		return fmt.Errorf("job_product_requirements table is unavailable")
+		return errJobProductRequirementsTableUnavailable
 	}
 
 	jobCols, err := getTableColumnsForDB(db, "jobs")
@@ -127,15 +209,7 @@ func replaceLocalJobRequirements(jobID int, requirements []localJobRequirementIn
 		return sql.ErrNoRows
 	}
 
-	filtered := make([]localJobRequirementInput, 0, len(requirements))
-	seen := make(map[int]bool)
-	for _, req := range requirements {
-		if req.ProductID <= 0 || req.Quantity <= 0 || seen[req.ProductID] {
-			continue
-		}
-		seen[req.ProductID] = true
-		filtered = append(filtered, req)
-	}
+	filtered := normalizeLocalJobRequirements(requirements)
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -166,7 +240,7 @@ func upsertLocalJobRequirement(jobID int, productID int, quantity int) error {
 		return err
 	}
 	if !jobReqCols["job_id"] || !jobReqCols["product_id"] || !jobReqCols["quantity"] {
-		return fmt.Errorf("job_product_requirements table is unavailable")
+		return errJobProductRequirementsTableUnavailable
 	}
 
 	jobCols, err := getTableColumnsForDB(db, "jobs")
@@ -223,6 +297,37 @@ func ReplaceJobRequirements(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusNotFound, map[string]string{"error": "job not found"})
 			return
 		}
+		if errors.Is(err, errJobProductRequirementsTableUnavailable) {
+			normalized := normalizeLocalJobRequirements(req.Requirements)
+			if twentyConfigured() {
+				savedCount, syncErr := replaceTwentyJobRequirements(r.Context(), jobID, req.Requirements)
+				if syncErr == nil {
+					respondJSON(w, http.StatusOK, map[string]interface{}{
+						"ok":           true,
+						"job_id":       jobID,
+						"saved_count":  savedCount,
+						"requirements": req.Requirements,
+						"storage":      "twenty",
+					})
+					return
+				}
+				log.Printf("[REQ] Twenty sync failed for job %d, using app_settings fallback: %v", jobID, syncErr)
+			}
+
+			if fallbackErr := saveJobRequirementsFallback(jobID, req.Requirements); fallbackErr != nil {
+				respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": fmt.Sprintf("failed to save requirements: local requirements table is unavailable and fallback storage failed: %v", fallbackErr)})
+				return
+			}
+
+			respondJSON(w, http.StatusOK, map[string]interface{}{
+				"ok":           true,
+				"job_id":       jobID,
+				"saved_count":  len(normalized),
+				"requirements": req.Requirements,
+				"storage":      "app_settings",
+			})
+			return
+		}
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to save requirements: %v", err)})
 		return
 	}
@@ -232,7 +337,116 @@ func ReplaceJobRequirements(w http.ResponseWriter, r *http.Request) {
 		"job_id":       jobID,
 		"saved_count":  len(req.Requirements),
 		"requirements": req.Requirements,
+		"storage":      "warehousecore",
 	})
+}
+
+func replaceTwentyJobRequirements(ctx context.Context, jobID int, requirements []localJobRequirementInput) (int, error) {
+	opp, err := loadTwentyOpportunityForJob(ctx, jobID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to load linked opportunity: %w", err)
+	}
+	if opp == nil {
+		return 0, fmt.Errorf("no Twenty opportunity linked to this job")
+	}
+
+	desired := make(map[int]int)
+	for _, req := range requirements {
+		if req.ProductID <= 0 || req.Quantity <= 0 {
+			continue
+		}
+		desired[req.ProductID] = req.Quantity
+	}
+
+	existingByProduct := make(map[int]twentyRequirementNode)
+	for _, line := range opp.JobRequirements {
+		lineProductID := 0
+		if line.WarehouseCoreProduct != nil {
+			lineProductID = int(*line.WarehouseCoreProduct)
+		}
+		if lineProductID <= 0 && line.WarehouseProduct != nil && line.WarehouseProduct.WarehouseID != nil {
+			lineProductID = int(*line.WarehouseProduct.WarehouseID)
+		}
+		if lineProductID > 0 {
+			existingByProduct[lineProductID] = line
+		}
+	}
+
+	savedCount := 0
+	for productID, quantityInt := range desired {
+		productName, unitPrice, nameErr := loadLocalProductPricing(productID)
+		if nameErr != nil {
+			if nameErr == sql.ErrNoRows {
+				return 0, fmt.Errorf("product %d not found", productID)
+			}
+			return 0, fmt.Errorf("failed to load product %d: %w", productID, nameErr)
+		}
+
+		productTwentyID, prodMapErr := resolveTwentyProductRecordID(ctx, productID)
+		if prodMapErr != nil {
+			return 0, fmt.Errorf("failed to resolve Twenty product mapping for %d: %w", productID, prodMapErr)
+		}
+		if productTwentyID == "" {
+			return 0, fmt.Errorf("product %d is not synced to Twenty yet", productID)
+		}
+
+		quantity := float64(quantityInt)
+		lineTotal := unitPrice * quantity
+
+		if existing, exists := existingByProduct[productID]; exists && strings.TrimSpace(existing.ID) != "" {
+			if err := updateTwentyRequirement(ctx, existing.ID, productName, quantity, productID, productTwentyID, unitPrice, lineTotal); err != nil {
+				return 0, fmt.Errorf("failed to update requirement for product %d: %w", productID, err)
+			}
+		} else {
+			if err := createTwentyRequirement(ctx, opp.ID, productName, quantity, productID, productTwentyID, unitPrice, lineTotal); err != nil {
+				return 0, fmt.Errorf("failed to create requirement for product %d: %w", productID, err)
+			}
+		}
+		savedCount++
+	}
+
+	for productID, existing := range existingByProduct {
+		if _, stillNeeded := desired[productID]; stillNeeded {
+			continue
+		}
+		requirementID := strings.TrimSpace(existing.ID)
+		if requirementID == "" {
+			continue
+		}
+		if err := deleteTwentyRequirement(ctx, requirementID); err != nil {
+			return 0, fmt.Errorf("failed to delete requirement for product %d: %w", productID, err)
+		}
+	}
+
+	_ = updateOpportunityEstimatedTotal(ctx, opp)
+	return savedCount, nil
+}
+
+func deleteTwentyRequirement(ctx context.Context, requirementID string) error {
+	requirementID = strings.TrimSpace(requirementID)
+	if requirementID == "" {
+		return nil
+	}
+
+	const deleteOppLineQ = `mutation DeleteReq($id: UUID!) {
+		deleteOpportunityRequirementLine(id: $id) { id }
+	}`
+	const deleteOneQ = `mutation DeleteReq($id: UUID!) {
+		deleteOneJobProductRequirement(id: $id) { id }
+	}`
+	const deleteQ = `mutation DeleteReq($id: UUID!) {
+		deleteJobProductRequirement(id: $id) { id }
+	}`
+
+	vars := map[string]interface{}{"id": requirementID}
+	err := doTwentyGraphQLRoot(ctx, deleteOppLineQ, vars, "deleteOpportunityRequirementLine", nil)
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, deleteOneQ, vars, "deleteOneJobProductRequirement", nil)
+	}
+	if err != nil {
+		err = doTwentyGraphQLRoot(ctx, deleteQ, vars, "deleteJobProductRequirement", nil)
+	}
+	return err
 }
 
 // GetJobRequirementProductOptions returns products for the guided
@@ -320,11 +534,11 @@ func UpsertJobRequirement(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"ok":        true,
-			"action":    "deleted",
-			"job_id":    jobID,
+			"ok":         true,
+			"action":     "deleted",
+			"job_id":     jobID,
 			"product_id": req.ProductID,
-			"quantity":  0,
+			"quantity":   0,
 		})
 		return
 	}

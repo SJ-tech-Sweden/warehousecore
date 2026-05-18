@@ -2217,35 +2217,107 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		Assigned    int    `json:"assigned"`
 	}
 
-	reqRows, err := db.Query(`
-		SELECT jpr.product_id, COALESCE(p.name, '') as product_name, jpr.quantity,
-		       COALESCE(assigned_counts.assigned, 0) as assigned
-		FROM job_product_requirements jpr
-		LEFT JOIN products p ON jpr.product_id = p.productid
-		LEFT JOIN (
-			SELECT d2.productid, COUNT(*) as assigned
-			FROM jobdevices jd2
-			LEFT JOIN devices d2 ON jd2.deviceid = d2.deviceid
-			WHERE jd2.jobid = $1 AND d2.status = 'on_job'
-			GROUP BY d2.productid
-		) assigned_counts ON assigned_counts.productid = jpr.product_id
-		WHERE jpr.job_id = $1
-		ORDER BY COALESCE(p.name, ''), jpr.product_id
-	`, jobID)
-
 	productRequirements := []ProductRequirement{}
-	if err == nil {
-		defer reqRows.Close()
-		for reqRows.Next() {
-			var req ProductRequirement
-			if err := reqRows.Scan(&req.ProductID, &req.ProductName, &req.Required, &req.Assigned); err != nil {
-				log.Printf("Error scanning requirement row: %v", err)
-				continue
+	jobReqCols, reqColsErr := getTableColumnsForDB(db, "job_product_requirements")
+	if reqColsErr != nil {
+		log.Printf("Error checking requirement table columns: %v", reqColsErr)
+	} else if jobReqCols["job_id"] && jobReqCols["product_id"] && jobReqCols["quantity"] {
+		reqRows, reqErr := db.Query(`
+			SELECT jpr.product_id, COALESCE(p.name, '') as product_name, jpr.quantity,
+			       COALESCE(assigned_counts.assigned, 0) as assigned
+			FROM job_product_requirements jpr
+			LEFT JOIN products p ON jpr.product_id = p.productid
+			LEFT JOIN (
+				SELECT d2.productid, COUNT(*) as assigned
+				FROM jobdevices jd2
+				LEFT JOIN devices d2 ON jd2.deviceid = d2.deviceid
+				WHERE jd2.jobid = $1 AND d2.status = 'on_job'
+				GROUP BY d2.productid
+			) assigned_counts ON assigned_counts.productid = jpr.product_id
+			WHERE jpr.job_id = $1
+			ORDER BY COALESCE(p.name, ''), jpr.product_id
+		`, jobID)
+		if reqErr == nil {
+			defer reqRows.Close()
+			for reqRows.Next() {
+				var req ProductRequirement
+				if err := reqRows.Scan(&req.ProductID, &req.ProductName, &req.Required, &req.Assigned); err != nil {
+					log.Printf("Error scanning requirement row: %v", err)
+					continue
+				}
+				productRequirements = append(productRequirements, req)
 			}
-			productRequirements = append(productRequirements, req)
+		} else {
+			log.Printf("Error getting product requirements: %v", reqErr)
 		}
 	} else {
-		log.Printf("Error getting product requirements: %v", err)
+		fallbackRequirements, fallbackErr := loadJobRequirementsFallback(jobID)
+		if fallbackErr != nil {
+			log.Printf("job_product_requirements table missing and fallback load failed for job %d: %v", jobID, fallbackErr)
+		} else if len(fallbackRequirements) > 0 {
+			assignedByProduct := make(map[int]int)
+			assignedRows, assignedErr := db.Query(`
+				SELECT COALESCE(d2.productid, 0) as product_id, COUNT(*) as assigned
+				FROM jobdevices jd2
+				LEFT JOIN devices d2 ON jd2.deviceid = d2.deviceid
+				WHERE jd2.jobid = $1 AND d2.status = 'on_job'
+				GROUP BY COALESCE(d2.productid, 0)
+			`, jobID)
+			if assignedErr == nil {
+				defer assignedRows.Close()
+				for assignedRows.Next() {
+					var productID int
+					var assigned int
+					if scanErr := assignedRows.Scan(&productID, &assigned); scanErr != nil {
+						continue
+					}
+					if productID > 0 {
+						assignedByProduct[productID] = assigned
+					}
+				}
+			}
+
+			productNameByID := make(map[int]string)
+			if len(fallbackRequirements) > 0 {
+				placeholders := make([]string, 0, len(fallbackRequirements))
+				args := make([]interface{}, 0, len(fallbackRequirements))
+				for i, req := range fallbackRequirements {
+					placeholders = append(placeholders, fmt.Sprintf("$%d", i+1))
+					args = append(args, req.ProductID)
+				}
+				if len(placeholders) > 0 {
+					nameQuery := fmt.Sprintf("SELECT productID, name FROM products WHERE productID IN (%s)", strings.Join(placeholders, ","))
+					nameRows, nameErr := db.Query(nameQuery, args...)
+					if nameErr == nil {
+						defer nameRows.Close()
+						for nameRows.Next() {
+							var productID int
+							var productName string
+							if scanErr := nameRows.Scan(&productID, &productName); scanErr != nil {
+								continue
+							}
+							productNameByID[productID] = productName
+						}
+					}
+				}
+			}
+
+			for _, req := range fallbackRequirements {
+				productName := productNameByID[req.ProductID]
+				if strings.TrimSpace(productName) == "" {
+					productName = fmt.Sprintf("Product %d", req.ProductID)
+				}
+				productRequirements = append(productRequirements, ProductRequirement{
+					ProductID:   req.ProductID,
+					ProductName: productName,
+					Required:    req.Quantity,
+					Assigned:    assignedByProduct[req.ProductID],
+				})
+			}
+			log.Printf("job_product_requirements table missing; loaded %d fallback requirements for job %d", len(productRequirements), jobID)
+		} else {
+			log.Printf("job_product_requirements table missing; returning empty requirement list for job %d", jobID)
+		}
 	}
 
 	jobCodeValue := fmt.Sprintf("JOB%06d", jobID)
