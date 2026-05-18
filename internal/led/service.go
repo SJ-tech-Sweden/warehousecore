@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -792,15 +791,6 @@ func rentalCoreBaseURL() string {
 	if base == "" {
 		return "http://rentalcore:8080"
 	}
-
-	parsed, err := url.Parse(base)
-	if err == nil {
-		host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
-		if host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0" {
-			return "http://rentalcore:8080"
-		}
-	}
-
 	return base
 }
 

@@ -103,15 +103,15 @@ func SaveTwentyConfig(cfg *TwentyConfig) error {
 	})
 }
 
-// BootstrapTwentyFromEnv seeds the Twenty config from TWENTY_BASE_URL /
-// TWENTY_API_KEY env vars if no DB record exists yet.
+// BootstrapTwentyFromEnv seeds the Twenty config from supported Twenty env vars
+// if no DB record exists yet.
 func BootstrapTwentyFromEnv() {
 	if repository.GetDB() == nil {
 		return
 	}
 
-	baseURL := strings.TrimSpace(os.Getenv("TWENTY_BASE_URL"))
-	apiKey := strings.TrimSpace(os.Getenv("TWENTY_API_KEY"))
+	baseURL := twentyBaseURLFromEnv()
+	apiKey := twentyAPIKeyFromEnv()
 	if baseURL == "" && apiKey == "" {
 		return
 	}
@@ -137,6 +137,32 @@ func BootstrapTwentyFromEnv() {
 		return
 	}
 	log.Printf("[TWENTY] Bootstrap: seeded config from environment variables (base_url=%s)", baseURL)
+}
+
+func twentyBaseURLFromEnv() string {
+	for _, key := range []string{"TWENTY_BASE_URL", "TWENTY_URL", "TWENTY_SERVER_URL", "TWENTY_GRAPHQL_URL"} {
+		if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
+			return normalizeTwentyBaseURL(raw)
+		}
+	}
+	return ""
+}
+
+func twentyAPIKeyFromEnv() string {
+	for _, key := range []string{"TWENTY_API_KEY", "TWENTY_ACCESS_TOKEN", "TWENTY_TOKEN"} {
+		if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
+			return raw
+		}
+	}
+	return ""
+}
+
+func normalizeTwentyBaseURL(raw string) string {
+	v := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if strings.HasSuffix(strings.ToLower(v), "/graphql") {
+		v = strings.TrimSuffix(v, "/graphql")
+	}
+	return v
 }
 
 // twentyCredentialKey returns the AES-256 key for encrypting/decrypting the

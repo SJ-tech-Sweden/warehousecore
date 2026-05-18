@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { User, Mail, Shield, Save, Key } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../lib/api';
-import { authService } from '../services/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfile {
   profile: {
@@ -28,6 +28,7 @@ interface UserProfile {
 
 export function ProfilePage() {
   const { t } = useTranslation();
+  const { changePassword } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [avatarURL, setAvatarURL] = useState('');
@@ -224,7 +225,7 @@ export function ProfilePage() {
                   if (pwNew.length < 6) throw new Error(t('profilePage.passwordMinLengthError'));
                   if (!pwCurrent.trim()) throw new Error(t('profilePage.currentPasswordRequiredError'));
                   if (pwNew === pwCurrent) throw new Error(t('profilePage.passwordSameAsCurrentError'));
-                  await authService.changePassword(pwCurrent, pwNew);
+                  await changePassword(pwCurrent, pwNew);
                   setPwMessage(t('profilePage.passwordChangeSuccess'));
                   setPwMessageIsSuccess(true);
                   setPwCurrent(''); setPwNew(''); setPwConfirm('');
