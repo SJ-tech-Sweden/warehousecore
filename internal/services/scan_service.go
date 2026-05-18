@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"warehousecore/internal/led"
@@ -34,6 +35,11 @@ type movementInsertColumn struct {
 	value interface{}
 }
 
+var movementColumnsCache struct {
+	mu   sync.RWMutex
+	cols map[string]bool
+}
+
 // NewScanService creates a new scan service
 func NewScanService() *ScanService {
 	return &ScanService{
@@ -42,10 +48,18 @@ func NewScanService() *ScanService {
 }
 
 func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
+	movementColumnsCache.mu.RLock()
+	if movementColumnsCache.cols != nil {
+		defer movementColumnsCache.mu.RUnlock()
+		return cloneMovementColumnsMap(movementColumnsCache.cols), nil
+	}
+	movementColumnsCache.mu.RUnlock()
+
 	rows, err := tx.Query(`
 		SELECT column_name
 		FROM information_schema.columns
 		WHERE table_name = 'device_movements'
+		  AND table_schema = current_schema()
 		  AND column_name IN ('action', 'movement_type', 'timestamp', 'created_at')
 	`)
 	if err != nil {
@@ -70,7 +84,19 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 		return nil, err
 	}
 
+	movementColumnsCache.mu.Lock()
+	movementColumnsCache.cols = cloneMovementColumnsMap(available)
+	movementColumnsCache.mu.Unlock()
+
 	return available, nil
+}
+
+func cloneMovementColumnsMap(in map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func (s *ScanService) insertDeviceMovement(tx *sql.Tx, movement *models.DeviceMovement, extraColumns []movementInsertColumn) error {

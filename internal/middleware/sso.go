@@ -161,21 +161,25 @@ func SSOMiddleware(next http.Handler) http.Handler {
 		if os.Getenv("RENTALCORE_BASE_URL") != "" {
 			rcBase := strings.TrimSuffix(os.Getenv("RENTALCORE_BASE_URL"), "/")
 			url := fmt.Sprintf("%s/api/v1/security/auth/users/%d", rcBase, claims.UserID)
-			req, _ := http.NewRequest(http.MethodGet, url, nil)
-			req.Header.Set("Accept", "application/json")
-			if k := os.Getenv("RENTALCORE_API_KEY"); k != "" {
-				req.Header.Set("X-API-Key", k)
-			}
-			client := &http.Client{Timeout: 5 * time.Second}
-			resp, err := client.Do(req)
-			if err == nil && resp != nil {
-				defer resp.Body.Close()
-				if resp.StatusCode == http.StatusOK {
-					body, _ := io.ReadAll(resp.Body)
-					var rcUser models.User
-					if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
-						rcUser.PasswordHash = ""
-						user = rcUser
+			req, reqErr := http.NewRequest(http.MethodGet, url, nil)
+			if reqErr != nil {
+				log.Printf("[SSO] Failed to build RentalCore user request: %v", reqErr)
+			} else {
+				req.Header.Set("Accept", "application/json")
+				if k := os.Getenv("RENTALCORE_API_KEY"); k != "" {
+					req.Header.Set("X-API-Key", k)
+				}
+				client := &http.Client{Timeout: 5 * time.Second}
+				resp, err := client.Do(req)
+				if err == nil && resp != nil {
+					defer resp.Body.Close()
+					if resp.StatusCode == http.StatusOK {
+						body, _ := io.ReadAll(resp.Body)
+						var rcUser models.User
+						if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
+							rcUser.PasswordHash = ""
+							user = rcUser
+						}
 					}
 				}
 			}
