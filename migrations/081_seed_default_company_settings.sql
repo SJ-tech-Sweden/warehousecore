@@ -1,4 +1,4 @@
--- Migration 079: Ensure a default company_settings row exists
+-- Migration 081: Ensure a default company_settings row exists
 -- Idempotent: inserts only when company_settings is empty
 
 BEGIN;

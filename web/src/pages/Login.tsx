@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
+import { fetchPublicCompanyName, getInitialCompanyName } from '../lib/publicConfig';
 
 export function Login() {
   const { t } = useTranslation();
@@ -13,25 +14,14 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [companyName, setCompanyName] = useState<string>(
-    (window as any).__APP_CONFIG__?.companyName || 'WarehouseCore'
-  );
+  const [companyName, setCompanyName] = useState<string>(getInitialCompanyName());
 
   useEffect(() => {
-    const normalize = (value: unknown): string => {
-      if (typeof value !== 'string') return '';
-      return value.trim();
-    };
-
-    fetch('/api/v1/config', { credentials: 'include' })
-      .then(res => (res.ok ? res.json() : null))
-      .then(publicCfg => {
-        const name = normalize(publicCfg?.companyName) || normalize(publicCfg?.company_name);
-        if (name) {
-          setCompanyName(name);
-        }
-      })
-      .catch(() => {});
+    fetchPublicCompanyName().then((name) => {
+      if (name) {
+        setCompanyName(name);
+      }
+    });
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {

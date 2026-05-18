@@ -65,6 +65,13 @@ var errDBUnavailable = errors.New("database unavailable")
 // admin keys.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Trust pre-authenticated users injected by trusted upstream middleware
+		// (e.g. SSOMiddleware) in the same server chain.
+		if existingUser, ok := GetUserFromContext(r); ok && existingUser.UserID != 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// Debug: Log cookie metadata only (never cookie values).
 		authDebugLog("DEBUG [WarehouseCore]: AuthMiddleware - Path: %s, CookieCount: %d, CookieHeader: %s",
 			r.URL.Path, len(r.Cookies()), redactCookieHeader(r.Header.Get("Cookie")))

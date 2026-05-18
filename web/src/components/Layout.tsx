@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
+import { fetchPublicCompanyName, getInitialCompanyName } from '../lib/publicConfig';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,25 +18,14 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const { t } = useTranslation();
-  const [companyName, setCompanyName] = useState<string>(
-    (window as any).__APP_CONFIG__?.companyName || 'WarehouseCore'
-  );
+  const [companyName, setCompanyName] = useState<string>(getInitialCompanyName());
 
   useEffect(() => {
-    const normalize = (value: unknown): string => {
-      if (typeof value !== 'string') return '';
-      return value.trim();
-    };
-
-    fetch('/api/v1/config', { credentials: 'include' })
-      .then(res => (res.ok ? res.json() : null))
-      .then(publicCfg => {
-        const name = normalize(publicCfg?.companyName) || normalize(publicCfg?.company_name);
-        if (name) {
-          setCompanyName(name);
-        }
-      })
-      .catch(() => {});
+    fetchPublicCompanyName().then((name) => {
+      if (name) {
+        setCompanyName(name);
+      }
+    });
   }, []);
 
   useEffect(() => {

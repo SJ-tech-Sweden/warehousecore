@@ -14,7 +14,7 @@ func isForwardMigrationFile(name string) bool {
 		return false
 	}
 	lower := strings.ToLower(name)
-	if strings.Contains(lower, ".down.") || strings.HasSuffix(lower, ".down.sql") {
+	if strings.Contains(lower, ".down.") || strings.HasSuffix(lower, ".down.sql") || strings.HasSuffix(lower, "_down.sql") {
 		return false
 	}
 	return true
