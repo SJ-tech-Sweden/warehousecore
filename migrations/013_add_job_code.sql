@@ -5,9 +5,17 @@ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'jobs') THEN
     EXECUTE 'ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_code VARCHAR(16)';
 
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'jobid') THEN
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'jobs' AND table_schema = current_schema() AND column_name = 'jobid'
+    ) THEN
       ref_col := 'jobid';
-    ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'jobs' AND column_name = 'id') THEN
+    ELSIF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'jobs' AND table_schema = current_schema() AND column_name = 'id'
+    ) THEN
       ref_col := 'id';
     END IF;
 
@@ -16,6 +24,8 @@ BEGIN
         'UPDATE jobs SET job_code = ''JOB'' || LPAD((%I)::text, 6, ''0'') WHERE job_code IS NULL OR job_code = ''''''',
         ref_col
       );
+    ELSE
+      RAISE WARNING 'Migration 013: jobs table missing jobid/id column in current schema; job_code backfill skipped';
     END IF;
 
     EXECUTE 'ALTER TABLE jobs ALTER COLUMN job_code TYPE VARCHAR(16)';
