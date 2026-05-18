@@ -521,22 +521,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Insert user
 	now := time.Now()
-	res := db.Exec(`INSERT INTO users (username, email, password_hash, first_name, last_name, is_active, force_password_change, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		payload.Username, payload.Email, string(hash), payload.FirstName, payload.LastName, true, force, now, now)
-	if res.Error != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": res.Error.Error()})
-		return
-	}
-
-	// Get created user id
 	var userID uint
-	// Try to query by username
-	var user models.User
-	if err := db.Where("username = ?", payload.Username).First(&user).Error; err != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load created user"})
+	if err := db.Raw(`INSERT INTO users (username, email, password_hash, first_name, last_name, is_active, force_password_change, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING userid`,
+		payload.Username, payload.Email, string(hash), payload.FirstName, payload.LastName, true, force, now, now).Scan(&userID).Error; err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	userID = user.UserID
 
 	// Create profile
 	adminSvc := services.NewAdminService()

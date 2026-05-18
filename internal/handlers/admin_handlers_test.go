@@ -89,13 +89,8 @@ func TestCreateUser_Success(t *testing.T) {
 	mock.ExpectQuery(`SELECT 1 FROM users WHERE email`).WillReturnRows(sqlmock.NewRows([]string{"?column?"}))
 
 	// Expect INSERT INTO users ... RETURNING userid
-	mock.ExpectExec(`INSERT INTO users`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
-
-	// Then Select user by username
-	userRow := sqlmock.NewRows([]string{"userid", "username", "email", "password_hash", "first_name", "last_name", "is_active"}).AddRow(42, "jdoe", "jdoe@example.com", "hash", "John", "Doe", true)
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE username = $1 ORDER BY "users"."userid" LIMIT $2`)).
-		WithArgs("jdoe", sqlmock.AnyArg()).
-		WillReturnRows(userRow)
+	mock.ExpectQuery(`INSERT INTO users`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"userid"}).AddRow(42))
 
 	// User profile check - return no rows so insert happens
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "user_profiles" WHERE user_id = $1 ORDER BY "user_profiles"."id" LIMIT $2`)).
