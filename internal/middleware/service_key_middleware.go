@@ -23,13 +23,13 @@ func ServiceKeyMiddleware(next http.Handler) http.Handler {
 			json.NewEncoder(w).Encode(map[string]string{"error": msg}) //nolint:errcheck
 		}
 
-		if incoming == "" {
-			writeError(http.StatusUnauthorized, "missing API key")
+		if expected == "" {
+			writeError(http.StatusServiceUnavailable, "service API key not configured")
 			return
 		}
 
-		if expected == "" {
-			writeError(http.StatusServiceUnavailable, "service API key not configured")
+		if incoming == "" {
+			writeError(http.StatusUnauthorized, "missing API key")
 			return
 		}
 

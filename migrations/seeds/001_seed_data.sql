@@ -4,25 +4,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS public.seed_marker (name text PRIMARY KEY, applied_at timestamptz DEFAULT now());
 INSERT INTO public.seed_marker (name) VALUES ('initial_seed') ON CONFLICT DO NOTHING;
 
--- API key for inter-service calls (handle schema variants: `api_key_hash` or legacy `key_hash`)
-DO $$
-BEGIN
-	IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'api_keys' AND column_name = 'api_key_hash') THEN
-		EXECUTE $q$
-			INSERT INTO api_keys (id, name, api_key_hash, created_at)
-			VALUES (1, 'rentalcore-internal', md5('rentalcore-internal-key'), NOW())
-			ON CONFLICT DO NOTHING;
-		$q$;
-	ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'api_keys' AND column_name = 'key_hash') THEN
-		EXECUTE $q$
-			INSERT INTO api_keys (id, name, key_hash, created_at)
-			VALUES (1, 'rentalcore-internal', md5('rentalcore-internal-key'), NOW())
-			ON CONFLICT DO NOTHING;
-		$q$;
-	ELSE
-		RAISE NOTICE 'Skipping api_keys seed: no recognized hash column present';
-	END IF;
-END$$;
+-- Inter-service API keys are configured via SERVICE_API_KEY (env), not seeded.
 
 -- Products (handle optional `created_at` column)
 DO $$

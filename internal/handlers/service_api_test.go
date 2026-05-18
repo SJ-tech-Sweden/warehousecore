@@ -115,6 +115,19 @@ func TestServiceAPI_MissingServiceKeyConfig_Returns503(t *testing.T) {
 	}
 }
 
+func TestServiceAPI_MissingServiceKeyConfig_WithoutHeader_Returns503(t *testing.T) {
+	withServiceAPIKey(t, "")
+	router := serviceRouter()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/service/products", nil)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when SERVICE_API_KEY is unset even without header, got %d", rr.Code)
+	}
+}
+
 // TestServiceAPI_Routes_NotFoundWithoutAuth checks that an unknown path under
 // the service prefix is not registered as a route in the router. Uses
 // router.Match directly to avoid relying on status codes, which can be

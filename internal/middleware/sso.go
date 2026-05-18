@@ -85,7 +85,10 @@ func parseAndVerifyJWT(tokenStr string, key []byte) (*ssoClaims, error) {
 		return nil, err
 	}
 
-	if claims.Exp != 0 && time.Now().Unix() > claims.Exp {
+	if claims.Exp == 0 {
+		return nil, fmt.Errorf("token missing exp")
+	}
+	if time.Now().Unix() > claims.Exp {
 		return nil, fmt.Errorf("token expired")
 	}
 

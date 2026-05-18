@@ -61,7 +61,7 @@ func Load() (*Config, error) {
 			Port:     getEnv("DB_PORT", "5432"),
 			Name:     getEnv("DB_NAME", "warehousecore"),
 			User:     getEnv("DB_USER", "warehousecore"),
-			Password: getEnv("DB_PASSWORD", "warehousecore123"),
+			Password: getEnv("DB_PASSWORD", ""),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		App: AppConfig{

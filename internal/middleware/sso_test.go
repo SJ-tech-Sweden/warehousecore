@@ -26,7 +26,7 @@ func signHS256(claims ssoClaims, key []byte) (string, error) {
 }
 
 func TestSSOMiddleware_CookieCreatesUserContext(t *testing.T) {
-	os.Setenv("SSO_JWT_SECRET", "test-secret-ss0")
+	os.Setenv("SSO_JWT_SECRET", "test-secret-sso")
 	defer os.Unsetenv("SSO_JWT_SECRET")
 
 	claims := ssoClaims{
@@ -91,6 +91,39 @@ func TestSSOMiddleware_DoesNotAuthenticateWithoutSigningKey(t *testing.T) {
 		Iat:      time.Now().Unix(),
 	}
 	s, err := signHS256(claims, []byte(""))
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_token", Value: s})
+	rr := httptest.NewRecorder()
+
+	handler := SSOMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := GetUserFromContext(r)
+		if ok && user != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+}
+
+func TestSSOMiddleware_TokenWithoutExpIsRejected(t *testing.T) {
+	os.Setenv("SSO_JWT_SECRET", "test-secret-sso")
+	defer os.Unsetenv("SSO_JWT_SECRET")
+
+	claims := ssoClaims{
+		UserID:   456,
+		Username: "no-exp",
+		Iat:      time.Now().Unix(),
+	}
+	s, err := signHS256(claims, ssoSigningKey())
 	if err != nil {
 		t.Fatalf("failed to sign token: %v", err)
 	}
