@@ -157,7 +157,6 @@ func SSOMiddleware(next http.Handler) http.Handler {
 			var dbUser models.User
 			result := db.Where("userid = ? AND is_active = ?", claims.UserID, true).Limit(1).Find(&dbUser)
 			if result.Error == nil && result.RowsAffected > 0 {
-				dbUser.PasswordHash = ""
 				user = dbUser
 				localUserLoaded = true
 			}
@@ -185,7 +184,6 @@ func SSOMiddleware(next http.Handler) http.Handler {
 						} else {
 							var rcUser models.User
 							if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
-								rcUser.PasswordHash = ""
 								user = rcUser
 							}
 						}

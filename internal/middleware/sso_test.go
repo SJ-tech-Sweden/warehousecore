@@ -10,6 +10,12 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+
+	"warehousecore/internal/repository"
 )
 
 func signHS256(claims ssoClaims, key []byte) (string, error) {
@@ -144,5 +150,74 @@ func TestSSOMiddleware_TokenWithoutExpIsRejected(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+}
+
+func TestSSOMiddleware_PreservesPasswordHashFromDBUser(t *testing.T) {
+	os.Setenv("SSO_JWT_SECRET", "test-secret-sso")
+	defer os.Unsetenv("SSO_JWT_SECRET")
+
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
+		DriverName:           "sqlmock",
+		Conn:                 sqlDB,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{})
+	if err != nil {
+		sqlDB.Close()
+		t.Fatalf("failed to create gorm db: %v", err)
+	}
+	restore := repository.WithTestDatabases(nil, gormDB)
+	defer func() {
+		restore()
+		sqlDB.Close()
+	}()
+
+	claims := ssoClaims{
+		UserID:   99,
+		Username: "alice",
+		Exp:      time.Now().Add(1 * time.Hour).Unix(),
+		Iat:      time.Now().Unix(),
+	}
+	s, err := signHS256(claims, ssoSigningKey())
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	now := time.Now()
+	mock.ExpectQuery(`SELECT \* FROM "users" WHERE userid = \$1 AND is_active = \$2 LIMIT \$3`).
+		WithArgs(claims.UserID, true, 1).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"userid", "username", "email", "password_hash", "first_name", "last_name", "is_admin", "is_active", "force_password_change", "created_at", "updated_at", "last_login",
+		}).AddRow(
+			claims.UserID, "alice", "alice@example.com", "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", "Alice", "User", false, true, false, now, now, nil,
+		))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_token", Value: s})
+	rr := httptest.NewRecorder()
+
+	handler := SSOMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := GetUserFromContext(r)
+		if !ok || user == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if user.PasswordHash == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations not met: %v", err)
 	}
 }

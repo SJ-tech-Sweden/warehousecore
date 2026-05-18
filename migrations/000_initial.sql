@@ -34,8 +34,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS api_keys (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  key_hash VARCHAR(255) NOT NULL,
+  api_key_hash CHAR(64) NOT NULL,
   is_active BOOLEAN DEFAULT TRUE,
+  is_admin BOOLEAN DEFAULT FALSE,
+  last_used_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -93,26 +95,6 @@ CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 CREATE INDEX IF NOT EXISTS idx_devices_product ON devices(productID);
 CREATE INDEX IF NOT EXISTS idx_devices_zone ON devices(zone_id);
 
--- Ensure api_keys.key_hash is populated via trigger using md5 (simple)
-CREATE OR REPLACE FUNCTION sync_api_key_hashes() RETURNS TRIGGER AS $$
-BEGIN
-  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-    IF NEW.key_hash IS NULL OR NEW.key_hash = '' THEN
-      -- If caller provided a plain key in a transient column 'key', hash it
-      IF TG_OP = 'INSERT' AND NEW.key_hash IS NULL THEN
-        -- no-op (expect callers to set key_hash explicitly), but keep for safety
-        NEW.key_hash := md5(COALESCE(NEW.name, '') || NOW()::text || FLOOR(RANDOM()*1000000)::text);
-      END IF;
-    END IF;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_sync_api_key_hashes ON api_keys;
-CREATE TRIGGER trg_sync_api_key_hashes
-BEFORE INSERT OR UPDATE ON api_keys
-FOR EACH ROW EXECUTE FUNCTION sync_api_key_hashes();
+-- API key hashes are generated in application code (HMAC-SHA256 via HashAPIKey).
 
 COMMIT;
-
