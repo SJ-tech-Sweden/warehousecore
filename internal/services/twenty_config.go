@@ -140,8 +140,11 @@ func BootstrapTwentyFromEnv() {
 }
 
 // twentyBaseURLFromEnv resolves the base URL from supported aliases.
-// Precedence follows legacy-to-current compatibility order and returns the first non-empty value:
-// TWENTY_BASE_URL, TWENTY_URL, TWENTY_SERVER_URL, TWENTY_GRAPHQL_URL.
+// Precedence returns the first non-empty value and prefers the canonical key first:
+// 1) TWENTY_BASE_URL (preferred), then legacy/compat aliases
+// 2) TWENTY_URL
+// 3) TWENTY_SERVER_URL
+// 4) TWENTY_GRAPHQL_URL
 func twentyBaseURLFromEnv() string {
 	for _, key := range []string{"TWENTY_BASE_URL", "TWENTY_URL", "TWENTY_SERVER_URL", "TWENTY_GRAPHQL_URL"} {
 		if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
@@ -152,8 +155,10 @@ func twentyBaseURLFromEnv() string {
 }
 
 // twentyAPIKeyFromEnv resolves the API key/token from supported aliases.
-// Precedence returns the first non-empty value:
-// TWENTY_API_KEY, TWENTY_ACCESS_TOKEN, TWENTY_TOKEN.
+// Precedence returns the first non-empty value and prefers the canonical key first:
+// 1) TWENTY_API_KEY (preferred), then legacy/compat aliases
+// 2) TWENTY_ACCESS_TOKEN
+// 3) TWENTY_TOKEN
 func twentyAPIKeyFromEnv() string {
 	for _, key := range []string{"TWENTY_API_KEY", "TWENTY_ACCESS_TOKEN", "TWENTY_TOKEN"} {
 		if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
