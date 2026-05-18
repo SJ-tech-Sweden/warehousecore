@@ -94,7 +94,6 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 				return err
 			}
 			if err := tx.Commit(); err != nil {
-				_ = tx.Rollback()
 				return err
 			}
 		}

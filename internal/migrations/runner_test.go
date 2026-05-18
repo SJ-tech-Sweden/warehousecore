@@ -60,7 +60,7 @@ func TestApplyMigrations_SelfManagedTransactionExecutesWithoutWrapperTx(t *testi
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM schema_migrations WHERE name = \$1\)`).
 		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-	mock.ExpectExec(`BEGIN;`).
+	mock.ExpectExec(`BEGIN;\s*SELECT 1;\s*COMMIT;\s*`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`INSERT INTO schema_migrations \(name\) VALUES \(\$1\)`).
 		WithArgs(name).
