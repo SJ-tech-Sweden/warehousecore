@@ -55,6 +55,12 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 	}
 	movementColumnsCache.mu.RUnlock()
 
+	movementColumnsCache.mu.Lock()
+	defer movementColumnsCache.mu.Unlock()
+	if movementColumnsCache.cols != nil {
+		return cloneMovementColumnsMap(movementColumnsCache.cols), nil
+	}
+
 	rows, err := tx.Query(`
 		SELECT column_name
 		FROM information_schema.columns
@@ -84,13 +90,13 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 		return nil, err
 	}
 
-	movementColumnsCache.mu.Lock()
 	movementColumnsCache.cols = cloneMovementColumnsMap(available)
-	movementColumnsCache.mu.Unlock()
 
-	return available, nil
+	return cloneMovementColumnsMap(movementColumnsCache.cols), nil
 }
 
+// cloneMovementColumnsMap returns a defensive copy so callers cannot mutate
+// the cached map shared across concurrent requests.
 func cloneMovementColumnsMap(in map[string]bool) map[string]bool {
 	out := make(map[string]bool, len(in))
 	for k, v := range in {
