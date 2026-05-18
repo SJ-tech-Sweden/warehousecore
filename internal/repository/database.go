@@ -28,6 +28,15 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
+func closeSQLDBWithLog(sqlDB *sql.DB, reason string) {
+	if sqlDB == nil {
+		return
+	}
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("failed to close database after %s: %v", reason, err)
+	}
+}
+
 // DB holds the database connection pool (sql.DB)
 var DB *sql.DB
 
@@ -53,6 +62,7 @@ func InitDatabase(cfg *config.Config) error {
 
 	// Test connection
 	if err := sqlDB.Ping(); err != nil {
+		closeSQLDBWithLog(sqlDB, "failed ping")
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -77,12 +87,16 @@ func InitDatabase(cfg *config.Config) error {
 		absDir, _ := filepath.Abs(migrationsDir)
 		log.Printf("Running SQL migrations from %s", absDir)
 		if err := migrations.ApplyMigrations(sqlDB, migrationsDir); err != nil {
+			closeSQLDBWithLog(sqlDB, "failed migrations")
+			DB = nil
 			return fmt.Errorf("apply migrations: %w", err)
 		}
 		// Apply all seeds in migrations/seeds. Seed files are expected to be
 		// idempotent so they are safe to execute on populated databases.
 		seedsDir := filepath.Join(migrationsDir, "seeds")
 		if err := migrations.ApplySeeds(sqlDB, seedsDir); err != nil {
+			closeSQLDBWithLog(sqlDB, "failed seeds")
+			DB = nil
 			return fmt.Errorf("apply seeds: %w", err)
 		}
 		log.Println("Migrations and startup seeds applied")
@@ -96,6 +110,8 @@ func InitDatabase(cfg *config.Config) error {
 		Logger:                 logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
+		closeSQLDBWithLog(sqlDB, "failed gorm initialization")
+		DB = nil
 		return fmt.Errorf("failed to initialize GORM: %w", err)
 	}
 

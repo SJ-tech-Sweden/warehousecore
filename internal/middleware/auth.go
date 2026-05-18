@@ -46,6 +46,13 @@ func redactCookieHeader(cookieHeader string) string {
 	return fmt.Sprintf("<redacted:%d-bytes>", len(cookieHeader))
 }
 
+func redactSessionID(sessionID string) string {
+	if strings.TrimSpace(sessionID) == "" {
+		return "<none>"
+	}
+	return fmt.Sprintf("<redacted:%d-chars>", len(sessionID))
+}
+
 // errDBUnavailable is returned by authenticate helpers when the database
 // connection is nil or unreachable so the middleware can map it to HTTP 500.
 var errDBUnavailable = errors.New("database unavailable")
@@ -148,7 +155,7 @@ func authenticateSession(cookieValue string) (*models.User, error) {
 		return nil, nil // bad cookie value – not a DB error
 	}
 
-	authDebugLog("DEBUG [WarehouseCore]: Found %s cookie (decoded: %s)", SessionCookieName(), sessionID)
+	authDebugLog("DEBUG [WarehouseCore]: Found %s cookie (decoded: %s)", SessionCookieName(), redactSessionID(sessionID))
 
 	db := repository.GetDB()
 	if db == nil {
@@ -161,11 +168,11 @@ func authenticateSession(cookieValue string) (*models.User, error) {
 		First(&session).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			authDebugLog("DEBUG [WarehouseCore]: Session not found for %s", sessionID)
+			authDebugLog("DEBUG [WarehouseCore]: Session not found for %s", redactSessionID(sessionID))
 			return nil, nil // credential mismatch
 		}
 		// Actual DB error (connection lost, etc.)
-		authDebugLog("DEBUG [WarehouseCore]: Session query error for %s: %v", sessionID, err)
+		authDebugLog("DEBUG [WarehouseCore]: Session query error for %s: %v", redactSessionID(sessionID), err)
 		return nil, fmt.Errorf("session query: %w", err)
 	}
 

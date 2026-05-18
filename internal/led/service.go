@@ -788,9 +788,6 @@ func (s *Service) getProductRequirementZonesWithCounts(jobID string) (zoneCounts
 
 func rentalCoreBaseURL() string {
 	base := strings.TrimRight(strings.TrimSpace(os.Getenv("RENTALCORE_BASE_URL")), "/")
-	if base == "" {
-		return "http://rentalcore:8080"
-	}
 	return base
 }
 

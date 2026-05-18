@@ -287,8 +287,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 
 	// optional columns
 	// first_name
-	var exists int
-	_ = s.db.Raw("SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='first_name'").Scan(&exists)
+	exists := s.userColumnExists("first_name")
 	if exists == 1 {
 		cols = append(cols, "first_name")
 		placeholders = append(placeholders, "?")
@@ -296,8 +295,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	}
 
 	// last_name
-	exists = 0
-	_ = s.db.Raw("SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='last_name'").Scan(&exists)
+	exists = s.userColumnExists("last_name")
 	if exists == 1 {
 		cols = append(cols, "last_name")
 		placeholders = append(placeholders, "?")
@@ -305,8 +303,7 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	}
 
 	// force_password_change
-	exists = 0
-	_ = s.db.Raw("SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='force_password_change'").Scan(&exists)
+	exists = s.userColumnExists("force_password_change")
 	if exists == 1 {
 		cols = append(cols, "force_password_change")
 		placeholders = append(placeholders, "?")
@@ -354,4 +351,13 @@ func (s *RBACService) EnsureDefaultAdminFromEnv() error {
 	log.Printf("[RBAC] Seeded admin user '%s'", username)
 
 	return nil
+}
+
+func (s *RBACService) userColumnExists(column string) int {
+	var exists int
+	if err := s.db.Raw("SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name='users' AND column_name=?", column).Scan(&exists).Error; err != nil {
+		log.Printf("[RBAC] WARNING: failed to check users.%s column existence: %v", column, err)
+		return 0
+	}
+	return exists
 }
