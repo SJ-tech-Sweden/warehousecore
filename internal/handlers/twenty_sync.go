@@ -97,8 +97,32 @@ func syncProductsToTwenty(ctx context.Context) (twentySyncCounters, error) {
 	counts := twentySyncCounters{}
 
 	db := repository.GetSQLDB()
+
+	// Check whether product_locations table exists; fall back to 0 for accessories/consumables if not.
+	var plExists bool
+	_ = db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = current_schema() AND table_name = 'product_locations'
+		)`).Scan(&plExists)
+
+	stockExpr := `COALESCE((SELECT COUNT(*) FROM devices d WHERE d.productid = p.productid), 0)`
+	if plExists {
+		stockExpr = `CASE
+				WHEN COALESCE(p.is_consumable, false) = true OR COALESCE(p.is_accessory, false) = true THEN
+					COALESCE((SELECT SUM(pl.quantity) FROM product_locations pl WHERE pl.product_id = p.productid), 0)
+				ELSE
+					COALESCE((SELECT COUNT(*) FROM devices d WHERE d.productid = p.productid), 0)
+			END`
+	}
+
 	rows, qErr := db.QueryContext(ctx, `
-		SELECT p.productid, p.name, COALESCE(c.name, '') AS category_name, COALESCE(p.itemcostperday, 0), COALESCE(p.stock_quantity, 0)
+		SELECT
+			p.productid,
+			p.name,
+			COALESCE(c.name, '') AS category_name,
+			COALESCE(p.itemcostperday, 0),
+			`+stockExpr+` AS stock_quantity
 		FROM products p
 		LEFT JOIN categories c ON c.categoryid = p.categoryid
 		ORDER BY p.productid

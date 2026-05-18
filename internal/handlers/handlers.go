@@ -1819,52 +1819,154 @@ func GetZoneByBarcode(w http.ResponseWriter, r *http.Request) {
 
 // GetJobs returns jobs filtered by status
 func GetJobs(w http.ResponseWriter, r *http.Request) {
-	if proxyTwentyJobs(w, r) {
-		return
-	}
+	forceLocal := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("source")), "local")
+	if !forceLocal {
+		if proxyTwentyJobs(w, r) {
+			return
+		}
 
-	if proxyRentalCoreServiceGET(w, r, "/api/v1/service/jobs") {
-		return
+		if proxyRentalCoreServiceGET(w, r, "/api/v1/service/jobs") {
+			return
+		}
 	}
 
 	status := r.URL.Query().Get("status")
 
 	db := repository.GetSQLDB()
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("Error loading jobs schema: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load jobs"})
+		return
+	}
+
+	jobPKExpr := "j.jobid"
+	if !jobCols["jobid"] && jobCols["id"] {
+		jobPKExpr = "j.id"
+	}
+	if !jobCols["jobid"] && !jobCols["id"] {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs primary key column is missing"})
+		return
+	}
+
+	statusCols, _ := getTableColumnsForDB(db, "status")
+	hasStatusJoin := jobCols["statusid"] && statusCols["statusid"] && statusCols["status"]
+
+	customersCols, _ := getTableColumnsForDB(db, "customers")
+	hasCustomersJoin := jobCols["customerid"] && customersCols["customerid"]
+
+	jobDevicesCols, _ := getTableColumnsForDB(db, "jobdevices")
+	hasJobDevices := jobDevicesCols["jobid"] && jobDevicesCols["deviceid"]
+
+	jobReqCols, _ := getTableColumnsForDB(db, "job_product_requirements")
+	hasJobRequirements := jobReqCols["job_id"]
+
+	jobCodeExpr := fmt.Sprintf("CONCAT('JOB', LPAD(CAST(%s AS TEXT), 6, '0'))", jobPKExpr)
+	if jobCols["job_code"] {
+		jobCodeExpr = fmt.Sprintf("COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(%s AS TEXT), 6, '0')))", jobPKExpr)
+	}
+
+	descriptionExpr := "NULL::text"
+	if jobCols["description"] {
+		descriptionExpr = "j.description"
+	}
+
+	startDateExpr := "NULL::text"
+	if jobCols["startdate"] {
+		startDateExpr = "j.startdate"
+	}
+
+	endDateExpr := "NULL::text"
+	if jobCols["enddate"] {
+		endDateExpr = "j.enddate"
+	}
+
+	statusExpr := "'open'"
+	statusFilterExpr := "'open'"
+	if hasStatusJoin {
+		statusExpr = "COALESCE(s.status, 'open')"
+		statusFilterExpr = "COALESCE(s.status, 'open')"
+	} else if jobCols["status"] {
+		statusExpr = "COALESCE(j.status, 'open')"
+		statusFilterExpr = "COALESCE(j.status, 'open')"
+	}
+
+	customerIDExpr := "NULL::bigint"
+	if jobCols["customerid"] {
+		customerIDExpr = "j.customerid"
+	}
+
+	statusIDExpr := "NULL::bigint"
+	if jobCols["statusid"] {
+		statusIDExpr = "j.statusid"
+	}
+
+	customerFirstExpr := "''"
+	customerLastExpr := "''"
+	if hasCustomersJoin {
+		if customersCols["firstname"] {
+			customerFirstExpr = "COALESCE(c.firstname, '')"
+		}
+		if customersCols["lastname"] {
+			customerLastExpr = "COALESCE(c.lastname, '')"
+		}
+	}
+
+	deviceCountExpr := "0"
+	if hasJobDevices {
+		deviceCountExpr = "COALESCE(dc.device_count, 0)"
+	}
+
+	requirementsCountExpr := "0"
+	if hasJobRequirements {
+		requirementsCountExpr = "COALESCE(rc.requirements_count, 0)"
+	}
+
 	qb := NewQueryBuilder()
-	query := `
-		SELECT j.jobid,
-		       COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.jobid AS TEXT), 6, '0'))) AS job_code,
-		       j.description, j.startdate, j.enddate, COALESCE(s.status, 'open') AS status,
-		       COALESCE(c.firstname, '') as customer_first_name,
-		       COALESCE(c.lastname, '') as customer_last_name,
-		       COALESCE(dc.device_count, 0) as device_count,
-		       COALESCE(rc.requirements_count, 0) as requirements_count
+	query := fmt.Sprintf(`
+		SELECT %s,
+		       %s AS job_code,
+		       %s, %s, %s, %s AS status,
+		       %s,
+		       %s,
+		       %s as customer_first_name,
+		       %s as customer_last_name,
+		       %s as device_count,
+		       %s as requirements_count
 		FROM jobs j
-		LEFT JOIN status s ON j.statusid = s.statusid
-		LEFT JOIN customers c ON j.customerid = c.customerid
-		LEFT JOIN (
-		    SELECT jobid, COUNT(DISTINCT deviceid) as device_count
-		    FROM jobdevices
-		    GROUP BY jobid
-		) dc ON dc.jobid = j.jobid
-		LEFT JOIN (
-		    SELECT job_id, SUM(quantity) as requirements_count
-		    FROM job_product_requirements
-		    GROUP BY job_id
-		) rc ON rc.job_id = j.jobid
-		WHERE 1=1`
+	`, jobPKExpr, jobCodeExpr, descriptionExpr, startDateExpr, endDateExpr, statusExpr,
+		customerIDExpr, statusIDExpr, customerFirstExpr, customerLastExpr, deviceCountExpr, requirementsCountExpr)
+
+	if hasStatusJoin {
+		query += "LEFT JOIN status s ON j.statusid = s.statusid\n"
+	}
+	if hasCustomersJoin {
+		query += "LEFT JOIN customers c ON j.customerid = c.customerid\n"
+	}
+	if hasJobDevices {
+		query += "LEFT JOIN (SELECT jobid, COUNT(DISTINCT deviceid) as device_count FROM jobdevices GROUP BY jobid) dc ON dc.jobid = " + jobPKExpr + "\n"
+	}
+	if hasJobRequirements {
+		query += "LEFT JOIN (SELECT job_id, SUM(quantity) as requirements_count FROM job_product_requirements GROUP BY job_id) rc ON rc.job_id = " + jobPKExpr + "\n"
+	}
+
+	query += "WHERE 1=1"
 
 	args := []interface{}{}
 	if status != "" {
 		if strings.EqualFold(status, "open") {
-			query += " AND (s.status IS NULL OR s.status NOT IN ('Completed', 'Invoiced', 'Cancelled'))"
+			query += " AND LOWER(" + statusFilterExpr + ") NOT IN ('completed', 'invoiced', 'cancelled')"
 		} else {
-			query += " AND LOWER(s.status) = LOWER(" + qb.NextPlaceholder() + ")"
+			query += " AND LOWER(" + statusFilterExpr + ") = LOWER(" + qb.NextPlaceholder() + ")"
 			args = append(args, status)
 		}
 	}
 
-	query += " ORDER BY j.startdate ASC"
+	if jobCols["startdate"] {
+		query += " ORDER BY j.startdate ASC"
+	} else {
+		query += " ORDER BY " + jobPKExpr + " DESC"
+	}
 
 	rows, err := db.Query(query, args...)
 	if err != nil {
@@ -1881,6 +1983,8 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 		StartDate         *string `json:"start_date,omitempty"`
 		EndDate           *string `json:"end_date,omitempty"`
 		Status            string  `json:"status"`
+		CustomerID        *int64  `json:"customer_id,omitempty"`
+		StatusID          *int64  `json:"status_id,omitempty"`
 		CustomerFirstName string  `json:"customer_first_name,omitempty"`
 		CustomerLastName  string  `json:"customer_last_name,omitempty"`
 		DeviceCount       int     `json:"device_count"`
@@ -1891,8 +1995,10 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var j JobResponse
 		var description, startDate, endDate sql.NullString
+		var customerID, statusID sql.NullInt64
 
 		if err := rows.Scan(&j.JobID, &j.JobCode, &description, &startDate, &endDate, &j.Status,
+			&customerID, &statusID,
 			&j.CustomerFirstName, &j.CustomerLastName, &j.DeviceCount, &j.RequirementsCount); err != nil {
 			log.Printf("Error scanning job row: %v", err)
 			continue
@@ -1906,6 +2012,14 @@ func GetJobs(w http.ResponseWriter, r *http.Request) {
 		}
 		if endDate.Valid {
 			j.EndDate = &endDate.String
+		}
+		if customerID.Valid {
+			v := customerID.Int64
+			j.CustomerID = &v
+		}
+		if statusID.Valid {
+			v := statusID.Int64
+			j.StatusID = &v
 		}
 
 		jobs = append(jobs, j)
@@ -1923,33 +2037,115 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if proxyTwentyJobSummaryWithLocalDevices(w, r, jobID) {
-		return
-	}
+	forceLocal := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("source")), "local")
+	if !forceLocal {
+		if proxyTwentyJobSummaryWithLocalDevices(w, r, jobID) {
+			return
+		}
 
-	if proxyRentalCoreJobSummaryWithLocalNames(w, r, jobID) {
-		return
+		if proxyRentalCoreJobSummaryWithLocalNames(w, r, jobID) {
+			return
+		}
 	}
 
 	db := repository.GetSQLDB()
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("Error loading jobs schema for summary: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load job"})
+		return
+	}
+
+	jobPKCol := "jobid"
+	if !jobCols["jobid"] && jobCols["id"] {
+		jobPKCol = "id"
+	}
+	if !jobCols["jobid"] && !jobCols["id"] {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs primary key column is missing"})
+		return
+	}
+
+	statusCols, _ := getTableColumnsForDB(db, "status")
+	hasStatusJoin := jobCols["statusid"] && statusCols["statusid"] && statusCols["status"]
+
+	customersCols, _ := getTableColumnsForDB(db, "customers")
+	hasCustomersJoin := jobCols["customerid"] && customersCols["customerid"]
+
+	jobCodeExpr := fmt.Sprintf("CONCAT('JOB', LPAD(CAST(j.%s AS TEXT), 6, '0'))", jobPKCol)
+	if jobCols["job_code"] {
+		jobCodeExpr = fmt.Sprintf("COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.%s AS TEXT), 6, '0')))", jobPKCol)
+	}
+
+	descriptionExpr := "NULL::text"
+	if jobCols["description"] {
+		descriptionExpr = "j.description"
+	}
+
+	startDateExpr := "NULL::text"
+	if jobCols["startdate"] {
+		startDateExpr = "j.startdate"
+	}
+
+	endDateExpr := "NULL::text"
+	if jobCols["enddate"] {
+		endDateExpr = "j.enddate"
+	}
+
+	statusExpr := "'open'"
+	if hasStatusJoin {
+		statusExpr = "COALESCE(s.status, 'open')"
+	} else if jobCols["status"] {
+		statusExpr = "COALESCE(j.status, 'open')"
+	}
+
+	customerIDExpr := "NULL::bigint"
+	if jobCols["customerid"] {
+		customerIDExpr = "j.customerid"
+	}
+
+	statusIDExpr := "NULL::bigint"
+	if jobCols["statusid"] {
+		statusIDExpr = "j.statusid"
+	}
+
+	customerFirstExpr := "''"
+	customerLastExpr := "''"
+	if hasCustomersJoin {
+		if customersCols["firstname"] {
+			customerFirstExpr = "COALESCE(c.firstname, '')"
+		}
+		if customersCols["lastname"] {
+			customerLastExpr = "COALESCE(c.lastname, '')"
+		}
+	}
 
 	var (
 		jobCode                             sql.NullString
 		description, startDate, endDate     sql.NullString
+		customerID, statusID                sql.NullInt64
 		status                              string
 		customerFirstName, customerLastName string
 	)
 
-	err = db.QueryRow(`
-		SELECT COALESCE(j.job_code, CONCAT('JOB', LPAD(CAST(j.jobid AS TEXT), 6, '0'))),
-		       j.description, j.startdate, j.enddate, COALESCE(s.status, 'open') AS status,
-		       COALESCE(c.firstname, '') as customer_first_name,
-		       COALESCE(c.lastname, '') as customer_last_name
+	query := fmt.Sprintf(`
+		SELECT %s,
+		       %s, %s, %s, %s AS status,
+		       %s, %s,
+		       %s as customer_first_name,
+		       %s as customer_last_name
 		FROM jobs j
-		LEFT JOIN status s ON j.statusid = s.statusid
-		LEFT JOIN customers c ON j.customerid = c.customerid
-		WHERE j.jobid = $1
-	`, jobID).Scan(&jobCode, &description, &startDate, &endDate, &status, &customerFirstName, &customerLastName)
+	`, jobCodeExpr, descriptionExpr, startDateExpr, endDateExpr, statusExpr, statusIDExpr, customerIDExpr, customerFirstExpr, customerLastExpr)
+
+	if hasStatusJoin {
+		query += "LEFT JOIN status s ON j.statusid = s.statusid\n"
+	}
+	if hasCustomersJoin {
+		query += "LEFT JOIN customers c ON j.customerid = c.customerid\n"
+	}
+
+	query += fmt.Sprintf("WHERE j.%s = $1", jobPKCol)
+
+	err = db.QueryRow(query, jobID).Scan(&jobCode, &description, &startDate, &endDate, &status, &statusID, &customerID, &customerFirstName, &customerLastName)
 
 	if err == sql.ErrNoRows {
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Job not found"})
@@ -2066,6 +2262,12 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 		"devices":              devices,
 		"product_requirements": productRequirements,
 	}
+	if customerID.Valid {
+		response["customer_id"] = customerID.Int64
+	}
+	if statusID.Valid {
+		response["status_id"] = statusID.Int64
+	}
 
 	if description.Valid {
 		response["description"] = description.String
@@ -2082,6 +2284,420 @@ func GetJobSummary(w http.ResponseWriter, r *http.Request) {
 
 func CompleteJob(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Job completed"})
+}
+
+func getTableColumnsForDB(db *sql.DB, tableName string) (map[string]bool, error) {
+	rows, err := db.Query(`
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = $1
+	`, tableName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols := make(map[string]bool)
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			return nil, err
+		}
+		cols[strings.ToLower(strings.TrimSpace(col))] = true
+	}
+
+	return cols, nil
+}
+
+func findOpenStatusID(db *sql.DB) (*int64, error) {
+	var statusID int64
+	err := db.QueryRow(`
+		SELECT statusid
+		FROM status
+		WHERE LOWER(COALESCE(status, '')) = 'open'
+		LIMIT 1
+	`).Scan(&statusID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &statusID, nil
+}
+
+// GetJobFormOptions returns customer and status options for job create/edit forms.
+func GetJobFormOptions(w http.ResponseWriter, r *http.Request) {
+	db := repository.GetSQLDB()
+
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("GetJobFormOptions jobs columns error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load job options"})
+		return
+	}
+
+	customers := []map[string]interface{}{}
+	if jobCols["customerid"] {
+		customerCols, err := getTableColumnsForDB(db, "customers")
+		if err == nil && customerCols["customerid"] {
+			rows, qErr := db.Query(`
+				SELECT customerid, COALESCE(firstname, ''), COALESCE(lastname, '')
+				FROM customers
+				ORDER BY lastname, firstname
+				LIMIT 1000
+			`)
+			if qErr == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var customerID int64
+					var firstName, lastName string
+					if scanErr := rows.Scan(&customerID, &firstName, &lastName); scanErr != nil {
+						continue
+					}
+					displayName := strings.TrimSpace(strings.TrimSpace(firstName) + " " + strings.TrimSpace(lastName))
+					if displayName == "" {
+						displayName = fmt.Sprintf("Customer %d", customerID)
+					}
+					customers = append(customers, map[string]interface{}{
+						"customer_id":  customerID,
+						"first_name":   firstName,
+						"last_name":    lastName,
+						"display_name": displayName,
+					})
+				}
+			}
+		}
+	}
+
+	statuses := []map[string]interface{}{}
+	var defaultStatusID *int64
+	if jobCols["statusid"] {
+		statusCols, err := getTableColumnsForDB(db, "status")
+		if err == nil && statusCols["statusid"] {
+			rows, qErr := db.Query(`
+				SELECT statusid, COALESCE(status, '')
+				FROM status
+				ORDER BY status
+			`)
+			if qErr == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var statusID int64
+					var statusName string
+					if scanErr := rows.Scan(&statusID, &statusName); scanErr != nil {
+						continue
+					}
+					if defaultStatusID == nil && strings.EqualFold(strings.TrimSpace(statusName), "open") {
+						copyID := statusID
+						defaultStatusID = &copyID
+					}
+					statuses = append(statuses, map[string]interface{}{
+						"status_id": statusID,
+						"name":      statusName,
+					})
+				}
+			}
+		}
+
+		if defaultStatusID == nil {
+			if openID, openErr := findOpenStatusID(db); openErr == nil {
+				defaultStatusID = openID
+			}
+		}
+	}
+
+	resp := map[string]interface{}{
+		"customers": customers,
+		"statuses":  statuses,
+	}
+	if defaultStatusID != nil {
+		resp["default_status_id"] = *defaultStatusID
+	}
+
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// CreateJob creates a new job record.
+func CreateJob(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		JobCode     string  `json:"job_code"`
+		Description *string `json:"description"`
+		StartDate   *string `json:"start_date"`
+		EndDate     *string `json:"end_date"`
+		CustomerID  *int64  `json:"customer_id"`
+		StatusID    *int64  `json:"status_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if strings.TrimSpace(req.JobCode) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "job_code is required"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("CreateJob columns error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to inspect jobs schema"})
+		return
+	}
+
+	if !jobCols["job_code"] {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs.job_code column is missing"})
+		return
+	}
+
+	insertCols := []string{"job_code"}
+	placeholders := []string{"$1"}
+	args := []interface{}{strings.TrimSpace(req.JobCode)}
+	nextArg := 2
+
+	if jobCols["description"] {
+		insertCols = append(insertCols, "description")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+		args = append(args, req.Description)
+		nextArg++
+	}
+	if jobCols["startdate"] {
+		insertCols = append(insertCols, "startdate")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+		args = append(args, req.StartDate)
+		nextArg++
+	}
+	if jobCols["enddate"] {
+		insertCols = append(insertCols, "enddate")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+		args = append(args, req.EndDate)
+		nextArg++
+	}
+	if jobCols["customerid"] && req.CustomerID != nil && *req.CustomerID > 0 {
+		insertCols = append(insertCols, "customerid")
+		placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+		args = append(args, *req.CustomerID)
+		nextArg++
+	}
+	if jobCols["statusid"] {
+		if req.StatusID != nil && *req.StatusID > 0 {
+			insertCols = append(insertCols, "statusid")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+			args = append(args, *req.StatusID)
+			nextArg++
+		} else if openStatusID, openErr := findOpenStatusID(db); openErr == nil && openStatusID != nil {
+			insertCols = append(insertCols, "statusid")
+			placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+			args = append(args, *openStatusID)
+			nextArg++
+		}
+	}
+
+	returningCol := ""
+	if jobCols["jobid"] {
+		returningCol = "jobid"
+	} else if jobCols["id"] {
+		returningCol = "id"
+	}
+	if returningCol == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs primary key column is missing"})
+		return
+	}
+
+	var jobID int64
+	query := fmt.Sprintf(
+		"INSERT INTO jobs (%s) VALUES (%s) RETURNING %s",
+		strings.Join(insertCols, ", "),
+		strings.Join(placeholders, ", "),
+		returningCol,
+	)
+	err = db.QueryRow(query, args...).Scan(&jobID)
+	if err != nil {
+		log.Printf("CreateJob error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to create job"})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"job_id":  jobID,
+		"message": "Job created successfully",
+	})
+}
+
+// UpdateJob updates an existing job.
+func UpdateJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobIDStr := vars["id"]
+	jobID, err := strconv.Atoi(jobIDStr)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid job ID"})
+		return
+	}
+
+	var req struct {
+		JobCode     string  `json:"job_code"`
+		Description *string `json:"description"`
+		StartDate   *string `json:"start_date"`
+		EndDate     *string `json:"end_date"`
+		CustomerID  *int64  `json:"customer_id"`
+		StatusID    *int64  `json:"status_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if strings.TrimSpace(req.JobCode) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "job_code is required"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("UpdateJob columns error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to inspect jobs schema"})
+		return
+	}
+
+	if !jobCols["job_code"] {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs.job_code column is missing"})
+		return
+	}
+
+	whereCol := ""
+	if jobCols["jobid"] {
+		whereCol = "jobid"
+	} else if jobCols["id"] {
+		whereCol = "id"
+	}
+	if whereCol == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs primary key column is missing"})
+		return
+	}
+
+	setClauses := []string{"job_code = $1"}
+	args := []interface{}{strings.TrimSpace(req.JobCode)}
+	nextArg := 2
+
+	if jobCols["description"] {
+		setClauses = append(setClauses, fmt.Sprintf("description = $%d", nextArg))
+		args = append(args, req.Description)
+		nextArg++
+	}
+	if jobCols["startdate"] {
+		setClauses = append(setClauses, fmt.Sprintf("startdate = $%d", nextArg))
+		args = append(args, req.StartDate)
+		nextArg++
+	}
+	if jobCols["enddate"] {
+		setClauses = append(setClauses, fmt.Sprintf("enddate = $%d", nextArg))
+		args = append(args, req.EndDate)
+		nextArg++
+	}
+	if jobCols["customerid"] {
+		if req.CustomerID != nil && *req.CustomerID > 0 {
+			setClauses = append(setClauses, fmt.Sprintf("customerid = $%d", nextArg))
+			args = append(args, *req.CustomerID)
+			nextArg++
+		} else if req.CustomerID != nil {
+			setClauses = append(setClauses, "customerid = NULL")
+		}
+	}
+	if jobCols["statusid"] && req.StatusID != nil {
+		if *req.StatusID > 0 {
+			setClauses = append(setClauses, fmt.Sprintf("statusid = $%d", nextArg))
+			args = append(args, *req.StatusID)
+			nextArg++
+		}
+	}
+	if jobCols["updated_at"] {
+		setClauses = append(setClauses, "updated_at = NOW()")
+	}
+
+	args = append(args, jobID)
+	query := fmt.Sprintf(
+		"UPDATE jobs SET %s WHERE %s = $%d",
+		strings.Join(setClauses, ", "),
+		whereCol,
+		nextArg,
+	)
+	result, err := db.Exec(query, args...)
+	if err != nil {
+		log.Printf("UpdateJob error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to update job"})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Job not found"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Job updated successfully"})
+}
+
+// DeleteJob deletes a job after verifying it has no assigned devices.
+func DeleteJob(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobIDStr := vars["id"]
+	jobID, err := strconv.Atoi(jobIDStr)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid job ID"})
+		return
+	}
+
+	db := repository.GetSQLDB()
+
+	var deviceCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM jobdevices WHERE jobid = $1", jobID).Scan(&deviceCount); err != nil {
+		log.Printf("DeleteJob check error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to check job devices"})
+		return
+	}
+	if deviceCount > 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error": fmt.Sprintf("Cannot delete job with %d device(s) assigned. Remove devices first.", deviceCount),
+		})
+		return
+	}
+
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("DeleteJob columns error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to inspect jobs schema"})
+		return
+	}
+
+	whereCol := ""
+	if jobCols["jobid"] {
+		whereCol = "jobid"
+	} else if jobCols["id"] {
+		whereCol = "id"
+	}
+	if whereCol == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "jobs primary key column is missing"})
+		return
+	}
+
+	result, err := db.Exec(fmt.Sprintf("DELETE FROM jobs WHERE %s = $1", whereCol), jobID)
+	if err != nil {
+		log.Printf("DeleteJob error: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete job"})
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "Job not found"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Job deleted successfully"})
 }
 
 func GetCases(w http.ResponseWriter, r *http.Request) {
@@ -3180,7 +3796,35 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := repository.GetSQLDB()
-	rows, err := db.Query(`
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		log.Printf("Error loading jobs schema for movements: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load movements"})
+		return
+	}
+
+	jobPKCol := "jobid"
+	if !jobCols["jobid"] && jobCols["id"] {
+		jobPKCol = "id"
+	}
+
+	fromJobJoin := fmt.Sprintf("dm.from_job_id = fj.%s", jobPKCol)
+	toJobJoin := fmt.Sprintf("dm.to_job_id = tj.%s", jobPKCol)
+
+	fromJobLabelExpr := "NULL::text"
+	toJobLabelExpr := "NULL::text"
+	if jobCols["description"] {
+		fromJobLabelExpr = "fj.description"
+		toJobLabelExpr = "tj.description"
+	} else if jobCols["job_code"] {
+		fromJobLabelExpr = "fj.job_code"
+		toJobLabelExpr = "tj.job_code"
+	} else if jobCols[jobPKCol] {
+		fromJobLabelExpr = fmt.Sprintf("CONCAT('JOB', LPAD(CAST(fj.%s AS TEXT), 6, '0'))", jobPKCol)
+		toJobLabelExpr = fmt.Sprintf("CONCAT('JOB', LPAD(CAST(tj.%s AS TEXT), 6, '0'))", jobPKCol)
+	}
+
+	query := fmt.Sprintf(`
 		SELECT
 			dm.movement_id,
 			dm.device_id,
@@ -3195,20 +3839,22 @@ func GetMovements(w http.ResponseWriter, r *http.Request) {
 			p.name,
 			fz.name,
 			tz.name,
-			fj.description,
-			tj.description,
+			%s,
+			%s,
 			COALESCE(NULLIF(TRIM(CONCAT(u.first_name, ' ', u.last_name)), ''), u.username) as performed_by
 		FROM device_movements dm
 		LEFT JOIN devices d ON dm.device_id = d.deviceID
 		LEFT JOIN products p ON d.productID = p.productID
 		LEFT JOIN storage_zones fz ON dm.from_zone_id = fz.zone_id
 		LEFT JOIN storage_zones tz ON dm.to_zone_id = tz.zone_id
-		LEFT JOIN jobs fj ON dm.from_job_id = fj.jobID
-		LEFT JOIN jobs tj ON dm.to_job_id = tj.jobID
+		LEFT JOIN jobs fj ON %s
+		LEFT JOIN jobs tj ON %s
 		LEFT JOIN users u ON dm.moved_by = u.userID
 		ORDER BY dm.created_at DESC
 		LIMIT $1
-	`, limit)
+	`, fromJobLabelExpr, toJobLabelExpr, fromJobJoin, toJobJoin)
+
+	rows, err := db.Query(query, limit)
 	if err != nil {
 		log.Printf("Error querying movements: %v", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load movements"})

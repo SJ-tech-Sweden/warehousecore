@@ -227,12 +227,19 @@ func main() {
 	api.HandleFunc("/jobs/{id}/complete", handlers.CompleteJob).Methods("POST")
 	protected.HandleFunc("/jobs/products/options", handlers.GetJobRequirementProductOptions).Methods("GET")
 	protected.HandleFunc("/jobs/{id}/requirements", handlers.UpsertJobRequirement).Methods("POST")
+	protected.HandleFunc("/jobs/{id}/requirements", handlers.ReplaceJobRequirements).Methods("PUT")
 
 	// Twenty CRM integration (admin-only write operation)
 	twenty := api.PathPrefix("/twenty").Subrouter()
 	twenty.Use(middleware.AuthMiddleware)
 	twenty.Use(middleware.RequireAdmin)
 	twenty.HandleFunc("/sync-products", handlers.TwentySyncProductsHandler).Methods("POST")
+
+	// Bidirectional integration ingest (admin-only write operation)
+	integrations := api.PathPrefix("/integrations/twenty").Subrouter()
+	integrations.Use(middleware.AuthMiddleware)
+	integrations.Use(middleware.RequireAdmin)
+	integrations.HandleFunc("/events", handlers.IngestTwentyEvent).Methods("POST")
 
 	// Public rental equipment endpoint (for RentalCore integration)
 	api.HandleFunc("/rental-equipment", handlers.GetRentalEquipment).Methods("GET")
@@ -317,11 +324,16 @@ func main() {
 	adminRead.HandleFunc("/rental-equipment/suppliers", handlers.GetRentalEquipmentSuppliers).Methods("GET")
 	adminRead.HandleFunc("/rental-equipment/{id}", handlers.GetRentalEquipmentByID).Methods("GET")
 	adminRead.HandleFunc("/api-keys", handlers.ListAPIKeys).Methods("GET")
+	adminRead.HandleFunc("/jobs/options", handlers.GetJobFormOptions).Methods("GET")
 
 	// Admin-only routes (write operations)
 	admin := api.PathPrefix("/admin").Subrouter()
 	admin.Use(middleware.AuthMiddleware)
 	admin.Use(middleware.RequireAdmin)
+	// Job CRUD (admin-only)
+	admin.HandleFunc("/jobs", handlers.CreateJob).Methods("POST")
+	admin.HandleFunc("/jobs/{id}", handlers.UpdateJob).Methods("PUT")
+	admin.HandleFunc("/jobs/{id}", handlers.DeleteJob).Methods("DELETE")
 	// Create role/user endpoints
 	admin.HandleFunc("/roles", handlers.CreateRole).Methods("POST")
 	admin.HandleFunc("/roles/{id}", handlers.UpdateRole).Methods("PUT")

@@ -95,6 +95,146 @@ type jobProductOption struct {
 	CategoryName string `json:"category_name"`
 }
 
+type localJobRequirementInput struct {
+	ProductID int `json:"product_id"`
+	Quantity  int `json:"quantity"`
+}
+
+func replaceLocalJobRequirements(jobID int, requirements []localJobRequirementInput) error {
+	db := repository.GetSQLDB()
+	jobReqCols, err := getTableColumnsForDB(db, "job_product_requirements")
+	if err != nil {
+		return err
+	}
+	if !jobReqCols["job_id"] || !jobReqCols["product_id"] || !jobReqCols["quantity"] {
+		return fmt.Errorf("job_product_requirements table is unavailable")
+	}
+
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		return err
+	}
+	jobPKCol := "jobid"
+	if !jobCols["jobid"] && jobCols["id"] {
+		jobPKCol = "id"
+	}
+
+	var jobExists bool
+	if err := db.QueryRow(fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM jobs WHERE %s = $1)", jobPKCol), jobID).Scan(&jobExists); err != nil {
+		return err
+	}
+	if !jobExists {
+		return sql.ErrNoRows
+	}
+
+	filtered := make([]localJobRequirementInput, 0, len(requirements))
+	seen := make(map[int]bool)
+	for _, req := range requirements {
+		if req.ProductID <= 0 || req.Quantity <= 0 || seen[req.ProductID] {
+			continue
+		}
+		seen[req.ProductID] = true
+		filtered = append(filtered, req)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM job_product_requirements WHERE job_id = $1", jobID); err != nil {
+		return err
+	}
+
+	for _, req := range filtered {
+		if _, err := tx.Exec(`
+			INSERT INTO job_product_requirements (job_id, product_id, quantity)
+			VALUES ($1, $2, $3)
+		`, jobID, req.ProductID, req.Quantity); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+func upsertLocalJobRequirement(jobID int, productID int, quantity int) error {
+	db := repository.GetSQLDB()
+	jobReqCols, err := getTableColumnsForDB(db, "job_product_requirements")
+	if err != nil {
+		return err
+	}
+	if !jobReqCols["job_id"] || !jobReqCols["product_id"] || !jobReqCols["quantity"] {
+		return fmt.Errorf("job_product_requirements table is unavailable")
+	}
+
+	jobCols, err := getTableColumnsForDB(db, "jobs")
+	if err != nil {
+		return err
+	}
+	jobPKCol := "jobid"
+	if !jobCols["jobid"] && jobCols["id"] {
+		jobPKCol = "id"
+	}
+
+	var jobExists bool
+	if err := db.QueryRow(fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM jobs WHERE %s = $1)", jobPKCol), jobID).Scan(&jobExists); err != nil {
+		return err
+	}
+	if !jobExists {
+		return sql.ErrNoRows
+	}
+
+	if quantity <= 0 {
+		_, err := db.Exec("DELETE FROM job_product_requirements WHERE job_id = $1 AND product_id = $2", jobID, productID)
+		return err
+	}
+
+	result, err := db.Exec("UPDATE job_product_requirements SET quantity = $3 WHERE job_id = $1 AND product_id = $2", jobID, productID, quantity)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		return nil
+	}
+	_, err = db.Exec(`INSERT INTO job_product_requirements (job_id, product_id, quantity) VALUES ($1, $2, $3)`, jobID, productID, quantity)
+	return err
+}
+
+func ReplaceJobRequirements(w http.ResponseWriter, r *http.Request) {
+	jobID, err := strconv.Atoi(mux.Vars(r)["id"])
+	if err != nil || jobID <= 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid job id"})
+		return
+	}
+
+	var req struct {
+		Requirements []localJobRequirementInput `json:"requirements"`
+	}
+	if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if err := replaceLocalJobRequirements(jobID, req.Requirements); err != nil {
+		if err == sql.ErrNoRows {
+			respondJSON(w, http.StatusNotFound, map[string]string{"error": "job not found"})
+			return
+		}
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to save requirements: %v", err)})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":           true,
+		"job_id":       jobID,
+		"saved_count":  len(req.Requirements),
+		"requirements": req.Requirements,
+	})
+}
+
 // GetJobRequirementProductOptions returns products for the guided
 // "add requirement" picker in the Jobs page.
 func GetJobRequirementProductOptions(w http.ResponseWriter, r *http.Request) {
@@ -156,11 +296,6 @@ func GetJobRequirementProductOptions(w http.ResponseWriter, r *http.Request) {
 // UpsertJobRequirement writes a product requirement to the linked Twenty
 // Opportunity for this WarehouseCore job.
 func UpsertJobRequirement(w http.ResponseWriter, r *http.Request) {
-	if !twentyConfigured() {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Twenty is not configured"})
-		return
-	}
-
 	jobID, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil || jobID <= 0 {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid job id"})
@@ -180,7 +315,33 @@ func UpsertJobRequirement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Quantity <= 0 {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "quantity must be > 0"})
+		if err := upsertLocalJobRequirement(jobID, req.ProductID, 0); err != nil && err != sql.ErrNoRows {
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to delete local requirement: %v", err)})
+			return
+		}
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"ok":        true,
+			"action":    "deleted",
+			"job_id":    jobID,
+			"product_id": req.ProductID,
+			"quantity":  0,
+		})
+		return
+	}
+
+	if localErr := upsertLocalJobRequirement(jobID, req.ProductID, req.Quantity); localErr != nil && localErr != sql.ErrNoRows {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("failed to save local requirement: %v", localErr)})
+		return
+	}
+
+	if !twentyConfigured() {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"ok":         true,
+			"action":     "updated",
+			"job_id":     jobID,
+			"product_id": req.ProductID,
+			"quantity":   req.Quantity,
+		})
 		return
 	}
 

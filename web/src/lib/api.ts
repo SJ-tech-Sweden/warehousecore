@@ -99,6 +99,10 @@ export interface DeviceTreeDevice {
   product_id?: number;
   product_name: string;
   status: string;
+  is_consumable?: boolean;
+  is_accessory?: boolean;
+  stock_quantity?: number;
+  unit?: string;
   barcode?: string;
   qr_code?: string;
   serial_number?: string;
@@ -266,6 +270,8 @@ export interface Job {
   start_date?: string;
   end_date?: string;
   status: string;
+  customer_id?: number;
+  status_id?: number;
   customer_first_name?: string;
   customer_last_name?: string;
   device_count: number;
@@ -297,10 +303,30 @@ export interface JobSummary {
   start_date?: string;
   end_date?: string;
   status: string;
+  customer_id?: number;
+  status_id?: number;
   customer_first_name?: string;
   customer_last_name?: string;
   devices: JobDevice[];
   product_requirements: ProductRequirement[];
+}
+
+export interface JobCustomerOption {
+  customer_id: number;
+  first_name?: string;
+  last_name?: string;
+  display_name: string;
+}
+
+export interface JobStatusOption {
+  status_id: number;
+  name: string;
+}
+
+export interface JobFormOptions {
+  customers: JobCustomerOption[];
+  statuses: JobStatusOption[];
+  default_status_id?: number;
 }
 
 export interface JobRequirementProductOption {
@@ -314,12 +340,23 @@ export interface JobRequirementUpsertPayload {
   quantity: number;
 }
 
+export interface JobRequirementReplacePayload {
+  requirements: JobRequirementUpsertPayload[];
+}
+
 export interface JobRequirementUpsertResponse {
   ok: boolean;
-  action: 'created' | 'updated';
+  action: 'created' | 'updated' | 'deleted';
   job_id: number;
   product_id: number;
   quantity: number;
+}
+
+export interface JobRequirementReplaceResponse {
+  ok: boolean;
+  job_id: number;
+  saved_count: number;
+  requirements: JobRequirementUpsertPayload[];
 }
 
 // API Functions
@@ -450,13 +487,41 @@ export const scansApi = {
   getHistory: (limit: number = 50) => api.get(`/scans/history`, { params: { limit } }),
 };
 
+export interface JobCreateInput {
+  job_code: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  customer_id?: number;
+  status_id?: number;
+}
+
+export interface JobUpdateInput {
+  job_code: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  customer_id?: number;
+  status_id?: number;
+}
+
 export const jobsApi = {
-  getAll: (params?: { status?: string }) => api.get<Job[]>('/jobs', { params }),
-  getById: (id: number) => api.get<JobSummary>(`/jobs/${id}`),
+  getAll: (params?: { status?: string; source?: 'local' | 'remote' }) => api.get<Job[]>('/jobs', { params }),
+  getById: (id: number, params?: { source?: 'local' | 'remote' }) => api.get<JobSummary>(`/jobs/${id}`, { params }),
   getRequirementProductOptions: (params?: { q?: string; limit?: number }) =>
     api.get<{ products: JobRequirementProductOption[]; count: number }>('/jobs/products/options', { params }),
   upsertRequirement: (jobId: number, payload: JobRequirementUpsertPayload) =>
     api.post<JobRequirementUpsertResponse>(`/jobs/${jobId}/requirements`, payload),
+  replaceRequirements: (jobId: number, payload: JobRequirementReplacePayload) =>
+    api.put<JobRequirementReplaceResponse>(`/jobs/${jobId}/requirements`, payload),
+  getFormOptions: () =>
+    api.get<JobFormOptions>('/admin/jobs/options'),
+  create: (data: JobCreateInput) =>
+    api.post<{ job_id: number; message: string }>('/admin/jobs', data),
+  update: (id: number, data: JobUpdateInput) =>
+    api.put<{ message: string }>(`/admin/jobs/${id}`, data),
+  delete: (id: number) =>
+    api.delete<{ message: string }>(`/admin/jobs/${id}`),
 };
 
 export interface Defect {
