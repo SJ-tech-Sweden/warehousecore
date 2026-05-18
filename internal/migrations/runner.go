@@ -20,20 +20,77 @@ func isForwardMigrationFile(name string) bool {
 	return true
 }
 
+func normalizedSQLStatements(sqlText string) []string {
+	lines := strings.Split(sqlText, "\n")
+	cleaned := make([]string, 0, len(lines))
+	inBlockComment := false
+
+	for _, line := range lines {
+		remaining := line
+
+		if inBlockComment {
+			if end := strings.Index(remaining, "*/"); end >= 0 {
+				remaining = remaining[end+2:]
+				inBlockComment = false
+			} else {
+				continue
+			}
+		}
+
+		for {
+			start := strings.Index(remaining, "/*")
+			if start < 0 {
+				break
+			}
+			end := strings.Index(remaining[start+2:], "*/")
+			if end < 0 {
+				remaining = remaining[:start]
+				inBlockComment = true
+				break
+			}
+			remaining = remaining[:start] + remaining[start+2+end+2:]
+		}
+
+		if idx := strings.Index(remaining, "--"); idx >= 0 {
+			remaining = remaining[:idx]
+		}
+
+		cleaned = append(cleaned, remaining)
+	}
+
+	joined := strings.Join(cleaned, "\n")
+	rawStatements := strings.Split(joined, ";")
+	statements := make([]string, 0, len(rawStatements))
+	for _, stmt := range rawStatements {
+		trimmed := strings.TrimSpace(stmt)
+		if trimmed == "" {
+			continue
+		}
+		statements = append(statements, strings.ToUpper(trimmed))
+	}
+	return statements
+}
+
 func managesOwnTransaction(sqlText string) bool {
-	trimmed := strings.TrimSpace(sqlText)
-	if trimmed == "" {
+	statements := normalizedSQLStatements(sqlText)
+	if len(statements) < 2 {
 		return false
 	}
-	upper := strings.ToUpper(trimmed)
-	firstStmt := upper
-	if idx := strings.Index(firstStmt, ";"); idx >= 0 {
-		firstStmt = firstStmt[:idx]
+	firstStmt := statements[0]
+	lastStmt := statements[len(statements)-1]
+	isBegin := strings.HasPrefix(firstStmt, "BEGIN") || strings.HasPrefix(firstStmt, "START TRANSACTION")
+	isCommit := strings.HasPrefix(lastStmt, "COMMIT")
+	return isBegin && isCommit
+}
+
+func execMigrationSQL(execer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}, sqlText string) error {
+	if strings.TrimSpace(sqlText) == "" {
+		return nil
 	}
-	if strings.HasPrefix(firstStmt, "BEGIN") || strings.HasPrefix(firstStmt, "START TRANSACTION") {
-		return strings.Contains(upper, "COMMIT")
-	}
-	return false
+	_, err := execer.Exec(sqlText)
+	return err
 }
 
 func ApplyMigrations(db *sql.DB, dir string) error {
@@ -70,10 +127,8 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 		}
 		sqlText := string(b)
 		if managesOwnTransaction(sqlText) {
-			if len(sqlText) > 0 {
-				if _, err := db.Exec(sqlText); err != nil {
-					return err
-				}
+			if err := execMigrationSQL(db, sqlText); err != nil {
+				return err
 			}
 			if _, err := db.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
 				return err
@@ -83,11 +138,9 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 			if err != nil {
 				return err
 			}
-			if len(sqlText) > 0 {
-				if _, err := tx.Exec(sqlText); err != nil {
-					_ = tx.Rollback()
-					return err
-				}
+			if err := execMigrationSQL(tx, sqlText); err != nil {
+				_ = tx.Rollback()
+				return err
 			}
 			if _, err := tx.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
 				_ = tx.Rollback()

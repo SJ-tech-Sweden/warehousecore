@@ -9,6 +9,53 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 )
 
+func TestManagesOwnTransaction(t *testing.T) {
+	tests := []struct {
+		name string
+		sql  string
+		want bool
+	}{
+		{
+			name: "begin and commit",
+			sql:  "BEGIN; SELECT 1; COMMIT;",
+			want: true,
+		},
+		{
+			name: "start transaction and commit with comments",
+			sql:  "-- header\nSTART TRANSACTION;\nSELECT 1;\n/* note: COMMIT happens below */\nCOMMIT;",
+			want: true,
+		},
+		{
+			name: "missing commit",
+			sql:  "BEGIN; SELECT 1;",
+			want: false,
+		},
+		{
+			name: "commit in comment only",
+			sql:  "BEGIN; SELECT 1; -- COMMIT\n",
+			want: false,
+		},
+		{
+			name: "empty sql",
+			sql:  "  \n\t ",
+			want: false,
+		},
+		{
+			name: "non-transactional migration",
+			sql:  "ALTER TABLE users ADD COLUMN nickname TEXT;",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := managesOwnTransaction(tt.sql); got != tt.want {
+				t.Fatalf("managesOwnTransaction()=%v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestApplyMigrations_RollsBackFailedMigration(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
