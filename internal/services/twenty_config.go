@@ -159,8 +159,10 @@ func twentyAPIKeyFromEnv() string {
 
 func normalizeTwentyBaseURL(raw string) string {
 	v := strings.TrimRight(strings.TrimSpace(raw), "/")
-	if strings.HasSuffix(strings.ToLower(v), "/graphql") {
-		v = strings.TrimSuffix(v, "/graphql")
+	lower := strings.ToLower(v)
+	const graphqlSuffix = "/graphql"
+	if strings.HasSuffix(lower, graphqlSuffix) {
+		v = v[:len(v)-len(graphqlSuffix)]
 	}
 	return v
 }
