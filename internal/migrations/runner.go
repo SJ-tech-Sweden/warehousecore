@@ -44,7 +44,7 @@ func parseSQLStatements(sqlText string) []string {
 			if start < 0 {
 				break
 			}
-			end := strings.Index(remaining[start+2:], "*/")
+			end := strings.Index(remaining[start+blockCommentMarkerLen:], "*/")
 			if end < 0 {
 				remaining = remaining[:start]
 				inBlockComment = true
@@ -80,7 +80,7 @@ func managesOwnTransaction(sqlText string) bool {
 	}
 	firstStmt := strings.ToUpper(strings.Join(strings.Fields(statements[0]), " "))
 	lastStmt := strings.ToUpper(strings.Join(strings.Fields(statements[len(statements)-1]), " "))
-	isBegin := firstStmt == "BEGIN" || strings.HasPrefix(firstStmt, "BEGIN ") || strings.HasPrefix(firstStmt, "START TRANSACTION")
+	isBegin := strings.HasPrefix(firstStmt, "BEGIN") || strings.HasPrefix(firstStmt, "START TRANSACTION")
 	isCommit := lastStmt == "COMMIT" || strings.HasPrefix(lastStmt, "COMMIT ")
 	return isBegin && isCommit
 }
