@@ -92,10 +92,15 @@ func TestCreateUser_Success(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO users`).WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"userid"}).AddRow(42))
 
-	// User profile check - return no rows so insert happens
+	// User profile check/update path used by UpdateUserProfile in CreateUser.
 	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "user_profiles" WHERE user_id = $1 ORDER BY "user_profiles"."id" LIMIT $2`)).
 		WithArgs(42, sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "display_name", "avatar_url", "prefs"}).
+			AddRow(1, 42, "", "", []byte(`{}`)))
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "user_profiles"`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	body := `{"username":"jdoe","email":"jdoe@example.com","password":"secretpw","first_name":"John","last_name":"Doe"}`
 	req := httptest.NewRequest(http.MethodPost, "/admin/users", bytes.NewBufferString(body))
