@@ -51,8 +51,9 @@ func NewScanService() *ScanService {
 func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 	movementColumnsCache.mu.RLock()
 	if movementColumnsCache.loaded {
-		defer movementColumnsCache.mu.RUnlock()
-		return cloneMovementColumnsMap(movementColumnsCache.cols), nil
+		cols := cloneMovementColumnsMap(movementColumnsCache.cols)
+		movementColumnsCache.mu.RUnlock()
+		return cols, nil
 	}
 	movementColumnsCache.mu.RUnlock()
 
