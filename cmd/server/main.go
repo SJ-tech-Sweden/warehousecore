@@ -222,9 +222,9 @@ func main() {
 	api.HandleFunc("/zone-types", handlers.GetZoneTypes).Methods("GET")
 
 	// Job endpoints
-	api.HandleFunc("/jobs", handlers.GetJobs).Methods("GET")
-	api.HandleFunc("/jobs/{id}", handlers.GetJobSummary).Methods("GET")
-	api.HandleFunc("/jobs/{id}/complete", handlers.CompleteJob).Methods("POST")
+	protected.HandleFunc("/jobs", handlers.GetJobs).Methods("GET")
+	protected.HandleFunc("/jobs/{id}", handlers.GetJobSummary).Methods("GET")
+	protected.HandleFunc("/jobs/{id}/complete", handlers.CompleteJob).Methods("POST")
 	protected.HandleFunc("/jobs/products/options", handlers.GetJobRequirementProductOptions).Methods("GET")
 	protected.HandleFunc("/jobs/{id}/requirements", handlers.UpsertJobRequirement).Methods("POST")
 	protected.HandleFunc("/jobs/{id}/requirements", handlers.ReplaceJobRequirements).Methods("PUT")

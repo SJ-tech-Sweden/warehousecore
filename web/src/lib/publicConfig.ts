@@ -1,4 +1,5 @@
 const DEFAULT_COMPANY_NAME = 'WarehouseCore';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 function normalizeString(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -11,7 +12,8 @@ export function getInitialCompanyName(): string {
 
 export async function fetchPublicCompanyName(): Promise<string | null> {
   try {
-    const res = await fetch('/api/v1/config', { credentials: 'include' });
+    const base = API_BASE_URL.replace(/\/+$/, '');
+    const res = await fetch(`${base}/config`, { credentials: 'include' });
     if (!res.ok) {
       return null;
     }

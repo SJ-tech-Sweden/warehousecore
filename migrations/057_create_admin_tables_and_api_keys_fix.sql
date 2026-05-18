@@ -72,67 +72,67 @@ CREATE TABLE IF NOT EXISTS count_types (
 -- Ensure products table has the expected columns used by handlers
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'subcategoryID') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'subcategoryid') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN subcategoryID TEXT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'subbiercategoryID') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'subbiercategoryid') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN subbiercategoryID TEXT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'brandID') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'brandid') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN brandID INT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'maintenanceInterval') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'maintenanceinterval') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN maintenanceInterval INT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'itemcostperday') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'itemcostperday') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN itemcostperday NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'weight') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'weight') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN weight NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'height') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'height') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN height NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'width') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'width') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN width NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'depth') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'depth') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN depth NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'powerconsumption') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'powerconsumption') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN powerconsumption NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'pos_in_category') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'pos_in_category') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN pos_in_category INT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'is_accessory') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'is_accessory') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN is_accessory BOOLEAN DEFAULT FALSE';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'is_consumable') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'is_consumable') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN is_consumable BOOLEAN DEFAULT FALSE';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'count_type_id') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'count_type_id') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN count_type_id INT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'stock_quantity') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'stock_quantity') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN stock_quantity NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'min_stock_level') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'min_stock_level') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN min_stock_level NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'generic_barcode') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'generic_barcode') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN generic_barcode TEXT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'price_per_unit') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'price_per_unit') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN price_per_unit NUMERIC NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'website_visible') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'website_visible') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN website_visible BOOLEAN DEFAULT FALSE';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'website_thumbnail') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'website_thumbnail') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN website_thumbnail TEXT NULL';
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'website_images_json') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'products' AND lower(column_name) = 'website_images_json') THEN
         EXECUTE 'ALTER TABLE products ADD COLUMN website_images_json TEXT NULL';
     END IF;
 END$$;

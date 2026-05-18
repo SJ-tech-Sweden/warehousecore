@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const defaultBrandName = "RentalCore"
+const defaultBrandName = "WarehouseCore"
 
 type companyRecord struct {
 	ID          uint   `gorm:"column:id"`
