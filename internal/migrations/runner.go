@@ -2,7 +2,6 @@ package migrations
 
 import (
 	"database/sql"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,7 +21,7 @@ func isForwardMigrationFile(name string) bool {
 }
 
 func ApplyMigrations(db *sql.DB, dir string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -49,7 +48,7 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 			continue
 		}
 		path := filepath.Join(dir, name)
-		b, err := ioutil.ReadFile(path)
+		b, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -72,7 +71,7 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 // ApplySeeds applies all .sql files in a seeds directory (lexical order).
 // If the directory does not exist, it's a no-op.
 func ApplySeeds(db *sql.DB, dir string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -88,7 +87,7 @@ func ApplySeeds(db *sql.DB, dir string) error {
 	sort.Strings(sqlFiles)
 	for _, name := range sqlFiles {
 		path := filepath.Join(dir, name)
-		b, err := ioutil.ReadFile(path)
+		b, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

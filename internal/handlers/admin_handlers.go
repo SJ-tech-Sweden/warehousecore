@@ -521,7 +521,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	// Insert user
 	now := time.Now()
-	res := db.Exec(`INSERT INTO users (username, email, password_hash, first_name, last_name, is_active, force_password_change, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING userid`,
+	res := db.Exec(`INSERT INTO users (username, email, password_hash, first_name, last_name, is_active, force_password_change, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		payload.Username, payload.Email, string(hash), payload.FirstName, payload.LastName, true, force, now, now)
 	if res.Error != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": res.Error.Error()})

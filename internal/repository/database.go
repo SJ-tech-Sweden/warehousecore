@@ -179,24 +179,3 @@ func HashAPIKey(key string) string {
 	mac.Write([]byte(key))
 	return hex.EncodeToString(mac.Sum(nil))
 }
-
-// applySQLFileIfExists reads a SQL file and executes its contents as a single
-// Exec call if the file exists. The SQL should be idempotent (use ON CONFLICT
-// guards) so it is safe to run on partially populated databases.
-func applySQLFileIfExists(db *sql.DB, path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read seed file: %w", err)
-	}
-	if len(data) == 0 {
-		return nil
-	}
-	if _, err := db.Exec(string(data)); err != nil {
-		return fmt.Errorf("exec seed SQL: %w", err)
-	}
-	log.Printf("Applied seed SQL from %s", path)
-	return nil
-}
