@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const blockCommentMarkerLen = 2
+
 func isForwardMigrationFile(name string) bool {
 	if !strings.HasSuffix(name, ".sql") {
 		return false
@@ -20,7 +22,7 @@ func isForwardMigrationFile(name string) bool {
 	return true
 }
 
-func normalizedSQLStatements(sqlText string) []string {
+func parseSQLStatements(sqlText string) []string {
 	lines := strings.Split(sqlText, "\n")
 	cleaned := make([]string, 0, len(lines))
 	inBlockComment := false
@@ -30,7 +32,7 @@ func normalizedSQLStatements(sqlText string) []string {
 
 		if inBlockComment {
 			if end := strings.Index(remaining, "*/"); end >= 0 {
-				remaining = remaining[end+2:]
+				remaining = remaining[end+blockCommentMarkerLen:]
 				inBlockComment = false
 			} else {
 				continue
@@ -48,7 +50,7 @@ func normalizedSQLStatements(sqlText string) []string {
 				inBlockComment = true
 				break
 			}
-			remaining = remaining[:start] + remaining[start+2+end+2:]
+			remaining = remaining[:start] + remaining[start+blockCommentMarkerLen+end+blockCommentMarkerLen:]
 		}
 
 		if idx := strings.Index(remaining, "--"); idx >= 0 {
@@ -66,20 +68,20 @@ func normalizedSQLStatements(sqlText string) []string {
 		if trimmed == "" {
 			continue
 		}
-		statements = append(statements, strings.ToUpper(trimmed))
+		statements = append(statements, trimmed)
 	}
 	return statements
 }
 
 func managesOwnTransaction(sqlText string) bool {
-	statements := normalizedSQLStatements(sqlText)
+	statements := parseSQLStatements(sqlText)
 	if len(statements) < 2 {
 		return false
 	}
-	firstStmt := statements[0]
-	lastStmt := statements[len(statements)-1]
-	isBegin := strings.HasPrefix(firstStmt, "BEGIN") || strings.HasPrefix(firstStmt, "START TRANSACTION")
-	isCommit := strings.HasPrefix(lastStmt, "COMMIT")
+	firstStmt := strings.ToUpper(strings.Join(strings.Fields(statements[0]), " "))
+	lastStmt := strings.ToUpper(strings.Join(strings.Fields(statements[len(statements)-1]), " "))
+	isBegin := firstStmt == "BEGIN" || strings.HasPrefix(firstStmt, "BEGIN ") || strings.HasPrefix(firstStmt, "START TRANSACTION")
+	isCommit := lastStmt == "COMMIT" || strings.HasPrefix(lastStmt, "COMMIT ")
 	return isBegin && isCommit
 }
 
