@@ -20,6 +20,22 @@ func isForwardMigrationFile(name string) bool {
 	return true
 }
 
+func managesOwnTransaction(sqlText string) bool {
+	trimmed := strings.TrimSpace(sqlText)
+	if trimmed == "" {
+		return false
+	}
+	upper := strings.ToUpper(trimmed)
+	firstStmt := upper
+	if idx := strings.Index(firstStmt, ";"); idx >= 0 {
+		firstStmt = firstStmt[:idx]
+	}
+	if strings.HasPrefix(firstStmt, "BEGIN") || strings.HasPrefix(firstStmt, "START TRANSACTION") {
+		return strings.Contains(upper, "COMMIT")
+	}
+	return false
+}
+
 func ApplyMigrations(db *sql.DB, dir string) error {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -52,16 +68,35 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 		if err != nil {
 			return err
 		}
-		// Execute the file contents as a single Exec call. This avoids
-		// fragile statement-splitting logic for complex dollar-quoted
-		// or non-UTF8-containing files which could hang the parser.
-		if len(b) > 0 {
-			if _, err := db.Exec(string(b)); err != nil {
+		sqlText := string(b)
+		if managesOwnTransaction(sqlText) {
+			if len(sqlText) > 0 {
+				if _, err := db.Exec(sqlText); err != nil {
+					return err
+				}
+			}
+			if _, err := db.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
 				return err
 			}
-		}
-		if _, err := db.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
-			return err
+		} else {
+			tx, err := db.Begin()
+			if err != nil {
+				return err
+			}
+			if len(sqlText) > 0 {
+				if _, err := tx.Exec(sqlText); err != nil {
+					_ = tx.Rollback()
+					return err
+				}
+			}
+			if _, err := tx.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
 		}
 		log.Printf("applied migration %s", name)
 	}

@@ -150,13 +150,18 @@ func SSOMiddleware(next http.Handler) http.Handler {
 		user.Username = claims.Username
 		user.IsActive = true
 
-		// Try to load richer user info from local DB if available
+		// Try to load richer user info from local DB if available.
+		// If a local user exists but is deactivated, deny immediately.
 		db := repository.GetDB()
 		localUserLoaded := false
 		if db != nil {
 			var dbUser models.User
-			result := db.Where("userid = ? AND is_active = ?", claims.UserID, true).Limit(1).Find(&dbUser)
+			result := db.Where("userid = ?", claims.UserID).Limit(1).Find(&dbUser)
 			if result.Error == nil && result.RowsAffected > 0 {
+				if !dbUser.IsActive {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
 				user = dbUser
 				localUserLoaded = true
 			}
