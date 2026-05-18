@@ -174,11 +174,15 @@ func SSOMiddleware(next http.Handler) http.Handler {
 				if err == nil && resp != nil {
 					defer resp.Body.Close()
 					if resp.StatusCode == http.StatusOK {
-						body, _ := io.ReadAll(resp.Body)
-						var rcUser models.User
-						if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
-							rcUser.PasswordHash = ""
-							user = rcUser
+						body, readErr := io.ReadAll(resp.Body)
+						if readErr != nil {
+							log.Printf("[SSO] Failed to read RentalCore user response: %v", readErr)
+						} else {
+							var rcUser models.User
+							if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
+								rcUser.PasswordHash = ""
+								user = rcUser
+							}
 						}
 					}
 				}

@@ -36,8 +36,9 @@ type movementInsertColumn struct {
 }
 
 var movementColumnsCache struct {
-	mu   sync.RWMutex
-	cols map[string]bool
+	mu     sync.RWMutex
+	loaded bool
+	cols   map[string]bool
 }
 
 // NewScanService creates a new scan service
@@ -49,7 +50,7 @@ func NewScanService() *ScanService {
 
 func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 	movementColumnsCache.mu.RLock()
-	if movementColumnsCache.cols != nil {
+	if movementColumnsCache.loaded {
 		defer movementColumnsCache.mu.RUnlock()
 		return cloneMovementColumnsMap(movementColumnsCache.cols), nil
 	}
@@ -57,7 +58,7 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 
 	movementColumnsCache.mu.Lock()
 	defer movementColumnsCache.mu.Unlock()
-	if movementColumnsCache.cols != nil {
+	if movementColumnsCache.loaded {
 		return cloneMovementColumnsMap(movementColumnsCache.cols), nil
 	}
 
@@ -65,6 +66,8 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 		SELECT column_name
 		FROM information_schema.columns
 		WHERE table_name = 'device_movements'
+		  -- Restrict to the active schema so similarly named tables in other schemas
+		  -- cannot affect movement insert column detection.
 		  AND table_schema = current_schema()
 		  AND column_name IN ('action', 'movement_type', 'timestamp', 'created_at')
 	`)
@@ -91,6 +94,7 @@ func deviceMovementColumnAvailability(tx *sql.Tx) (map[string]bool, error) {
 	}
 
 	movementColumnsCache.cols = cloneMovementColumnsMap(available)
+	movementColumnsCache.loaded = true
 
 	return cloneMovementColumnsMap(movementColumnsCache.cols), nil
 }

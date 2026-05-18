@@ -1,6 +1,6 @@
 DO $$
 DECLARE
-  ref_col text := NULL;
+  ref_col text;
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'jobs') THEN
     EXECUTE 'ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_code VARCHAR(16)';
