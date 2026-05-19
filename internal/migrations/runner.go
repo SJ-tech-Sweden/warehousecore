@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -93,21 +94,21 @@ func managesOwnTransaction(sqlText string) bool {
 	return isBegin && isCommit
 }
 
-func execMigrationSQL(execer interface {
-	Exec(query string, args ...any) (sql.Result, error)
+func execMigrationSQL(ctx context.Context, execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }, sqlText string) error {
 	if strings.TrimSpace(sqlText) == "" {
 		return nil
 	}
-	_, err := execer.Exec(sqlText)
+	_, err := execer.ExecContext(ctx, sqlText)
 	return err
 }
 
-func acquireMigrationsLock(db *sql.DB) (func(), error) {
+func acquireMigrationsLock(ctx context.Context, conn *sql.Conn) (func(), error) {
 	deadline := time.Now().Add(migrationsAdvisoryLockTimeout)
 	for {
 		var locked bool
-		if err := db.QueryRow("SELECT pg_try_advisory_lock($1)", migrationsAdvisoryLockKey).Scan(&locked); err != nil {
+		if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", migrationsAdvisoryLockKey).Scan(&locked); err != nil {
 			return nil, err
 		}
 		if locked {
@@ -123,13 +124,17 @@ func acquireMigrationsLock(db *sql.DB) (func(), error) {
 		time.Sleep(sleepFor)
 	}
 	return func() {
-		if _, err := db.Exec("SELECT pg_advisory_unlock($1)", migrationsAdvisoryLockKey); err != nil {
+		var unlocked bool
+		if err := conn.QueryRowContext(ctx, "SELECT pg_advisory_unlock($1)", migrationsAdvisoryLockKey).Scan(&unlocked); err != nil {
 			log.Printf("warning: failed to release migration advisory lock: %v", err)
+		} else if !unlocked {
+			log.Printf("warning: migration advisory lock was not held by current session")
 		}
 	}, nil
 }
 
 func ApplyMigrations(db *sql.DB, dir string) error {
+	ctx := context.Background()
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -142,10 +147,16 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 	}
 	sort.Strings(sqlFiles)
 
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`); err != nil {
+	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`); err != nil {
 		return err
 	}
-	unlock, err := acquireMigrationsLock(db)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	unlock, err := acquireMigrationsLock(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -153,7 +164,7 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 
 	for _, name := range sqlFiles {
 		var exists bool
-		err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)", name).Scan(&exists)
+		err := conn.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE name = $1)", name).Scan(&exists)
 		if err != nil {
 			return err
 		}
@@ -168,22 +179,22 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 		}
 		sqlText := string(b)
 		if managesOwnTransaction(sqlText) {
-			if err := execMigrationSQL(db, sqlText); err != nil {
+			if err := execMigrationSQL(ctx, conn, sqlText); err != nil {
 				return err
 			}
-			if _, err := db.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
+			if _, err := conn.ExecContext(ctx, "INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
 				return err
 			}
 		} else {
-			tx, err := db.Begin()
+			tx, err := conn.BeginTx(ctx, nil)
 			if err != nil {
 				return err
 			}
-			if err := execMigrationSQL(tx, sqlText); err != nil {
+			if err := execMigrationSQL(ctx, tx, sqlText); err != nil {
 				_ = tx.Rollback()
 				return err
 			}
-			if _, err := tx.Exec("INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO schema_migrations (name) VALUES ($1)", name); err != nil {
 				_ = tx.Rollback()
 				return err
 			}
