@@ -1,6 +1,8 @@
 DO $$
 DECLARE
   id_column_name text;
+  empty_job_code_count bigint;
+  duplicate_job_code_count bigint;
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'jobs') THEN
     EXECUTE 'ALTER TABLE jobs ADD COLUMN IF NOT EXISTS job_code VARCHAR(16)';
@@ -35,14 +37,26 @@ BEGIN
       FROM jobs
       WHERE COALESCE(TRIM(job_code), '') = ''
     ) THEN
-      RAISE WARNING 'Migration 013: jobs.job_code still contains NULL/empty values; NOT NULL and unique index enforcement skipped';
+      SELECT COUNT(*)
+      INTO empty_job_code_count
+      FROM jobs
+      WHERE COALESCE(TRIM(job_code), '') = '';
+      RAISE WARNING 'Migration 013: jobs.job_code contains % NULL/empty values; NOT NULL and unique index enforcement skipped', empty_job_code_count;
     ELSIF EXISTS (
       SELECT 1
       FROM jobs
       GROUP BY job_code
       HAVING COUNT(*) > 1
     ) THEN
-      RAISE WARNING 'Migration 013: jobs.job_code contains duplicate values; unique enforcement skipped';
+      SELECT COUNT(*)
+      INTO duplicate_job_code_count
+      FROM (
+        SELECT job_code
+        FROM jobs
+        GROUP BY job_code
+        HAVING COUNT(*) > 1
+      ) dupes;
+      RAISE WARNING 'Migration 013: jobs.job_code contains % duplicate values; unique enforcement skipped', duplicate_job_code_count;
     ELSE
       EXECUTE 'ALTER TABLE jobs ALTER COLUMN job_code SET NOT NULL';
       EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_jobs_job_code ON jobs(job_code)';

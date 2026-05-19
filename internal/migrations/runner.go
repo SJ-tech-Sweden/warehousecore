@@ -120,9 +120,6 @@ func acquireMigrationsLock(db *sql.DB) (func(), error) {
 		if remaining := time.Until(deadline); remaining < sleepFor {
 			sleepFor = remaining
 		}
-		if sleepFor <= 0 {
-			return nil, fmt.Errorf("timed out waiting for migration advisory lock after %s", migrationsAdvisoryLockTimeout)
-		}
 		time.Sleep(sleepFor)
 	}
 	return func() {
