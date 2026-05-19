@@ -56,28 +56,31 @@ func (s *CompanyBrandingService) CompanyName() string {
 		return s.name
 	}
 
-	var record companyRecord
-	companyQuery := s.db.Order("id DESC").Limit(1).Find(&record)
-	if companyQuery.Error != nil {
-		log.Printf("[BRANDING] company_settings lookup failed: %v", companyQuery.Error)
+	// Prefer app_settings (authoritative admin-managed company.info).
+	var appSetting models.AppSetting
+	appSettingsQuery := s.db.Table("app_settings").Where("scope = ? AND key = ?", "warehousecore", "company.info").Limit(1).Find(&appSetting)
+	if appSettingsQuery.Error != nil && !isMissingAppSettingsTableErr(appSettingsQuery.Error) {
+		log.Printf("[BRANDING] app_settings lookup failed: %v", appSettingsQuery.Error)
 	}
-	if companyQuery.Error == nil && companyQuery.RowsAffected > 0 {
-		s.name = sanitizeBrandName(record.CompanyName)
-	} else {
-		// Try fallback to app_settings (new company.info stored as JSON)
-		var appSetting models.AppSetting
-		appSettingsQuery := s.db.Table("app_settings").Where("scope = ? AND key = ?", "warehousecore", "company.info").Limit(1).Find(&appSetting)
-		if appSettingsQuery.Error != nil && !isMissingAppSettingsTableErr(appSettingsQuery.Error) {
-			log.Printf("[BRANDING] app_settings lookup failed: %v", appSettingsQuery.Error)
+	if appSettingsQuery.Error == nil && appSettingsQuery.RowsAffected > 0 {
+		if nameVal, ok := appSetting.Value["name"].(string); ok && strings.TrimSpace(nameVal) != "" {
+			s.name = sanitizeBrandName(nameVal)
 		}
-		if appSettingsQuery.Error == nil && appSettingsQuery.RowsAffected > 0 {
-			if nameVal, ok := appSetting.Value["name"].(string); ok && strings.TrimSpace(nameVal) != "" {
-				s.name = sanitizeBrandName(nameVal)
-			}
+	}
+
+	if s.name == "" {
+		var record companyRecord
+		companyQuery := s.db.Order("id DESC").Limit(1).Find(&record)
+		if companyQuery.Error != nil {
+			log.Printf("[BRANDING] company_settings lookup failed: %v", companyQuery.Error)
 		}
-		if s.name == "" {
-			s.name = defaultBrandName
+		if companyQuery.Error == nil && companyQuery.RowsAffected > 0 {
+			s.name = sanitizeBrandName(record.CompanyName)
 		}
+	}
+
+	if s.name == "" {
+		s.name = defaultBrandName
 	}
 	s.lastFetch = time.Now()
 	return s.name

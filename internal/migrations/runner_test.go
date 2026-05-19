@@ -71,6 +71,9 @@ func TestApplyMigrations_RollsBackFailedMigration(t *testing.T) {
 
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
+		WithArgs(migrationsAdvisoryLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM schema_migrations WHERE name = \$1\)`).
 		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
@@ -78,6 +81,9 @@ func TestApplyMigrations_RollsBackFailedMigration(t *testing.T) {
 	mock.ExpectExec(`ALTER TABLE test_table ADD COLUMN fail_col INTEGER;`).
 		WillReturnError(errors.New("boom"))
 	mock.ExpectRollback()
+	mock.ExpectExec(`SELECT pg_advisory_unlock\(\$1\)`).
+		WithArgs(migrationsAdvisoryLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	err = ApplyMigrations(db, dir)
 	if err == nil {
@@ -104,6 +110,9 @@ func TestApplyMigrations_SelfManagedTransactionExecutesWithoutWrapperTx(t *testi
 
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
+		WithArgs(migrationsAdvisoryLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM schema_migrations WHERE name = \$1\)`).
 		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
@@ -112,6 +121,9 @@ func TestApplyMigrations_SelfManagedTransactionExecutesWithoutWrapperTx(t *testi
 	mock.ExpectExec(`INSERT INTO schema_migrations \(name\) VALUES \(\$1\)`).
 		WithArgs(name).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`SELECT pg_advisory_unlock\(\$1\)`).
+		WithArgs(migrationsAdvisoryLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 
 	if err := ApplyMigrations(db, dir); err != nil {
 		t.Fatalf("unexpected migration error: %v", err)

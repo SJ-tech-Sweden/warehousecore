@@ -29,7 +29,23 @@ BEGIN
     END IF;
 
     EXECUTE 'ALTER TABLE jobs ALTER COLUMN job_code TYPE VARCHAR(16)';
-    EXECUTE 'ALTER TABLE jobs ALTER COLUMN job_code SET NOT NULL';
-    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_jobs_job_code ON jobs(job_code)';
+
+    IF EXISTS (
+      SELECT 1
+      FROM jobs
+      WHERE job_code IS NULL OR job_code = ''
+    ) THEN
+      RAISE WARNING 'Migration 013: jobs.job_code still contains NULL/empty values; NOT NULL and unique index enforcement skipped';
+    ELSIF EXISTS (
+      SELECT 1
+      FROM jobs
+      GROUP BY job_code
+      HAVING COUNT(*) > 1
+    ) THEN
+      RAISE WARNING 'Migration 013: jobs.job_code contains duplicate values; unique enforcement skipped';
+    ELSE
+      EXECUTE 'ALTER TABLE jobs ALTER COLUMN job_code SET NOT NULL';
+      EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS ux_jobs_job_code ON jobs(job_code)';
+    END IF;
   END IF;
 END$$;

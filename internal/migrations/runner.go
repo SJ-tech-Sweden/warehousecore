@@ -10,6 +10,7 @@ import (
 )
 
 const blockCommentMarkerLen = 2
+const migrationsAdvisoryLockKey int64 = 871234901
 
 func isForwardMigrationFile(name string) bool {
 	if !strings.HasSuffix(name, ".sql") {
@@ -95,6 +96,17 @@ func execMigrationSQL(execer interface {
 	return err
 }
 
+func acquireMigrationsLock(db *sql.DB) (func(), error) {
+	if _, err := db.Exec("SELECT pg_advisory_lock($1)", migrationsAdvisoryLockKey); err != nil {
+		return nil, err
+	}
+	return func() {
+		if _, err := db.Exec("SELECT pg_advisory_unlock($1)", migrationsAdvisoryLockKey); err != nil {
+			log.Printf("warning: failed to release migration advisory lock: %v", err)
+		}
+	}, nil
+}
+
 func ApplyMigrations(db *sql.DB, dir string) error {
 	files, err := os.ReadDir(dir)
 	if err != nil {
@@ -111,6 +123,11 @@ func ApplyMigrations(db *sql.DB, dir string) error {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`); err != nil {
 		return err
 	}
+	unlock, err := acquireMigrationsLock(db)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	for _, name := range sqlFiles {
 		var exists bool
