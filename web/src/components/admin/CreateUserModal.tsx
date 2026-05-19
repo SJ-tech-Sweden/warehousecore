@@ -49,9 +49,9 @@ export function CreateUserModal({ isOpen, onClose, onCreated, roles }: Props) {
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-60 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-        <div className="relative w-full max-w-2xl bg-dark rounded-xl p-6 border border-white/10 z-70">
+        <div className="relative z-10 w-full max-w-2xl bg-dark rounded-xl p-6 border border-white/10">
           <h3 className="text-2xl font-bold text-white mb-2">{t('admin.rolesTab.createUser')}</h3>
           <p className="text-gray-400 text-sm mb-4">{t('admin.rolesTab.createUserSubtitle')}</p>
 

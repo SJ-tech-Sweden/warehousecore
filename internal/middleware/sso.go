@@ -189,6 +189,10 @@ func SSOMiddleware(next http.Handler) http.Handler {
 						} else {
 							var rcUser models.User
 							if jsonErr := json.Unmarshal(body, &rcUser); jsonErr == nil {
+								if !rcUser.IsActive {
+									http.Error(w, "unauthorized", http.StatusUnauthorized)
+									return
+								}
 								user = rcUser
 							}
 						}
