@@ -10,6 +10,9 @@ import (
 )
 
 const blockCommentMarkerLen = 2
+
+// Arbitrary application-specific advisory lock ID used to serialize startup migrations.
+// Keeping this constant stable ensures all app instances contend on the same lock.
 const migrationsAdvisoryLockKey int64 = 871234901
 
 func isForwardMigrationFile(name string) bool {
