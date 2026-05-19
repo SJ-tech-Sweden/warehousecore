@@ -116,7 +116,14 @@ func acquireMigrationsLock(db *sql.DB) (func(), error) {
 		if time.Now().After(deadline) {
 			return nil, fmt.Errorf("timed out waiting for migration advisory lock after %s", migrationsAdvisoryLockTimeout)
 		}
-		time.Sleep(migrationsAdvisoryLockRetryInterval)
+		sleepFor := migrationsAdvisoryLockRetryInterval
+		if remaining := time.Until(deadline); remaining < sleepFor {
+			sleepFor = remaining
+		}
+		if sleepFor <= 0 {
+			return nil, fmt.Errorf("timed out waiting for migration advisory lock after %s", migrationsAdvisoryLockTimeout)
+		}
+		time.Sleep(sleepFor)
 	}
 	return func() {
 		if _, err := db.Exec("SELECT pg_advisory_unlock($1)", migrationsAdvisoryLockKey); err != nil {
