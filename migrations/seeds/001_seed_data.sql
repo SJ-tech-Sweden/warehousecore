@@ -12,16 +12,16 @@ BEGIN
 	IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'created_at') THEN
 		EXECUTE $q$
 			INSERT INTO products (productID, name, created_at)
-			VALUES (1, 'Widget A', NOW()) ON CONFLICT DO NOTHING;
-			INSERT INTO products (productID, name, created_at)
-			VALUES (2, 'Cable 1m', NOW()) ON CONFLICT DO NOTHING;
+			VALUES (1, 'Widget A', NOW()),
+			       (2, 'Cable 1m', NOW())
+			ON CONFLICT DO NOTHING;
 		$q$;
 	ELSE
 		EXECUTE $q$
 			INSERT INTO products (productID, name)
-			VALUES (1, 'Widget A') ON CONFLICT DO NOTHING;
-			INSERT INTO products (productID, name)
-			VALUES (2, 'Cable 1m') ON CONFLICT DO NOTHING;
+			VALUES (1, 'Widget A'),
+			       (2, 'Cable 1m')
+			ON CONFLICT DO NOTHING;
 		$q$;
 	END IF;
 END$$;

@@ -1,5 +1,6 @@
+import { API_BASE_URL } from './api';
+
 const DEFAULT_COMPANY_NAME = 'WarehouseCore';
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 function normalizeString(value: unknown): string {
   if (typeof value !== 'string') return '';

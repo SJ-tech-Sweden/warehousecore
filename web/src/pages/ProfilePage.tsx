@@ -231,18 +231,18 @@ export function ProfilePage() {
             <p className="text-gray-400 text-sm">{t('profilePage.changePasswordHelp')}</p>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.currentPassword')}</label>
-              <input type="password" autoComplete="current-password" value={pwCurrent} onChange={(e)=>setPwCurrent(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <label htmlFor="profile-current-password" className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.currentPassword')}</label>
+              <input id="profile-current-password" type="password" autoComplete="current-password" required value={pwCurrent} onChange={(e)=>setPwCurrent(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.newPassword')}</label>
-              <input type="password" autoComplete="new-password" value={pwNew} onChange={(e)=>setPwNew(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <label htmlFor="profile-new-password" className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.newPassword')}</label>
+              <input id="profile-new-password" type="password" autoComplete="new-password" required value={pwNew} onChange={(e)=>setPwNew(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.confirmPassword')}</label>
-              <input type="password" autoComplete="new-password" value={pwConfirm} onChange={(e)=>setPwConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
+              <label htmlFor="profile-confirm-password" className="block text-sm font-semibold text-gray-400 mb-2">{t('profilePage.confirmPassword')}</label>
+              <input id="profile-confirm-password" type="password" autoComplete="new-password" required value={pwConfirm} onChange={(e)=>setPwConfirm(e.target.value)} className="w-full px-4 py-3 rounded-xl glass text-white" />
             </div>
 
             <div className="pt-2">
