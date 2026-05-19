@@ -71,9 +71,9 @@ func TestApplyMigrations_RollsBackFailedMigration(t *testing.T) {
 
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
+	mock.ExpectQuery(`SELECT pg_try_advisory_lock\(\$1\)`).
 		WithArgs(migrationsAdvisoryLockKey).
-		WillReturnResult(sqlmock.NewResult(0, 0))
+		WillReturnRows(sqlmock.NewRows([]string{"pg_try_advisory_lock"}).AddRow(true))
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM schema_migrations WHERE name = \$1\)`).
 		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
@@ -110,9 +110,9 @@ func TestApplyMigrations_SelfManagedTransactionExecutesWithoutWrapperTx(t *testi
 
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
+	mock.ExpectQuery(`SELECT pg_try_advisory_lock\(\$1\)`).
 		WithArgs(migrationsAdvisoryLockKey).
-		WillReturnResult(sqlmock.NewResult(0, 0))
+		WillReturnRows(sqlmock.NewRows([]string{"pg_try_advisory_lock"}).AddRow(true))
 	mock.ExpectQuery(`SELECT EXISTS\(SELECT 1 FROM schema_migrations WHERE name = \$1\)`).
 		WithArgs(name).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))

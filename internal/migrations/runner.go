@@ -2,11 +2,13 @@ package migrations
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 const blockCommentMarkerLen = 2
@@ -14,6 +16,8 @@ const blockCommentMarkerLen = 2
 // Arbitrary application-specific advisory lock ID used to serialize startup migrations.
 // Keeping this constant stable ensures all app instances contend on the same lock.
 const migrationsAdvisoryLockKey int64 = 871234901
+const migrationsAdvisoryLockTimeout = 2 * time.Minute
+const migrationsAdvisoryLockRetryInterval = time.Second
 
 func isForwardMigrationFile(name string) bool {
 	if !strings.HasSuffix(name, ".sql") {
@@ -100,8 +104,19 @@ func execMigrationSQL(execer interface {
 }
 
 func acquireMigrationsLock(db *sql.DB) (func(), error) {
-	if _, err := db.Exec("SELECT pg_advisory_lock($1)", migrationsAdvisoryLockKey); err != nil {
-		return nil, err
+	deadline := time.Now().Add(migrationsAdvisoryLockTimeout)
+	for {
+		var locked bool
+		if err := db.QueryRow("SELECT pg_try_advisory_lock($1)", migrationsAdvisoryLockKey).Scan(&locked); err != nil {
+			return nil, err
+		}
+		if locked {
+			break
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("timed out waiting for migration advisory lock after %s", migrationsAdvisoryLockTimeout)
+		}
+		time.Sleep(migrationsAdvisoryLockRetryInterval)
 	}
 	return func() {
 		if _, err := db.Exec("SELECT pg_advisory_unlock($1)", migrationsAdvisoryLockKey); err != nil {

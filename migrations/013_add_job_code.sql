@@ -33,7 +33,7 @@ BEGIN
     IF EXISTS (
       SELECT 1
       FROM jobs
-      WHERE job_code IS NULL OR job_code = ''
+      WHERE job_code IS NULL OR TRIM(job_code) = ''
     ) THEN
       RAISE WARNING 'Migration 013: jobs.job_code still contains NULL/empty values; NOT NULL and unique index enforcement skipped';
     ELSIF EXISTS (
