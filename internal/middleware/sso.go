@@ -170,7 +170,7 @@ func SSOMiddleware(next http.Handler) http.Handler {
 		// Optionally fetch authoritative user data from RentalCore API when local lookup misses.
 		// When configured, RentalCore becomes authoritative for users missing in local DB.
 		if !localUserLoaded && os.Getenv("RENTALCORE_BASE_URL") != "" {
-			rentalcoreUserLoaded := false
+			rentalCoreUserLoaded := false
 			rcBase := strings.TrimSuffix(os.Getenv("RENTALCORE_BASE_URL"), "/")
 			url := fmt.Sprintf("%s/api/v1/security/auth/users/%d", rcBase, claims.UserID)
 			req, reqErr := http.NewRequest(http.MethodGet, url, nil)
@@ -196,13 +196,14 @@ func SSOMiddleware(next http.Handler) http.Handler {
 									return
 								}
 								user = rcUser
-								rentalcoreUserLoaded = true
+								rentalCoreUserLoaded = true
 							}
 						}
 					}
 				}
 			}
-			if !rentalcoreUserLoaded {
+			if !rentalCoreUserLoaded {
+				log.Printf("[SSO] RentalCore user verification failed for userID=%d", claims.UserID)
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
