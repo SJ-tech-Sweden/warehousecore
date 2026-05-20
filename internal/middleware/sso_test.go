@@ -329,3 +329,45 @@ func TestSSOMiddleware_DeniesInactiveRentalCoreUser(t *testing.T) {
 		t.Fatalf("expected 401 Unauthorized, got %d", rr.Code)
 	}
 }
+
+func TestSSOMiddleware_DeniesWhenRentalCoreLookupFails(t *testing.T) {
+	os.Setenv("SSO_JWT_SECRET", "test-secret-sso")
+	defer os.Unsetenv("SSO_JWT_SECRET")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	os.Setenv("RENTALCORE_BASE_URL", server.URL)
+	defer os.Unsetenv("RENTALCORE_BASE_URL")
+
+	claims := ssoClaims{
+		UserID:   303,
+		Username: "remote-missing",
+		Exp:      time.Now().Add(1 * time.Hour).Unix(),
+		Iat:      time.Now().Unix(),
+	}
+	s, err := signHS256(claims, ssoSigningKey())
+	if err != nil {
+		t.Fatalf("failed to sign token: %v", err)
+	}
+
+	nextCalled := false
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "sso_token", Value: s})
+	rr := httptest.NewRecorder()
+
+	handler := SSOMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler.ServeHTTP(rr, req)
+
+	if nextCalled {
+		t.Fatalf("expected middleware to block request when RentalCore lookup fails")
+	}
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized, got %d", rr.Code)
+	}
+}
